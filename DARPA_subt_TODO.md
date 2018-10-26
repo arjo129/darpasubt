@@ -26,3 +26,4 @@
 3. SLAM with LIDAR - Arjo
 4. Acoustics localisation - Arjo/Marcus
 5. Bluetooth/ WiFI beacons - Wilson/Tze Guang
+6. Compass correction - Unassigned
