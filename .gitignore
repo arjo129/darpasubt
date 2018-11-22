@@ -1,0 +1,13 @@
+# Python-specific
+*.pyc
+__pycache__/
+*.swo
+*.swp
+
+# ROS-specific
+build/
+devel/
+install/
+
+# Others
+src/subt
