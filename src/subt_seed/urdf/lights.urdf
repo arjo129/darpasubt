@@ -4,29 +4,24 @@
   <xacro:include filename="$(find subt_gazebo)/urdf/flashlight.urdf.xacro" />
   <xacro:include filename="$(find subt_gazebo)/urdf/led.urdf.xacro" />
 
-  <xacro:flashlight flashlight_prefix="right" parent_link="base_link">
-    <pose>0.3 -0.3 0.3 0 ${M_PI*0.5} ${-M_PI*0.1}</pose>
+  <xacro:flashlight flashlight_prefix="right" parent_link="base_link" xyz="0.3 -0.3 0.3" rpy="0 ${M_PI*0.5} ${-M_PI*0.1}">
     <plugin_params></plugin_params>
   </xacro:flashlight>
-  <xacro:flashlight flashlight_prefix="downward" parent_link="base_link">
-    <pose>0.4 0 0.4 0 ${M_PI*0.6} 0</pose>
+  <xacro:flashlight flashlight_prefix="downward" parent_link="base_link" xyz="0.4 0 0.4" rpy="0 ${M_PI*0.6} 0">
     <plugin_params></plugin_params>
   </xacro:flashlight>
-  <xacro:flashlight flashlight_prefix="left" parent_link="base_link">
-    <pose>0.3 0.3 0.3 0 ${M_PI*0.5} ${M_PI*0.1}</pose>
+  <xacro:flashlight flashlight_prefix="left" parent_link="base_link" xyz="0.3 0.3 0.3" rpy="0 ${M_PI*0.5} ${M_PI*0.1}">
     <plugin_params></plugin_params>
   </xacro:flashlight>
 
-  <xacro:led led_prefix="right" parent_link="base_link">
-    <pose>-0.3 -0.3 0.3 0 0 0</pose>
+  <xacro:led led_prefix="right" parent_link="base_link" xyz="-0.3 -0.3 0.3" rpy="0 0 0">
     <plugin_params>
       <duration>0.3</duration>
       <interval>0.3</interval>
       <color>1 0.8 0</color>
     </plugin_params>
   </xacro:led>
-  <xacro:led led_prefix="center" parent_link="base_link">
-    <pose>-0.3 0 0.3 0 0 0</pose>
+  <xacro:led led_prefix="center" parent_link="base_link" xyz="-0.3 0 0.3" rpy="0 0 0">
     <plugin_params>
       <block>
         <duration>0.1</duration>
@@ -45,8 +40,7 @@
       </block>
     </plugin_params>
   </xacro:led>
-  <xacro:led led_prefix="left" parent_link="base_link">
-    <pose>-0.3 0.3 0.3 0 0 0</pose>
+  <xacro:led led_prefix="left" parent_link="base_link" xyz="-0.3 0.3 0.3" rpy="0 0 0">
     <plugin_params>
       <duration>0.3</duration>
       <interval>0.3</interval>
