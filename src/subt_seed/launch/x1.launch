@@ -18,5 +18,7 @@
   <!-- Launch your controller nodes -->
   <node name="$(arg x2_name)_control" pkg="subt_seed" type="subt_seed_node" args="$(arg x2_name)" />
 
+  <!-- Start RViz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find subt_seed)/rviz/x2.rviz" />
 
 </launch>
