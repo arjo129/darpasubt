@@ -1,17 +1,22 @@
 <?xml version="1.0"?>
 <launch>
   <!-- Arguments -->
-  <arg name="robot_name" default="X1_1" />
+  <arg name="x2_name" default="X2" />
 
   <!-- Spawn your team here. -->
-  <include file="$(find x1_gazebo)/launch/spawn_x1.launch">
-    <arg name="robot_namespace" value="$(arg robot_name)"/>
-    <arg name="x" value="1"/>
-    <arg name="y" value="1"/>
-  </include>
+  <group ns="$(arg x2_name)">
+    <include file="$(find x2_description)/launch/description.launch">
+      <arg name="robot_namespace" value="$(arg x2_name)" />
+    </include>
+    <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model"
+          args="-urdf -model $(arg x2_name) -param robot_description -x 0 -y 1 -z 0.2" />
+    <include file="$(find x2_control)/launch/control.launch">
+      <arg name="robot_namespace" value="$(arg x2_name)" />
+    </include>
+  </group>
 
   <!-- Launch your controller nodes -->
-  <node name="$(arg robot_name)_control" pkg="subt_seed" type="subt_seed_node" args="$(arg robot_name)" />
+  <node name="$(arg x2_name)_control" pkg="subt_seed" type="subt_seed_node" args="$(arg x2_name)" />
 
 
 </launch>
