@@ -61,6 +61,12 @@ target_link_libraries(subt_seed_node ${catkin_LIBRARIES})
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch)
 
+install(DIRECTORY rviz/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/rviz)
+
+install(DIRECTORY urdf/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/urdf)
+
 # Mark executables and/or libraries for installation
 install(TARGETS subt_seed_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
