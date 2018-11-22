@@ -21,4 +21,9 @@
   <!-- Start RViz -->
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find subt_seed)/rviz/x2.rviz" />
 
+  <node name="rosservice_left_headlight" pkg="rosservice" type="rosservice" args="call /$(arg x2_name)/left_headlight/enable 'data: true'" />
+  <node name="rosservice_center_left_headlight" pkg="rosservice" type="rosservice" args="call /$(arg x2_name)/center_left_headlight/enable 'data: true'" />
+  <node name="rosservice_center_right_headlight" pkg="rosservice" type="rosservice" args="call /$(arg x2_name)/center_right_headlight/enable 'data: true'" />
+  <node name="rosservice_right_headlight" pkg="rosservice" type="rosservice" args="call /$(arg x2_name)/right_headlight/enable 'data: true'" />
+
 </launch>
