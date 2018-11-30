@@ -34,7 +34,12 @@
     <folder Name="Application">
       <file file_name="../main.c" />
       <file file_name="../config/sdk_config.h" />
-      <file file_name="../ss_resp_main.c" />
+      <file file_name="../ss_resp_main.c">
+        <configuration
+          Name="nrf52832_xxaa"
+          c_additional_options=""
+          c_only_additional_options="" />
+      </file>
     </folder>
     <folder Name="Board Definition">
       <file file_name="../../../nRF5_SDK_14.2.0/components/boards/boards.c" />
