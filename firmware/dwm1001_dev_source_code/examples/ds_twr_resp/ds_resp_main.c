@@ -102,7 +102,7 @@ int ss_resp_run(void)
   /* Poll for reception of a frame or error/timeout. See NOTE 5 below. */
   while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
   {};
-
+  printf("hi");
     #if 0	  // Include to determine the type of timeout if required.
     int temp = 0;
     // (frame wait timeout and preamble detect timeout)
