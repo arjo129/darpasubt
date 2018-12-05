@@ -25,6 +25,7 @@
 #include "nordic_common.h"
 #include "nrf_drv_clock.h"
 #include "nrf_drv_spi.h"
+#include "nrf_uart.h"
 #include "app_util_platform.h"
 #include "nrf_gpio.h"
 #include "nrf_delay.h"
@@ -125,6 +126,10 @@ int main(void)
 
   /* Setup DW1000 IRQ pin */
   nrf_gpio_cfg_input(DW1000_IRQ, NRF_GPIO_PIN_NOPULL); 		//irq
+
+  /*Initialization UART*/
+  boUART_Init ();
+  printf("Double Sided Two Way Ranging Response Example \r\n");
 
   /* Reset DW1000 */
   reset_DW1000(); 
