@@ -25,7 +25,7 @@
 #include "nordic_common.h"
 #include "nrf_drv_clock.h"
 #include "nrf_drv_spi.h"
-#include "nrf_uart.h"
+#include "nrf_uart.h" 
 #include "app_util_platform.h"
 #include "nrf_gpio.h"
 #include "nrf_delay.h"
@@ -39,6 +39,7 @@
 #include "deca_param_types.h"
 #include "deca_regs.h"
 #include "deca_device_api.h"
+#include "UART.h"
 
 // Defines ---------------------------------------------
 
@@ -65,8 +66,8 @@ static dwt_config_t config = {
 #define TIMER_PERIOD      2000          /**< Timer period. LED1 timer will expire after 1000 ms */
 
 #ifdef USE_FREERTOS
-  TaskHandle_t  ss_responder_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
-  extern void ss_responder_task_function (void * pvParameter);
+  TaskHandle_t  ds_responder_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
+  extern void ds_responder_task_function (void * pvParameter);
   TaskHandle_t  led_toggle_task_handle;   /**< Reference to LED0 toggling FreeRTOS task. */
   TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS timer. */
 #else
@@ -119,7 +120,7 @@ int main(void)
     UNUSED_VARIABLE(xTimerStart(led_toggle_timer_handle, 0));
 
     /* Create task for SS TWR Initiator set to 2 */
-    UNUSED_VARIABLE(xTaskCreate(ss_responder_task_function, "SSTWR_RESP", configMINIMAL_STACK_SIZE + 200, NULL, 2, &ss_responder_task_handle)); 
+    UNUSED_VARIABLE(xTaskCreate(ds_responder_task_function, "SSTWR_RESP", configMINIMAL_STACK_SIZE + 200, NULL, 2, &ds_responder_task_handle)); 
   #endif  // #ifdef USE_FREERTOS
 
   //-------------dw1000  ini------------------------------------	
@@ -129,7 +130,6 @@ int main(void)
 
   /*Initialization UART*/
   boUART_Init ();
-  printf("Double Sided Two Way Ranging Response Example \r\n");
 
   /* Reset DW1000 */
   reset_DW1000(); 
