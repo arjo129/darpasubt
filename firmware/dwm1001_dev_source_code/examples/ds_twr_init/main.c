@@ -69,8 +69,8 @@ static dwt_config_t config = {
 
 #ifdef USE_FREERTOS
 
-TaskHandle_t  ss_initiator_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
-extern void ss_initiator_task_function (void * pvParameter);
+TaskHandle_t  ds_initiator_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
+extern void ds_initiator_task_function (void * pvParameter);
 TaskHandle_t  led_toggle_task_handle;   /**< Reference to LED0 toggling FreeRTOS task. */
 TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS timer. */
 #endif
@@ -123,7 +123,7 @@ int main(void)
     UNUSED_VARIABLE(xTimerStart(led_toggle_timer_handle, 0));
 
     /* Create task for SS TWR Initiator set to 2 */
-    UNUSED_VARIABLE(xTaskCreate(ss_initiator_task_function, "SSTWR_INIT", configMINIMAL_STACK_SIZE + 200, NULL, 2, &ss_initiator_task_handle));
+    UNUSED_VARIABLE(xTaskCreate(ds_initiator_task_function, "SSTWR_INIT", configMINIMAL_STACK_SIZE + 200, NULL, 2, &ds_initiator_task_handle));
   #endif // #ifdef USE_FREERTOS
   
   //-------------dw1000  ini------------------------------------	
