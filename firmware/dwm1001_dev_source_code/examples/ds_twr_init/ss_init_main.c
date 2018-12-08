@@ -33,23 +33,23 @@
 #define RNG_DELAY_MS 100
 
 /* Frames used in the ranging process. See NOTE 1,2 below. */
-static uint8 initiatorMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 responderMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 initiatorMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 responderMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 // static uint8 finalMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
 /* Indexes to access some of the fields in the frames defined above. */
 #define ALL_MSG_SN_IDX 2
 #define INIT_TX_1_TS_IDX 10
-#define INIT_RX_1_TS_IDX 14
-#define INIT_TX_2_TS_IDX 18
-#define RESP_MSG_TS_LEN 4
+#define INIT_RX_1_TS_IDX 15
+#define INIT_TX_2_TS_IDX 20
+#define RESP_MSG_TS_LEN 5
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 24 // TODO: Fix the appropriate length
+#define RX_BUF_LEN 30 // TODO: Fix the appropriate length
 static uint8 rx_buffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -72,7 +72,9 @@ static double tof;
 static double distance;
 
 /* Declaration of static functions. */
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
+static uint64 getRxTimestampU64(void);
+static uint64 getTxTimestampU64(void);
+static void resp_msg_get_ts(uint8 *ts_field, uint64 *ts);
 static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
 
 /*Transactions Counters */
@@ -147,13 +149,13 @@ int ss_init_run(void)
     if (memcmp(rx_buffer, responderMessage, ALL_MSG_COMMON_LEN) == 0) {	
       rxCount++;
       printf("Initiator - Reception # : %d\r\n", rxCount);
-      uint32 initTxTimestamp1, initRxTimestamp1, respRxTimestamp1, respTxTimestamp1, initTxTimestamp2, initTxDelay;
+      uint64 initTxTimestamp1, initRxTimestamp1, respRxTimestamp1, respTxTimestamp1, initTxTimestamp2, initTxDelay;
       int32 rtd_init, rtd_resp;
       int ret;
 
       /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
-      initTxTimestamp1 = dwt_readtxtimestamplo32();
-      initRxTimestamp1 = dwt_readrxtimestamplo32();
+      initTxTimestamp1 = getTxTimestampU64();
+      initRxTimestamp1 = getRxTimestampU64();
 
       /* Get timestamps embedded in response message. */
       // resp_msg_get_ts(&rx_buffer[RESP_TX_1_TS_IDX], &respRxTimestamp1);
@@ -224,6 +226,54 @@ int ss_init_run(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
+* @fn getRxTimestampU64()
+*
+* @brief Get the RX time-stamp in a 64-bit variable.
+*        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+*
+* @param  none
+*
+* @return  64-bit value of the read time-stamp.
+*/
+static uint64 getRxTimestampU64(void)
+{
+  uint8 ts_tab[5];
+  uint64 ts = 0;
+  int i;
+  dwt_readrxtimestamp(ts_tab);
+  for (i = 4; i >= 0; i--)
+  {
+    ts <<= 8;
+    ts |= ts_tab[i];
+  }
+  return ts;
+}
+
+/*! ------------------------------------------------------------------------------------------------------------------
+* @fn getTxTimestampU64()
+*
+* @brief Get the TX time-stamp in a 64-bit variable.
+*        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+*
+* @param  none
+*
+* @return  64-bit value of the read time-stamp.
+*/
+static uint64 getTxTimestampU64(void)
+{
+  uint8 ts_tab[5];
+  uint64 ts = 0;
+  int i;
+  dwt_readtxtimestamp(ts_tab);
+  for (i = 4; i >= 0; i--)
+  {
+    ts <<= 8;
+    ts |= ts_tab[i];
+  }
+  return ts;
+}
+
+/*! ------------------------------------------------------------------------------------------------------------------
 * @fn final_msg_set_ts()
 *
 * @brief Fill a given timestamp field in the response message with the given value. In the timestamp fields of the
@@ -254,7 +304,7 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts)
 *
 * @return none
 */
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
+static void resp_msg_get_ts(uint8 *ts_field, uint64 *ts)
 {
   int i;
   *ts = 0;

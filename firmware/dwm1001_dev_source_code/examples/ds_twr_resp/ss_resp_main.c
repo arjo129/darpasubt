@@ -30,8 +30,8 @@
 #define RNG_DELAY_MS 80
 
 /* Frames used in the ranging process. See NOTE 2,3 below. */
-static uint8 initiatorMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 responderMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 initiatorMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 responderMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -39,16 +39,16 @@ static uint8 responderMessage[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A'
 /* Index to access some of the fields in the frames involved in the process. */
 #define ALL_MSG_SN_IDX 2
 #define INIT_TX_1_TS_IDX 10
-#define INIT_RX_1_TS_IDX 14
-#define INIT_TX_2_TS_IDX 18
-#define RESP_MSG_TS_LEN 4	
+#define INIT_RX_1_TS_IDX 15
+#define INIT_TX_2_TS_IDX 20
+#define RESP_MSG_TS_LEN 5
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 24 // TODO: Fix the appropriate length
+#define RX_BUF_LEN 30 // TODO: Fix the appropriate length
 static uint8 rx_buffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -77,9 +77,10 @@ static uint64 respRxTimestamp1;
 
 /* Declaration of static functions. */
 //static uint64 get_tx_timestamp_u64(void);
-static uint64 get_rx_timestamp_u64(void);
+static uint64 getRxTimestampU64(void);
+static uint64 getTxTimestampU64(void);
 static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
+static void resp_msg_get_ts(uint8 *ts_field, uint64 *ts);
 
 /* Timestamps of frames transmission/reception.
 * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
@@ -145,11 +146,11 @@ int ss_resp_run(void)
     if (memcmp(rx_buffer, initiatorMessage, ALL_MSG_COMMON_LEN) == 0){
       firstRxCount++;
       printf("Responder - 1st Reception # : %d\r\n", firstRxCount);
-      uint32 respTxDelay;
+      uint64 respTxDelay;
       int ret;
 
       /* Retrieve poll reception timestamp. */
-      respRxTimestamp1 = get_rx_timestamp_u64();
+      respRxTimestamp1 = getRxTimestampU64();
 
       /* Compute final message transmission time. See NOTE 7 below. */
       respTxDelay = (respRxTimestamp1 + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
@@ -172,6 +173,8 @@ int ss_resp_run(void)
 
       /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. */
       if (ret == DWT_SUCCESS) {
+      printf("\r\nResp RX1 = %u\r\n", respRxTimestamp1);
+      printf("\r\nResp TX1 = %u\r\n", respTxTimestamp1);
         /* Poll DW1000 until TX frame sent event set. See NOTE 5 below. */
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
 
@@ -228,12 +231,12 @@ int ss_resp_run(void)
     if (memcmp(rx_buffer, initiatorMessage, ALL_MSG_COMMON_LEN) == 0) {
       secondRxCount++;
       printf("Responder - 2nd Reception # : %d\r\n", secondRxCount);
-      uint32 initTxTimestamp1, initRxTimestamp1, initTxTimestamp2, respRxTimeStamp2;
+printf("Resp - RX1 = %u\r\n", respRxTimestamp1);
+      uint64 initTxTimestamp1, initRxTimestamp1, initTxTimestamp2, respRxTimeStamp2;
       int32 roundTrip1, roundTrip2, replyTrip1, replyTrip2;
       float clockOffsetRatio;
-
       /* Retrieve the final reception timestamp */
-      respRxTimeStamp2 = dwt_readrxtimestamplo32();
+      respRxTimeStamp2 = getRxTimestampU64();
       /* Read carrier integrator value and calculate clock offset ratio. See NOTE 7 below. */
       clockOffsetRatio = dwt_readcarrierintegrator() * (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6) ;
 
@@ -248,11 +251,19 @@ int ss_resp_run(void)
       roundTrip2 = respRxTimeStamp2 - respTxTimestamp1;
       replyTrip2 = initTxTimestamp2 - initRxTimestamp1;
 
+      // printf("print timestamps\r\n");
+      // printf("Init - TX1 = %u\r\n", initTxTimestamp1 * DWT_TIME_UNITS);
+      // printf("Resp - RX1 = %u\r\n", respRxTimestamp1 * DWT_TIME_UNITS);
+      // printf("Resp - TX1 = %u\r\n", respTxTimestamp1 * DWT_TIME_UNITS);
+      // printf("Init - RX1 = %u\r\n", initRxTimestamp1 * DWT_TIME_UNITS);
+      // printf("Init - TX2 = %u\r\n", initTxTimestamp2 * DWT_TIME_UNITS);
+      // printf("Resp - RX2 = %u\r\n\n", respRxTimeStamp2 * DWT_TIME_UNITS);
+
       replyTrip1 = replyTrip1 * (1.0f - clockOffsetRatio);
       replyTrip2 = replyTrip2 * (1.0f - clockOffsetRatio);
       tof = ((roundTrip1 * roundTrip2) - (replyTrip1 * replyTrip2)) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
-      distance = tof * SPEED_OF_LIGHT;
-      printf("Distance : %f\r\n", distance);
+      distance = tof * DWT_TIME_UNITS * SPEED_OF_LIGHT;
+      printf("Distance : %f\r\n\n", distance);
     }
 
   }
@@ -261,7 +272,7 @@ int ss_resp_run(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
-* @fn get_rx_timestamp_u64()
+* @fn getRxTimestampU64()
 *
 * @brief Get the RX time-stamp in a 64-bit variable.
 *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
@@ -270,12 +281,36 @@ int ss_resp_run(void)
 *
 * @return  64-bit value of the read time-stamp.
 */
-static uint64 get_rx_timestamp_u64(void)
+static uint64 getRxTimestampU64(void)
 {
   uint8 ts_tab[5];
   uint64 ts = 0;
   int i;
   dwt_readrxtimestamp(ts_tab);
+  for (i = 4; i >= 0; i--)
+  {
+    ts <<= 8;
+    ts |= ts_tab[i];
+  }
+  return ts;
+}
+
+/*! ------------------------------------------------------------------------------------------------------------------
+* @fn getTxTimestampU64()
+*
+* @brief Get the TX time-stamp in a 64-bit variable.
+*        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+*
+* @param  none
+*
+* @return  64-bit value of the read time-stamp.
+*/
+static uint64 getTxTimestampU64(void)
+{
+  uint8 ts_tab[5];
+  uint64 ts = 0;
+  int i;
+  dwt_readtxtimestamp(ts_tab);
   for (i = 4; i >= 0; i--)
   {
     ts <<= 8;
@@ -314,7 +349,7 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts)
 *         ts  timestamp value
 *
 * @return none
-*/static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
+*/static void resp_msg_get_ts(uint8 *ts_field, uint64 *ts)
 {
   int i;
   *ts = 0;

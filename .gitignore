@@ -1,3 +1,4 @@
 # For DWM1001 related
 **/SES/Output/**
+**/*.emSession
 /firmware/dwm1001_dev_source_code/.vscode/
