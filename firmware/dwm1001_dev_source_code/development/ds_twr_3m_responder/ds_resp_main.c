@@ -30,9 +30,9 @@
 #define RNG_DELAY_MS 80
 
 /* Frames used in the ranging process. See NOTE 2,3 below. */
-static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 rx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 initiatorFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
+static uint8 responderMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 initiatorFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -74,21 +74,21 @@ static uint32 status_reg = 0;
 * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
 typedef signed long long int64;
 typedef unsigned long long uint64;
-static uint64 poll_rx_ts;
-static uint64 resp_tx_ts;
-static uint64 final_rx_ts;
+static uint64 respRxTimestamp1;
+static uint64 respTxTimestamp1;
+static uint64 respRxTimestamp2;
 
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
 
 /* Hold copies of computed time of flight and distance here for reference so that it can be examined at a debug breakpoint. */
-static double tof;
-static double distance;
+static double timeOfFlight;
+static double distanceMetre;
 
 /* Declaration of static functions. */
-static uint64 get_tx_timestamp_u64(void);
-static uint64 get_rx_timestamp_u64(void);
-static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
+static uint64 getTxTimestampU64(void);
+static uint64 getRxTimestampU64(void);
+static void finalMsgGetTs(const uint8 *ts_field, uint32 *ts);
 
 /*! ------------------------------------------------------------------------------------------------------------------
 * @fn main()
@@ -130,16 +130,16 @@ int ss_resp_run(void)
     /* Check that the frame is a poll sent by "SS TWR initiator" example.
     * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
     rx_buffer[ALL_MSG_SN_IDX] = 0;
-    if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
+    if (memcmp(rx_buffer, initiatorFirstMsg, ALL_MSG_COMMON_LEN) == 0)
     {
       uint32 resp_tx_time;
       int ret;
 
       /* Retrieve poll reception timestamp. */
-      poll_rx_ts = get_rx_timestamp_u64();
+      respRxTimestamp1 = getRxTimestampU64();
 
       /* Set send time for response. See NOTE 9 below. */
-      resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+      resp_tx_time = (respRxTimestamp1 + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
       dwt_setdelayedtrxtime(resp_tx_time);
 
       /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
@@ -147,9 +147,9 @@ int ss_resp_run(void)
       dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
 
       /* Write and send the response message. See NOTE 10 below. */
-      tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-      dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
-      dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
+      responderMsg[ALL_MSG_SN_IDX] = frame_seq_nb;
+      dwt_writetxdata(sizeof(responderMsg), responderMsg, 0);
+      dwt_writetxfctrl(sizeof(responderMsg), 0, 1);
       ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 
       /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
@@ -180,38 +180,38 @@ int ss_resp_run(void)
           /* Check that the frame is a final message sent by "DS TWR initiator" example.
             * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
           rx_buffer[ALL_MSG_SN_IDX] = 0;
-          if (memcmp(rx_buffer, rx_final_msg, ALL_MSG_COMMON_LEN) == 0)
+          if (memcmp(rx_buffer, initiatorFinalMsg, ALL_MSG_COMMON_LEN) == 0)
           {
-              uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
-              uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
-              double Ra, Rb, Da, Db;
-              int64 tof_dtu;
+              uint32 initTxTimestamp1, initRxTimestamp1, initTxTimestamp2;
+              uint32 respRxTimestamp1_32, respTxTimestamp1_32, respRxTimestamp2_32;
+              double roundTrip1, roundTrip2, replyTrip2, replyTrip1;
+              int64 timeOfFlightInUnits;
 
               /* Retrieve response transmission and final reception timestamps. */
-              resp_tx_ts = get_tx_timestamp_u64();
-              final_rx_ts = get_rx_timestamp_u64();
+              respTxTimestamp1 = getTxTimestampU64();
+              respRxTimestamp2 = getRxTimestampU64();
 
               /* Get timestamps embedded in the final message. */
-              final_msg_get_ts(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &poll_tx_ts);
-              final_msg_get_ts(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &resp_rx_ts);
-              final_msg_get_ts(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &final_tx_ts);
+              finalMsgGetTs(&rx_buffer[FINAL_MSG_POLL_TX_TS_IDX], &initTxTimestamp1);
+              finalMsgGetTs(&rx_buffer[FINAL_MSG_RESP_RX_TS_IDX], &initRxTimestamp1);
+              finalMsgGetTs(&rx_buffer[FINAL_MSG_FINAL_TX_TS_IDX], &initTxTimestamp2);
 
               /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
-              poll_rx_ts_32 = (uint32)poll_rx_ts;
-              resp_tx_ts_32 = (uint32)resp_tx_ts;
-              final_rx_ts_32 = (uint32)final_rx_ts;
-              Ra = (double)(resp_rx_ts - poll_tx_ts);
-              Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
-              Da = (double)(final_tx_ts - resp_rx_ts);
-              Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
-              tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+              respRxTimestamp1_32 = (uint32)respRxTimestamp1;
+              respTxTimestamp1_32 = (uint32)respTxTimestamp1;
+              respRxTimestamp2_32 = (uint32)respRxTimestamp2;
+              roundTrip1 = (double)(initRxTimestamp1 - initTxTimestamp1);
+              roundTrip2 = (double)(respRxTimestamp2_32 - respTxTimestamp1_32);
+              replyTrip2 = (double)(initTxTimestamp2 - initRxTimestamp1);
+              replyTrip1 = (double)(respTxTimestamp1_32 - respRxTimestamp1_32);
+              timeOfFlightInUnits = (int64)((roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2));
 
-              tof = tof_dtu * DWT_TIME_UNITS;
-              distance = tof * SPEED_OF_LIGHT;
+              timeOfFlight = timeOfFlightInUnits * DWT_TIME_UNITS;
+              distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
 
-              // printf("Distance = %f m\r\n", distance);
+              // printf("Distance = %f m\r\n", distanceMetre);
               // printf("\n");
-              printf("%f\r\n", distance);
+              printf("%f m\r\n", distanceMetre);
           }
       }
       else
@@ -237,7 +237,7 @@ int ss_resp_run(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_tx_timestamp_u64()
+ * @fn getTxTimestampU64()
  *
  * @brief Get the TX time-stamp in a 64-bit variable.
  *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
@@ -246,7 +246,7 @@ int ss_resp_run(void)
  *
  * @return  64-bit value of the read time-stamp.
  */
-static uint64 get_tx_timestamp_u64(void)
+static uint64 getTxTimestampU64(void)
 {
     uint8 ts_tab[5];
     uint64 ts = 0;
@@ -261,7 +261,7 @@ static uint64 get_tx_timestamp_u64(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
-* @fn get_rx_timestamp_u64()
+* @fn getRxTimestampU64()
 *
 * @brief Get the RX time-stamp in a 64-bit variable.
 *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
@@ -270,7 +270,7 @@ static uint64 get_tx_timestamp_u64(void)
 *
 * @return  64-bit value of the read time-stamp.
 */
-static uint64 get_rx_timestamp_u64(void)
+static uint64 getRxTimestampU64(void)
 {
   uint8 ts_tab[5];
   uint64 ts = 0;
@@ -285,7 +285,7 @@ static uint64 get_rx_timestamp_u64(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_get_ts()
+ * @fn finalMsgGetTs()
  *
  * @brief Read a given timestamp value from the final message. In the timestamp fields of the final message, the least
  *        significant byte is at the lower address.
@@ -295,7 +295,7 @@ static uint64 get_rx_timestamp_u64(void)
  *
  * @return none
  */
-static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts)
+static void finalMsgGetTs(const uint8 *ts_field, uint32 *ts)
 {
     int i;
     *ts = 0;
@@ -328,7 +328,7 @@ void ss_responder_task_function (void * pvParameter)
  * NOTES:
  *
  * 4. Delays between frames have been chosen here to ensure proper synchronisation of transmission and reception of the frames between the initiator
- *    and the responder and to ensure a correct accuracy of the computed distance. The user is referred to DecaRanging ARM Source Code Guide for more
+ *    and the responder and to ensure a correct accuracy of the computed distance. The user is referred to DecaroundTrip1nging ARM Source Code Guide for more
  *    details about the timings involved in the ranging process.
  * 5. This timeout is for complete reception of a frame, i.e. timeout duration must take into account the length of the expected frame. Here the value
  *    is arbitrary but chosen large enough to make sure that there is enough time to receive the complete final frame sent by the responder at the
@@ -352,6 +352,6 @@ void ss_responder_task_function (void * pvParameter)
  * 12. The high order byte of each 40-bit time-stamps is discarded here. This is acceptable as, on each device, those time-stamps are not separated by
  *     more than 2**32 device time units (which is around 67 ms) which means that the calculation of the round-trip delays can be handled by a 32-bit
  *     subtraction.
- * 13. The user is referred to DecaRanging ARM application (distributed with EVK1000 product) for additional practical example of usage, and to the
+ * 13. The user is referred to DecaroundTrip1nging ARM application (distributed with EVK1000 product) for additional practical example of usage, and to the
  *     DW1000 API Guide for more details on the DW1000 driver functions.
  ****************************************************************************************************************************************************/
