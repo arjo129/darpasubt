@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "deca_regs.h": "c",
-        "freertos.h": "c",
-        "stdio.h": "c",
-        "string.h": "c"
-    }
-}

@@ -4221,7 +4221,15 @@
 // </h> 
 //==========================================================
 
+// <q> RETARGET_ENABLED  - retarget - Retargeting stdio functions
+ 
+
+#ifndef RETARGET_ENABLED
+#define RETARGET_ENABLED 1
+#endif
+
 // </h> 
+
 //==========================================================
 
 // <h> nRF_Log 
@@ -8734,9 +8742,6 @@
 #define POWER_CONFIG_SOC_OBSERVER_PRIO 0
 #endif
 
-#ifndef RETARGET_ENABLED
-#define RETARGET_ENABLED 1
-#endif
 // </h> 
 //==========================================================
 
@@ -8751,3 +8756,4 @@
 
 // <<< end of configuration section >>>
 #endif //SDK_CONFIG_H
+
