@@ -44,9 +44,8 @@ static uint8 initiatorFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E
 #define FINAL_MSG_FINAL_TX_TS_IDX 18
 #define FINAL_MSG_TS_LEN 4
 
-/* Frame sequence number, incremented after each transmission. */
-// TODO: Centralise the change to frame number. Either initiator or responder change this value. 
-static uint8 frameSeqNum = 0;
+/* Exchange sequence number, incremented after each transmission of the final message. */
+static uint8 exchangeSeqNum = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
@@ -143,7 +142,6 @@ int ds_resp_run(void) {
       dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
 
       /* Write and send the response message. See NOTE 10 below. */
-      responderMsg[ALL_MSG_SN_IDX] = frameSeqNum;
       dwt_writetxdata(sizeof(responderMsg), responderMsg, 0);
       dwt_writetxfctrl(sizeof(responderMsg), 0, 1);
       ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -156,9 +154,6 @@ int ds_resp_run(void) {
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
       while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
-      /* Increment frame sequence number after transmission of the poll message (modulo 256). */
-      frameSeqNum++;
-
       if (status_reg & SYS_STATUS_RXFCG) {
         /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
@@ -168,6 +163,9 @@ int ds_resp_run(void) {
         if (frameLen <= RX_BUF_LEN) {
             dwt_readrxdata(rxBuffer, frameLen, 0);
         }
+
+        /* Get exchange sequence number embedded in the final message. */
+        exchangeSeqNum = rxBuffer[ALL_MSG_SN_IDX];
 
         /* Check that the frame is a final message sent by "DS TWR initiator" example.
           * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
@@ -202,7 +200,7 @@ int ds_resp_run(void) {
 
           // printf("Distance = %f m\r\n", distanceMetre);
           // printf("\n");
-          printf("Frame #: %u\tDistance: %lf m\r\n", frameSeqNum, distanceMetre);
+          printf("Exchange #: %u\tDistance: %lf m\r\n", exchangeSeqNum, distanceMetre);
         } else {
           /* Clear RX error/timeout events in the DW1000 status register. */
           dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);

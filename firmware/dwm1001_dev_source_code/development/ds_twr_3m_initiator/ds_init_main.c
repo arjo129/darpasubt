@@ -25,30 +25,33 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 
-#define APP_NAME "DS TWR INIT v1.3"
+#define APP_NAME "DS TWR INITIATOR"
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 100
 
 /* Frames used in the ranging process. See NOTE 2 below. */
-static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 tx_final_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 initiatorFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
+static uint8 responderMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 initiatorFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
+
 /* Indexes to access some of the fields in the frames defined above. */
 #define ALL_MSG_SN_IDX 2
-#define FINAL_MSG_POLL_TX_TS_IDX 10
-#define FINAL_MSG_RESP_RX_TS_IDX 14
-#define FINAL_MSG_FINAL_TX_TS_IDX 18
+#define FINAL_MSG_initTxTimestamp1_IDX 10
+#define FINAL_MSG_initRxTimestamp1_IDX 14
+#define FINAL_MSG_initTxTimestamp2_IDX 18
 #define FINAL_MSG_TS_LEN 4
-/* Frame sequence number, incremented after each transmission. */
-static uint8 frame_seq_nb = 0;
+
+/* Exchange sequence number, incremented after each transmission of the final message. */
+static uint8 exchangeSeqNum = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
 #define RX_BUF_LEN 20
-static uint8 rx_buffer[RX_BUF_LEN];
+static uint8 rxBuffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32 status_reg = 0;
@@ -71,14 +74,14 @@ static uint32 status_reg = 0;
 /* Time-stamps of frames transmission/reception, expressed in device time units.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
 typedef unsigned long long uint64;
-static uint64 poll_tx_ts;
-static uint64 resp_rx_ts;
-static uint64 final_tx_ts;
+static uint64 initTxTimestamp1;
+static uint64 initRxTimestamp1;
+static uint64 initTxTimestamp2;
 
 /* Declaration of static functions. */
-static uint64 get_tx_timestamp_u64(void);
-static uint64 get_rx_timestamp_u64(void);
-static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
+static uint64 getTxTimestampU64(void);
+static uint64 getRxTimestampU64(void);
+static void finalMsgSetTs(uint8 *tsField, uint64 ts);
 
 /*Transactions Counters */
 static volatile int tx_count = 0 ; // Successful transmit counter
@@ -94,18 +97,14 @@ static volatile int rx_count = 0 ; // Successful receive counter
 *
 * @return none
 */
-int ds_init_run(void)
-{
-
-
+int dsInitRun(void) {
   /* Loop forever initiating ranging exchanges. */
 
-
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
-  tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+  initiatorFirstMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-  dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0); /* Zero offset in TX buffer. */
-  dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+  dwt_writetxdata(sizeof(initiatorFirstMsg), initiatorFirstMsg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(initiatorFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
 
   /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
   * set by dwt_setrxaftertxdelay() has elapsed. */
@@ -115,85 +114,66 @@ int ds_init_run(void)
 
 
   /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
-  while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-  {};
+  while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
-    #if 0  // include if required to help debug timeouts.
-    int temp = 0;		
-    if(status_reg & SYS_STATUS_RXFCG )
-    temp =1;
-    else if(status_reg & SYS_STATUS_ALL_RX_TO )
-    temp =2;
-    if(status_reg & SYS_STATUS_ALL_RX_ERR )
-    temp =3;
-    #endif
-
-  /* Increment frame sequence number after transmission of the poll message (modulo 256). */
-  frame_seq_nb++;
-
-  if (status_reg & SYS_STATUS_RXFCG)
-  {		
-    uint32 frame_len;
+  if (status_reg & SYS_STATUS_RXFCG) {		
+    uint32 frameLen;
 
     /* Clear good RX frame event in the DW1000 status register. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
     /* A frame has been received, read it into the local buffer. */
-    frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+    frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
    
-    if (frame_len <= RX_BUF_LEN)
-    {
-      dwt_readrxdata(rx_buffer, frame_len, 0);
+    if (frameLen <= RX_BUF_LEN) {
+      dwt_readrxdata(rxBuffer, frameLen, 0);
     }
 
     /* Check that the frame is the expected response from the companion "DS TWR responder" example.
     * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-    rx_buffer[ALL_MSG_SN_IDX] = 0;
-    if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
-    {	
+    rxBuffer[ALL_MSG_SN_IDX] = 0;
+    if (memcmp(rxBuffer, responderMsg, ALL_MSG_COMMON_LEN) == 0) {	
       rx_count++;
       printf("Reception # : %d\r\n",rx_count);
-      uint32 final_tx_time;
+      uint32 initSendDelayTime;
       int ret;
 
       /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
-      poll_tx_ts = get_tx_timestamp_u64();
-      resp_rx_ts = get_rx_timestamp_u64();
+      initTxTimestamp1 = getTxTimestampU64();
+      initRxTimestamp1 = getRxTimestampU64();
 
       /* Compute final message transmission time. See NOTE 10 below. */
-      final_tx_time = (resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-      dwt_setdelayedtrxtime(final_tx_time);
+      initSendDelayTime = (initRxTimestamp1 + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+      dwt_setdelayedtrxtime(initSendDelayTime);
 
       /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-      final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFEUL)) << 8) + 16436;
+      initTxTimestamp2 = (((uint64)(initSendDelayTime & 0xFFFFFFFEUL)) << 8) + 16436;
 
       /* Write all the timestamps in the final message. See NOTE 11 below. */
-      final_msg_set_ts(&tx_final_msg[FINAL_MSG_POLL_TX_TS_IDX], poll_tx_ts);
-      final_msg_set_ts(&tx_final_msg[FINAL_MSG_RESP_RX_TS_IDX], resp_rx_ts);
-      final_msg_set_ts(&tx_final_msg[FINAL_MSG_FINAL_TX_TS_IDX], final_tx_ts);
+      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_initTxTimestamp1_IDX], initTxTimestamp1);
+      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_initRxTimestamp1_IDX], initRxTimestamp1);
+      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_initTxTimestamp2_IDX], initTxTimestamp2);
+
+      /* Increment frame sequence number after transmission of the final message (modulo 256). */
+      exchangeSeqNum++;
 
       /* Write and send final message. See NOTE 8 below. */
-      tx_final_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-      dwt_writetxdata(sizeof(tx_final_msg), tx_final_msg, 0); /* Zero offset in TX buffer. */
-      dwt_writetxfctrl(sizeof(tx_final_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+      initiatorFinalMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
+      dwt_writetxdata(sizeof(initiatorFinalMsg), initiatorFinalMsg, 0); /* Zero offset in TX buffer. */
+      dwt_writetxfctrl(sizeof(initiatorFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
       ret = dwt_starttx(DWT_START_TX_DELAYED);
 
       /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
       if (ret == DWT_SUCCESS) {
         /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
-        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
-        { };
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
 
         /* Clear TXFRS event. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
-        /* Increment frame sequence number after transmission of the final message (modulo 256). */
-        frame_seq_nb++;
       }
     }
-  }
-  else
-  {
+  } else {
     /* Clear RX error/timeout events in the DW1000 status register. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
@@ -208,7 +188,7 @@ int ds_init_run(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_tx_timestamp_u64()
+ * @fn getTxTimestampU64()
  *
  * @brief Get the TX time-stamp in a 64-bit variable.
  *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
@@ -217,14 +197,12 @@ int ds_init_run(void)
  *
  * @return  64-bit value of the read time-stamp.
  */
-static uint64 get_tx_timestamp_u64(void)
-{
+static uint64 getTxTimestampU64(void) {
     uint8 ts_tab[5];
     uint64 ts = 0;
     int i;
     dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
+    for (i = 4; i >= 0; i--) {
         ts <<= 8;
         ts |= ts_tab[i];
     }
@@ -232,7 +210,7 @@ static uint64 get_tx_timestamp_u64(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn get_rx_timestamp_u64()
+ * @fn getRxTimestampU64()
  *
  * @brief Get the RX time-stamp in a 64-bit variable.
  *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
@@ -241,14 +219,12 @@ static uint64 get_tx_timestamp_u64(void)
  *
  * @return  64-bit value of the read time-stamp.
  */
-static uint64 get_rx_timestamp_u64(void)
-{
+static uint64 getRxTimestampU64(void) {
     uint8 ts_tab[5];
     uint64 ts = 0;
     int i;
     dwt_readrxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
+    for (i = 4; i >= 0; i--) {
         ts <<= 8;
         ts |= ts_tab[i];
     }
@@ -256,22 +232,20 @@ static uint64 get_rx_timestamp_u64(void)
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_set_ts()
+ * @fn finalMsgSetTs()
  *
  * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
  *        message, the least significant byte is at the lower address.
  *
- * @param  ts_field  pointer on the first byte of the timestamp field to fill
+ * @param  tsField  pointer on the first byte of the timestamp field to fill
  *         ts  timestamp value
  *
  * @return none
  */
-static void final_msg_set_ts(uint8 *ts_field, uint64 ts)
-{
+static void finalMsgSetTs(uint8 *tsField, uint64 ts) {
     int i;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++)
-    {
-        ts_field[i] = (uint8) ts;
+    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
+        tsField[i] = (uint8) ts;
         ts >>= 8;
     }
 }
@@ -280,17 +254,15 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts)
 *
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
 */
-void ds_initiator_task_function (void * pvParameter)
-{
+void ds_initiator_task_function (void * pvParameter) {
   UNUSED_PARAMETER(pvParameter);
 
   //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
   dwt_setleds(DWT_LEDS_ENABLE);
 
-  while (true)
-  {
-    ds_init_run();
+  while (true) {
+    dsInitRun();
     /* Delay a task for a given number of ticks */
     vTaskDelay(RNG_DELAY_MS);
     /* Tasks must be implemented to never return... */
