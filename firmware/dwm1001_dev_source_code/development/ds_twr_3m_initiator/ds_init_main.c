@@ -112,7 +112,7 @@ int dsInitRun(void) {
   tx_count++;
   printf("Transmission # : %d\r\n",tx_count);
 
-
+  printf("Attempting to receive second frame...\r\n");
   /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
   while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -184,7 +184,7 @@ int dsInitRun(void) {
   /* Execute a delay between ranging exchanges. */
   //     deca_sleep(RNG_DELAY_MS);
 
-  //	return(1);
+  return(1);
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

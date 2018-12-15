@@ -77,31 +77,31 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 #ifdef USE_FREERTOS
 
-/**@brief LED0 task entry function.
- *
- * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
- */
-static void led_toggle_task_function (void * pvParameter)
-{
-  UNUSED_PARAMETER(pvParameter);
-  while (true)
+  /**@brief LED0 task entry function.
+   *
+   * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
+   */
+  static void led_toggle_task_function (void * pvParameter)
   {
-    LEDS_INVERT(BSP_LED_0_MASK);
-    /* Delay a task for a given number of ticks */
-    vTaskDelay(TASK_DELAY);
-    /* Tasks must be implemented to never return... */
+    UNUSED_PARAMETER(pvParameter);
+    while (true)
+    {
+      LEDS_INVERT(BSP_LED_0_MASK);
+      /* Delay a task for a given number of ticks */
+      vTaskDelay(TASK_DELAY);
+      /* Tasks must be implemented to never return... */
+    }
   }
-}
 
-/**@brief The function to call when the LED1 FreeRTOS timer expires.
- *
- * @param[in] pvParameter   Pointer that will be used as the parameter for the timer.
- */
-static void led_toggle_timer_callback (void * pvParameter)
-{
-  UNUSED_PARAMETER(pvParameter);
-  LEDS_INVERT(BSP_LED_1_MASK);
-}
+  /**@brief The function to call when the LED1 FreeRTOS timer expires.
+   *
+   * @param[in] pvParameter   Pointer that will be used as the parameter for the timer.
+   */
+  static void led_toggle_timer_callback (void * pvParameter)
+  {
+    UNUSED_PARAMETER(pvParameter);
+    LEDS_INVERT(BSP_LED_1_MASK);
+  }
 #else
 
   extern int ss_init_run(void);

@@ -108,6 +108,7 @@ int ds_resp_run(void) {
   /* Activate reception immediately. */
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
+  printf("Attempting to receive first frame...\r\n");
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -151,6 +152,7 @@ int ds_resp_run(void) {
           return;
       }
 
+      printf("Attempting to receive final frame...\r\n");
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
       while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 

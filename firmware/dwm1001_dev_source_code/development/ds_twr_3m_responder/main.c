@@ -63,6 +63,9 @@ static dwt_config_t config = {
 #define TASK_DELAY        10            /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD      2000          /**< Timer period. LED1 timer will expire after 1000 ms */
 
+/* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
+#define PRE_TIMEOUT 8
+
 #ifdef USE_FREERTOS
   TaskHandle_t  ds_responder_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
   extern void ds_responder_task_function (void * pvParameter);
@@ -155,7 +158,7 @@ int main(void)
   dwt_settxantennadelay(TX_ANT_DLY);
 
   /* Set preamble timeout for expected frames.  */
-  //dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+  // dwt_setpreambledetecttimeout(PRE_TIMEOUT);
 
   dwt_setrxtimeout(0);    // set to NO receive timeout for this simple example   
 
