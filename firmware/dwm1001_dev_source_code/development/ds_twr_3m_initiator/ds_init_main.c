@@ -40,9 +40,9 @@ static uint8 initiatorFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E
 
 /* Indexes to access some of the fields in the frames defined above. */
 #define ALL_MSG_SN_IDX 2
-#define FINAL_MSG_initTxTimestamp1_IDX 10
-#define FINAL_MSG_initRxTimestamp1_IDX 14
-#define FINAL_MSG_initTxTimestamp2_IDX 18
+#define FINAL_MSG_TX_1_IDX 10
+#define FINAL_MSG_RX_1_IDX 14
+#define FINAL_MSG_TX_2_IDX 18
 #define FINAL_MSG_TS_LEN 4
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
@@ -150,9 +150,9 @@ int dsInitRun(void) {
       initTxTimestamp2 = (((uint64)(initSendDelayTime & 0xFFFFFFFEUL)) << 8) + 16436;
 
       /* Write all the timestamps in the final message. See NOTE 11 below. */
-      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_initTxTimestamp1_IDX], initTxTimestamp1);
-      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_initRxTimestamp1_IDX], initRxTimestamp1);
-      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_initTxTimestamp2_IDX], initTxTimestamp2);
+      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_TX_1_IDX], initTxTimestamp1);
+      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_RX_1_IDX], initRxTimestamp1);
+      finalMsgSetTs(&initiatorFinalMsg[FINAL_MSG_TX_2_IDX], initTxTimestamp2);
 
       /* Increment frame sequence number after transmission of the final message (modulo 256). */
       exchangeSeqNum++;
