@@ -18,6 +18,7 @@
 * @author Decawave
 */
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
@@ -33,7 +34,7 @@
 /* Frames used in the ranging process. See NOTE 2 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -41,8 +42,8 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 /* Indexes to access some of the fields in the frames defined above. */
 #define ALL_MSG_SN_IDX 2
 #define FINAL_MSG_TX_1_IDX 10
-#define FINAL_MSG_RX_1_IDX 14
-#define FINAL_MSG_TX_2_IDX 18
+#define FINAL_MSG_TX_2_IDX 14
+#define FINAL_MSG_RX_1_IDX 18
 #define ANCHOR_ID_IDX 10
 #define FINAL_MSG_TS_LEN 4
 
@@ -86,6 +87,7 @@ static uint64 tagTxTimestamp2;
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
 static void finalMsgSetTs(uint8 *tsField, uint64 ts);
+static void finalMsgSetRxTs(uint8 *tsField);
 
 /*Transactions Counters */
 static volatile int tx_count = 0 ; // Successful transmit counter
@@ -93,15 +95,16 @@ static volatile int rx_count = 0 ; // Successful receive counter
 static volatile int anchorsCount = 0; // Counter for response from anchors
 
 /* Temporary storage for the timestamps to be sent to anchors. */
-uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT] = {0};
+static uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT];
 
 void printTS(void) {
   int i = 0;
   printf("--- anchors ts --- \r\n");
   for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
-    printf("%u\t", anchorsTimestamps);
+    uint64 out = anchorsTimestamps[i];
+    printf("%x \t", out);
   }
-  printf("\r\n");
+  printf("\r\n------------------\r\n");
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -116,6 +119,9 @@ void printTS(void) {
 int dsInitRun(void) {
   /* Loop forever initiating ranging exchanges. */
 
+  uint32 tagSendDelayTime;
+  int ret;
+
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
   tagFirstMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
@@ -127,6 +133,9 @@ int dsInitRun(void) {
   dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   tx_count++;
   printf("Transmission # : %d\r\n",tx_count);
+
+  /* Clears the anchor timestamps temporary storage. */
+  memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
   
   printf("Attempting to receive frames from anchors...\r\n");
   anchorsCount = 0;
@@ -163,20 +172,10 @@ int dsInitRun(void) {
       if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
         rx_count++;
         printf("Reception # : %d\r\n",rx_count);
-        uint32 tagSendDelayTime;
-        int ret;
         uint8 anchorID;
 
         /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
         tagRxTimestamp1 = getRxTimestampU64();
-        printf("rx = %x \r\n", tagRxTimestamp1);
-
-        /* Compute final message transmission time. See NOTE 10 below. */
-        // tagSendDelayTime = (tagRxTimestamp1 + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-        // dwt_setdelayedtrxtime(tagSendDelayTime);
-
-        /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-        // tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + 16436;
 
         /* Retrieve the anchor number embedded in the response message. */
         anchorID = rxBuffer[ANCHOR_ID_IDX];
@@ -193,37 +192,6 @@ int dsInitRun(void) {
 
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-        /***********************
-         * PROBLEM: 2nd anchor onwards will not be detected. Tag stops after printing "Received anchor ..."
-         * /
-
-        // Sending portion, to be used after receiving from all anchors and thus sending the final message to all anchors
-        // We need to calculate the final TX from this Tag AFTER receiving all anchors response. So how do we do this?
-        //////////////////////////////////////////////////////////////////////////////////////////////////
-        /* Write all the timestamps in the final message. See NOTE 11 below. */
-        // finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
-        // finalMsgSetTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX], tagRxTimestamp1);
-        // finalMsgSetTs(&tagFinalMsg[FINAL_MSG_DWT_RESPONSE_EXPECTEDTX_2_IDX], tagTxTimestamp2);
-
-        /* Increment frame sequence number after transmission of the final message (modulo 256). */
-        // exchangeSeqNum++;
-
-        // /* Write and send final message. See NOTE 8 below. */
-        // tagFinalMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
-        // dwt_writetxdata(sizeof(tagFinalMsg), tagFinalMsg, 0); /* Zero offset in TX buffer. */
-        // dwt_writetxfctrl(sizeof(tagFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
-        // ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-
-        /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
-        // if (ret == DWT_SUCCESS) {
-        //   /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
-        //   while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
-
-        //   /* Clear TXFRS event. */
-        //   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-        // }
-        // //////////////////////////////////////////////////////////////////////////////////////////////////
       } else {
         /* Clear RX error/timeout events in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
@@ -234,17 +202,54 @@ int dsInitRun(void) {
     }
   }
 
-  // printTS();
-
   tagTxTimestamp1 = getTxTimestampU64();
 
   // Send final message to inform all anchors of end of measurement
+  /* Compute final message transmission time. See NOTE 10 below. */
+  // Uses the RX timestamp from the last received anchor response to calculate the delay.
+  tagSendDelayTime = (anchorsTimestamps[ANCHORS_TOTAL_COUNT - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+  dwt_setdelayedtrxtime(tagSendDelayTime);
 
-  /* Clears the anchor timestamps temporary storage. */
-  memset(anchorsTimestamps, 0, sizeof(anchorsTimestamps));
+  /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
+  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + 16436;
+
+  /***********************
+   * TODO: Modify the anchor code to match here for the measurement functionality.
+   * PROBLEM: This code stuck at line 243 while loop where the TXFRS isn't set to 1 and a receive frame wait timeout will occur eventually.
+   * /
+
+  // Sending portion, to be used after receiving from all anchors and thus sending the final message to all anchors
+  // We need to calculate the final TX from this Tag AFTER receiving all anchors response. So how do we do this?
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+  /* Write all the timestamps in the final message. See NOTE 11 below. */
+  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
+  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
+  finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
+
+  /* Increment frame sequence number after transmission of the final message (modulo 256). */
+  exchangeSeqNum++;
+
+  /* Write and send final message. See NOTE 8 below. */
+  tagFinalMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
+  dwt_writetxdata(sizeof(tagFinalMsg), tagFinalMsg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(tagFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
+  ret = dwt_starttx(DWT_START_TX_DELAYED);
+
+  /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
+  if (ret == DWT_SUCCESS) {
+    /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
+    uint32 b = dwt_read32bitreg(SYS_STATUS_ID);
+    printf("%x \r\n", b);
+    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
+
+    /* Clear TXFRS event. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+
+  }
+  //////////////////////////////////////////////////////////////////////////////////////////////////
 
   /* Execute a delay between ranging exchanges. */
-  //     deca_sleep(RNG_DELAY_MS);
+  // deca_sleep(RNG_DELAY_MS);
 
   return(1);
 }
@@ -291,6 +296,19 @@ static uint64 getRxTimestampU64(void) {
         ts |= ts_tab[i];
     }
     return ts;
+}
+
+static void finalMsgSetRxTs(uint8 *tsField) {
+  int i, j = 0;
+  uint64 ts;
+  for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+    ts = anchorsTimestamps[i];
+    // We want to continuosly write all RX values which are all 4 bytes. So we start at multiples of 4.
+    for (j = i * 4; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
+      tsField[j] = (uint8) ts;
+      ts >>= 8;
+    }
+  }
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
