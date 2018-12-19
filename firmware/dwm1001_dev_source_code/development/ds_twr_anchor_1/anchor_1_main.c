@@ -32,7 +32,7 @@
 /* Frames used in the ranging process. See NOTE 2,3 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -46,14 +46,14 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 #define FINAL_MSG_TS_LEN 4
 
 /* ID of this anchor. */
-#define ANCHORD_ID 3
+#define ANCHORD_ID 1
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
 static uint8 exchangeSeqNum = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 24
+#define RX_BUF_LEN 32
 static uint8 rxBuffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -147,79 +147,79 @@ int ds_resp_run(void) {
       dwt_setdelayedtrxtime(respSendDelayTime);
 
       /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-      dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-      dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+      // dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
+      // dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
 
       /* Write and send the response message. See NOTE 10 below. */
       dwt_writetxdata(sizeof(anchorMsg), anchorMsg, 0);
       dwt_writetxfctrl(sizeof(anchorMsg), 0, 1);
-      ret = dwt_starttx(DWT_START_TX_DELAYED);
+      ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 
       /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
       if (ret == DWT_ERROR) {
           return;
       }
-      printf("%u \r\n", respSendDelayTime);
 
-      // printf("Attempting to receive final frame...\r\n");
-      // /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-      // while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+      printf("ID: %d\tAttempting to receive final frame...\r\n", ANCHORD_ID);
+      /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
+      while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
-      // if (status_reg & SYS_STATUS_RXFCG) {
-      //   /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
-      //   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+      if (status_reg & SYS_STATUS_RXFCG) {
+        /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
 
-      //   /* A frame has been received, read it into the local buffer. */
-      //   frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-      //   if (frameLen <= RX_BUF_LEN) {
-      //       dwt_readrxdata(rxBuffer, frameLen, 0);
-      //   }
+        /* A frame has been received, read it into the local buffer. */
+        frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+        if (frameLen <= RX_BUF_LEN) {
+            dwt_readrxdata(rxBuffer, frameLen, 0);
+        }
 
-      //   /* Get exchange sequence number embedded in the final message. */
-      //   exchangeSeqNum = rxBuffer[ALL_MSG_SN_IDX];
+        /* Get exchange sequence number embedded in the final message. */
+        exchangeSeqNum = rxBuffer[ALL_MSG_SN_IDX];
 
-      //   /* Check that the frame is a final message sent by "DS TWR initiator" example.
-      //     * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
-      //   rxBuffer[ALL_MSG_SN_IDX] = 0;
-      //   if (memcmp(rxBuffer, tagFinalMsg, ALL_MSG_COMMON_LEN) == 0) {
-      //     uint32 initTxTimestamp1, initRxTimestamp1, initTxTimestamp2;
-      //     uint32 respRxTimestamp1_32, respTxTimestamp1_32, respRxTimestamp2_32;
-      //     double roundTrip1, roundTrip2, replyTrip2, replyTrip1;
-      //     int64 timeOfFlightInUnits;
+        /* Check that the frame is a final message sent by "DS TWR initiator" example.
+          * As the sequence number field of the frame is not used in this example, it can be zeroed to ease the validation of the frame. */
+        rxBuffer[ALL_MSG_SN_IDX] = 0;
+        if (memcmp(rxBuffer, tagFinalMsg, ALL_MSG_COMMON_LEN) == 0) {
+                    printf("test\r\n");
+          uint32 initTxTimestamp1, initRxTimestamp1, initTxTimestamp2;
+          uint32 respRxTimestamp1_32, respTxTimestamp1_32, respRxTimestamp2_32;
+          double roundTrip1, roundTrip2, replyTrip2, replyTrip1;
+          int64 timeOfFlightInUnits;
 
-      //     /* Retrieve response transmission and final reception timestamps. */
-      //     respTxTimestamp1 = getTxTimestampU64();
-      //     respRxTimestamp2 = getRxTimestampU64();
+          /* Retrieve response transmission and final reception timestamps. */
+          respTxTimestamp1 = getTxTimestampU64();
+          respRxTimestamp2 = getRxTimestampU64();
 
-      //     /* Get timestamps embedded in the final message. */
-      //     finalMsgGetTs(&rxBuffer[FINAL_MSG_POLL_TX_TS_IDX], &initTxTimestamp1);
-      //     finalMsgGetTs(&rxBuffer[FINAL_MSG_RESP_RX_TS_IDX], &initRxTimestamp1);
-      //     finalMsgGetTs(&rxBuffer[FINAL_MSG_FINAL_TX_TS_IDX], &initTxTimestamp2);
+          /* Get timestamps embedded in the final message. */
+          finalMsgGetTs(&rxBuffer[FINAL_MSG_POLL_TX_TS_IDX], &initTxTimestamp1);
+          finalMsgGetTs(&rxBuffer[FINAL_MSG_RESP_RX_TS_IDX], &initRxTimestamp1);
+          finalMsgGetTs(&rxBuffer[FINAL_MSG_FINAL_TX_TS_IDX], &initTxTimestamp2);
 
-      //     /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
-      //     respRxTimestamp1_32 = (uint32)respRxTimestamp1;
-      //     respTxTimestamp1_32 = (uint32)respTxTimestamp1;
-      //     respRxTimestamp2_32 = (uint32)respRxTimestamp2;
-      //     roundTrip1 = (double)(initRxTimestamp1 - initTxTimestamp1);
-      //     roundTrip2 = (double)(respRxTimestamp2_32 - respTxTimestamp1_32);
-      //     replyTrip2 = (double)(initTxTimestamp2 - initRxTimestamp1);
-      //     replyTrip1 = (double)(respTxTimestamp1_32 - respRxTimestamp1_32);
-      //     timeOfFlightInUnits = (int64)((roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2));
+          /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 12 below. */
+          respRxTimestamp1_32 = (uint32)respRxTimestamp1;
+          respTxTimestamp1_32 = (uint32)respTxTimestamp1;
+          respRxTimestamp2_32 = (uint32)respRxTimestamp2;
+          roundTrip1 = (double)(initRxTimestamp1 - initTxTimestamp1);
+          roundTrip2 = (double)(respRxTimestamp2_32 - respTxTimestamp1_32);
+          replyTrip2 = (double)(initTxTimestamp2 - initRxTimestamp1);
+          replyTrip1 = (double)(respTxTimestamp1_32 - respRxTimestamp1_32);
+          timeOfFlightInUnits = (int64)((roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2));
 
-      //     timeOfFlight = timeOfFlightInUnits * DWT_TIME_UNITS;
-      //     distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
+          timeOfFlight = timeOfFlightInUnits * DWT_TIME_UNITS;
+          distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
 
-      //     // printf("Distance = %f m\r\n", distanceMetre);
-      //     // printf("\n");
-      //     printf("Exchange #: %u\tDistance: %lf m\r\n", exchangeSeqNum, distanceMetre);
-      //   } else {
-      //     /* Clear RX error/timeout events in the DW1000 status register. */
-      //     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+          // printf("Distance = %f m\r\n", distanceMetre);
+          // printf("\n");
+          printf("Exchange #: %u\tDistance: %lf m\r\n", exchangeSeqNum, distanceMetre);
+        } else {
+          /* Clear RX error/timeout events in the DW1000 status register. */
+          dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
 
-      //     /* Reset RX to properly reinitialise LDE operation. */
-      //     dwt_rxreset();
-      //   }
-      // }
+          /* Reset RX to properly reinitialise LDE operation. */
+          dwt_rxreset();
+        }
+      }
     }
   } else {
     /* Clear RX error events in the DW1000 status register. */
