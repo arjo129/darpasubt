@@ -48,14 +48,14 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 #define FINAL_MSG_TS_LEN 4
 
 /* Total anchors number */
-#define ANCHORS_TOTAL_COUNT 3
+#define ANCHORS_TOTAL_COUNT 2
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
 static uint8 exchangeSeqNum = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 20
+#define RX_BUF_LEN 31
 static uint8 rxBuffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -121,6 +121,7 @@ int dsInitRun(void) {
 
   uint32 tagSendDelayTime;
   int ret;
+  uint32 stat;
 
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
   tagFirstMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
@@ -147,7 +148,7 @@ int dsInitRun(void) {
       printf("waiting     %d\r\n", anchorsCount);
     }
     count++;
-
+    
     /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -190,7 +191,9 @@ int dsInitRun(void) {
           anchorsCount++;
         }
 
-        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+        if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+          dwt_rxenable(DWT_START_RX_IMMEDIATE);
+        }
 
       } else {
         /* Clear RX error/timeout events in the DW1000 status register. */
@@ -203,7 +206,7 @@ int dsInitRun(void) {
   }
 
   tagTxTimestamp1 = getTxTimestampU64();
-
+  
   // Send final message to inform all anchors of end of measurement
   /* Compute final message transmission time. See NOTE 10 below. */
   // Uses the RX timestamp from the last received anchor response to calculate the delay.
@@ -215,7 +218,6 @@ int dsInitRun(void) {
 
   /***********************
    * TODO: Modify the anchor code to match here for the measurement functionality.
-   * PROBLEM: This code stuck at line 243 while loop where the TXFRS isn't set to 1 and a receive frame wait timeout will occur eventually.
    * /
 
   // Sending portion, to be used after receiving from all anchors and thus sending the final message to all anchors
@@ -238,8 +240,6 @@ int dsInitRun(void) {
   /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
   if (ret == DWT_SUCCESS) {
     /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
-    uint32 b = dwt_read32bitreg(SYS_STATUS_ID);
-    printf("%x \r\n", b);
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
 
     /* Clear TXFRS event. */
