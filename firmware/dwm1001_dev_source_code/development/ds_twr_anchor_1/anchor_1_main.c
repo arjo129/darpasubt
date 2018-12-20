@@ -100,34 +100,6 @@ static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
 static void finalMsgGetTs(const uint8 *ts_field, uint32 *ts);
 
-void getTs(uint8 *ts_field, uint32 *ts) {
-  int i;
-  *ts = 0;
-  for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-    *ts += ts_field[i] << (i * 8);
-  }
-}
-
-void printM(uint8 *array) {
-  printf("--- Final Message TS ---\r\n");
-  int i = 10;
-  uint32 val = 0;
-  for (i = 10; i < 27; i+=FINAL_MSG_TS_LEN) {
-    getTs(&array[i], &val);
-    printf("%u\r\n", val);
-  }
-  printf("------------------------\r\n");
-}
-
-void printP(uint8 *array) {
-  printf("--- Final Message COMMON ---\r\n");
-  int i = 0;
-  for (i = 0; i < 10; i++) {
-    printf("%x\r\n", array[i]);
-  }
-  printf("----------------------------\r\n");
-}
-
 /*! ------------------------------------------------------------------------------------------------------------------
 * @fn main()
 *
@@ -181,7 +153,6 @@ int ds_resp_run(void) {
       dwt_setdelayedtrxtime(respSendDelayTime);
 
       /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-      // dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
       uint32 rxDelay = (3 - ANCHORD_ID) * ACH_RX_AFT_TX_DLY;
       dwt_setrxaftertxdelay(rxDelay);
       // dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
@@ -213,7 +184,6 @@ int ds_resp_run(void) {
         frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
         if (frameLen <= RX_BUF_LEN) {
             dwt_readrxdata(rxBuffer, frameLen, 0);
-            printM(rxBuffer);
         }
 
         /* Get exchange sequence number embedded in the final message. */
