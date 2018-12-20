@@ -65,6 +65,9 @@ static uint32 status_reg = 0;
 * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
 #define UUS_TO_DWT_TIME 65536
 
+/* TX antenna delay */
+#define TX_ANT_DLY 16436
+
 /* Delay between frames, in UWB microseconds. See NOTE 4 below. */
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
@@ -97,25 +100,6 @@ static volatile int anchorsCount = 0; // Counter for response from anchors
 /* Temporary storage for the timestamps to be sent to anchors. */
 static uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT];
 
-void getTs(uint8 *ts_field, uint32 *ts) {
-  int i;
-  *ts = 0;
-  for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-    *ts += ts_field[i] << (i * 8);
-  }
-}
-
-void printM(uint8 *array) {
-  printf("--- Final Message TS ---\r\n");
-  int i = 10;
-  uint32 val = 0;
-  for (i = 10; i < 27; i+=FINAL_MSG_TS_LEN) {
-    getTs(&array[i], &val);
-    printf("%u\r\n", val);
-  }
-  printf("------------------------\r\n");
-}
-
 /*! ------------------------------------------------------------------------------------------------------------------
 * @fn main()
 *
@@ -130,7 +114,9 @@ int dsInitRun(void) {
 
   uint32 tagSendDelayTime;
   int ret;
-  uint32 stat;
+
+  /* Clears the anchor timestamps temporary storage. */
+  memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
 
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
   tagFirstMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
@@ -138,30 +124,18 @@ int dsInitRun(void) {
   dwt_writetxdata(sizeof(tagFirstMsg), tagFirstMsg, 0); /* Zero offset in TX buffer. */
   dwt_writetxfctrl(sizeof(tagFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
 
-  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
-  * set by dwt_setrxaftertxdelay() has elapsed. */
+  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent. */
   dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   tx_count++;
   printf("Transmission # : %d\r\n",tx_count);
 
-  /* Clears the anchor timestamps temporary storage. */
-  memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
   
   printf("Attempting to receive frames from anchors...\r\n");
   anchorsCount = 0;
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
-  int count = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
-    if (count == 10000) {
-      count = 0;
-      printf("waiting     %d\r\n", anchorsCount);
-    }
-    count++;
-    
     /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
-
-    // printf("%x \r\n", status_reg);
 
     if (status_reg & SYS_STATUS_RXFCG) {	
       uint32 frameLen;
@@ -200,6 +174,9 @@ int dsInitRun(void) {
           anchorsCount++;
         }
 
+        /* We need to ensure we enable RX only when we expect another response from the anchors.
+         * This is crucial since enabling RX without receiving will cause any transmissions (final
+         * message transmission later) to be delayed for unusually long. */
         if (anchorsCount < ANCHORS_TOTAL_COUNT) {
           dwt_rxenable(DWT_START_RX_IMMEDIATE);
         }
@@ -214,30 +191,21 @@ int dsInitRun(void) {
     }
   }
 
+  /* Retrieve the timestamp from when the initial message transmits. */
   tagTxTimestamp1 = getTxTimestampU64();
   
-  // Send final message to inform all anchors of end of measurement
   /* Compute final message transmission time. See NOTE 10 below. */
-  // Uses the RX timestamp from the last received anchor response to calculate the delay.
+  // Uses the RX timestamp from the last received anchor response to calculate the delay needed to transmit final message.
   tagSendDelayTime = (anchorsTimestamps[ANCHORS_TOTAL_COUNT - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
   dwt_setdelayedtrxtime(tagSendDelayTime);
 
   /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + 16436;
+  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
 
-  /***********************
-   * TODO: Modify the anchor code to match here for the measurement functionality.
-   * /
-
-  // Sending portion, to be used after receiving from all anchors and thus sending the final message to all anchors
-  // We need to calculate the final TX from this Tag AFTER receiving all anchors response. So how do we do this?
-  //////////////////////////////////////////////////////////////////////////////////////////////////
   /* Write all the timestamps in the final message. See NOTE 11 below. */
   finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
   finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
   finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
-
-  printM(tagFinalMsg);
 
   /* Increment frame sequence number after transmission of the final message (modulo 256). */
   exchangeSeqNum++;
@@ -246,9 +214,6 @@ int dsInitRun(void) {
   tagFinalMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
   dwt_writetxdata(sizeof(tagFinalMsg), tagFinalMsg, 0); /* Zero offset in TX buffer. */
   dwt_writetxfctrl(sizeof(tagFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
-  uint8 buffer[31] = {0};
-  dwt_readfromdevice(TX_BUFFER_ID,0,sizeof(buffer),buffer);
-  printM(buffer);
   ret = dwt_starttx(DWT_START_TX_DELAYED);
 
   /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
@@ -258,9 +223,7 @@ int dsInitRun(void) {
 
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
   }
-  //////////////////////////////////////////////////////////////////////////////////////////////////
 
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_MS);
