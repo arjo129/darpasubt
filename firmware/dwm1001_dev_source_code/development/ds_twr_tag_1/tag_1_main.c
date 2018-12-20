@@ -34,7 +34,7 @@
 /* Frames used in the ranging process. See NOTE 2 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -48,14 +48,14 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 #define FINAL_MSG_TS_LEN 4
 
 /* Total anchors number */
-#define ANCHORS_TOTAL_COUNT 2
+#define ANCHORS_TOTAL_COUNT 3
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
 static uint8 exchangeSeqNum = 0;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 31
+#define RX_BUF_LEN 32
 static uint8 rxBuffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -70,7 +70,7 @@ static uint32 status_reg = 0;
 #define POLL_TX_TO_RESP_RX_DLY_UUS 150
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 3800
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 2700
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
@@ -97,14 +97,23 @@ static volatile int anchorsCount = 0; // Counter for response from anchors
 /* Temporary storage for the timestamps to be sent to anchors. */
 static uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT];
 
-void printTS(void) {
-  int i = 0;
-  printf("--- anchors ts --- \r\n");
-  for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
-    uint64 out = anchorsTimestamps[i];
-    printf("%x \t", out);
+void getTs(uint8 *ts_field, uint32 *ts) {
+  int i;
+  *ts = 0;
+  for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
+    *ts += ts_field[i] << (i * 8);
   }
-  printf("\r\n------------------\r\n");
+}
+
+void printM(uint8 *array) {
+  printf("--- Final Message TS ---\r\n");
+  int i = 10;
+  uint32 val = 0;
+  for (i = 10; i < 27; i+=FINAL_MSG_TS_LEN) {
+    getTs(&array[i], &val);
+    printf("%u\r\n", val);
+  }
+  printf("------------------------\r\n");
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -228,6 +237,8 @@ int dsInitRun(void) {
   finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
   finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
 
+  printM(tagFinalMsg);
+
   /* Increment frame sequence number after transmission of the final message (modulo 256). */
   exchangeSeqNum++;
 
@@ -235,6 +246,9 @@ int dsInitRun(void) {
   tagFinalMsg[ALL_MSG_SN_IDX] = exchangeSeqNum;
   dwt_writetxdata(sizeof(tagFinalMsg), tagFinalMsg, 0); /* Zero offset in TX buffer. */
   dwt_writetxfctrl(sizeof(tagFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
+  uint8 buffer[31] = {0};
+  dwt_readfromdevice(TX_BUFFER_ID,0,sizeof(buffer),buffer);
+  printM(buffer);
   ret = dwt_starttx(DWT_START_TX_DELAYED);
 
   /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
