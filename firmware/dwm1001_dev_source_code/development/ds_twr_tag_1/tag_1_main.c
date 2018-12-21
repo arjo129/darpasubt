@@ -243,13 +243,13 @@ int dsInitRun(void) {
  * @return  64-bit value of the read time-stamp.
  */
 static uint64 getTxTimestampU64(void) {
-    uint8 ts_tab[5];
+    uint8 tsTab[5];
     uint64 ts = 0;
     int i;
-    dwt_readtxtimestamp(ts_tab);
+    dwt_readtxtimestamp(tsTab);
     for (i = 4; i >= 0; i--) {
         ts <<= 8;
-        ts |= ts_tab[i];
+        ts |= tsTab[i];
     }
     return ts;
 }
@@ -265,13 +265,13 @@ static uint64 getTxTimestampU64(void) {
  * @return  64-bit value of the read time-stamp.
  */
 static uint64 getRxTimestampU64(void) {
-    uint8 ts_tab[5];
+    uint8 tsTab[5];
     uint64 ts = 0;
     int i;
-    dwt_readrxtimestamp(ts_tab);
+    dwt_readrxtimestamp(tsTab);
     for (i = 4; i >= 0; i--) {
         ts <<= 8;
-        ts |= ts_tab[i];
+        ts |= tsTab[i];
     }
     return ts;
 }
