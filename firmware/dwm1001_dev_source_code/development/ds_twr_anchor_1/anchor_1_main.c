@@ -26,11 +26,12 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 
+
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
 #define RNG_DELAY_MS 80
 
 /* Frames used in the ranging process. See NOTE 2,3 below. */
-static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
+static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -39,6 +40,7 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 
 /* Index to access some of the fields in the frames involved in the process. */
 #define EX_SEQ_COUNT_IDX 2
+#define ANCH_COUNT_IDX 10
 #define FINAL_MSG_TX_1_IDX 10
 #define FINAL_MSG_TX_2_IDX 14
 #define FINAL_MSG_RX_1_IDX 18
@@ -46,7 +48,7 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 #define FINAL_MSG_TS_LEN 4
 
 /* ID of this anchor. */
-#define ANCHORD_ID 1
+#define ANCHORD_ID 2
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
 static uint8 exchangeSeqCount = 0;
@@ -91,6 +93,9 @@ static uint64 respRxTimestamp2;
 static double timeOfFlight;
 static double distanceMetre;
 
+/* Total number of anchors in this system, set by the tag. */
+static uint8 totalAnchors;
+
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
@@ -108,13 +113,16 @@ static void finalMsgGetTs(const uint8 *tsField, uint32 *ts);
 
 int ds_resp_run(void) {
 
+  /* Notifies starting of reception. */
+  printf("Anchor ID #%d receiving...\r\n", ANCHORD_ID);
+
   /* Clear reception timeout to start next ranging process. */
   dwt_setrxtimeout(0);
 
   /* Activate reception immediately. */
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
   
-  printf("ID: %d\tAttempting to receive first frame...\r\n", ANCHORD_ID);
+  printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -137,6 +145,9 @@ int ds_resp_run(void) {
       uint32 respSendDelayTime, anchorExtraDelay;
       int ret;
 
+      /* Notifies reception of exchange initiation message. */
+      printf("Initiation message received.\r\n");
+
       /* Send ID of this anchor back to tag. */
       anchorMsg[ANCHOR_ID_IDX] = ANCHORD_ID;
 
@@ -149,7 +160,8 @@ int ds_resp_run(void) {
       dwt_setdelayedtrxtime(respSendDelayTime);
 
       /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-      uint32 rxDelay = (3 - ANCHORD_ID) * ANCH_RX_AFT_TX_DLY;
+      totalAnchors = rxBuffer[ANCH_COUNT_IDX];
+      uint32 rxDelay = (totalAnchors - ANCHORD_ID) * ANCH_RX_AFT_TX_DLY;
       dwt_setrxaftertxdelay(rxDelay);
       // dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
 
@@ -168,7 +180,7 @@ int ds_resp_run(void) {
        * which will reply earlier with the anchor ID will go to receive mode faster. This causes the first anchor to receive the message from the second
        * anchor, preventing it from receiving the final message from the tag.
        */
-      printf("ID: %d\tAttempting to receive final frame...\r\n", ANCHORD_ID);
+      printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
       while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -217,7 +229,7 @@ int ds_resp_run(void) {
           timeOfFlight = timeOfFlightInUnits * DWT_TIME_UNITS;
           distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
 
-          printf("Exchange #: %u\t|\tDistance: %lf m\r\n", exchangeSeqCount, distanceMetre);
+          printf("Completed Exchange #%u --- Distance: %lf m\r\n\r\n", exchangeSeqCount, distanceMetre);
         } else {
           /* Clear RX error/timeout events in the DW1000 status register. */
           dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);

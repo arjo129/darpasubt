@@ -32,7 +32,7 @@
 #define RNG_DELAY_MS 100
 
 /* Frames used in the ranging process. See NOTE 2 below. */
-static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
+static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -41,14 +41,15 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 
 /* Indexes to access some of the fields in the frames defined above. */
 #define EX_SEQ_COUNT_IDX 2
+#define ANCH_COUNT_IDX 10
 #define FINAL_MSG_TX_1_IDX 10
 #define FINAL_MSG_TX_2_IDX 14
 #define FINAL_MSG_RX_1_IDX 18
 #define ANCHOR_ID_IDX 10
 #define FINAL_MSG_TS_LEN 4
 
-/* Total anchors number */
-#define ANCHORS_TOTAL_COUNT 3
+/* Total anchors number. Minimum of 1 and maximum of 256, ie. a 1-byte value. */
+#define ANCHORS_TOTAL_COUNT 2
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
 static uint8 exchangeSeqCount = 0;
@@ -95,8 +96,6 @@ static uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT];
 
 /* TODO:
  *
- * 1. Rename all variables in tag and anchor to ensure readability.
- * 2. Include ANCHOR_TOTAL_COUNT in the exchange so anchors can dynamically compute delay.
  * 3. Adjust all delays and antenna delays so it matches their main.c as well as calibrate values to improve readings.
  * 4. Add proper comments NOTES to document this code.
  * 5. Rearrange the macro definitions and global variables line position.
@@ -120,8 +119,12 @@ int dsInitRun(void) {
   /* Clears the anchor timestamps temporary storage. */
   memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
 
+  /* Notifies initiating of measurement exchange. */
+  printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
+
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
   tagFirstMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
+  tagFirstMsg[ANCH_COUNT_IDX] = (uint8) ANCHORS_TOTAL_COUNT;
   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
   dwt_writetxdata(sizeof(tagFirstMsg), tagFirstMsg, 0); /* Zero offset in TX buffer. */
   dwt_writetxfctrl(sizeof(tagFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
@@ -131,7 +134,7 @@ int dsInitRun(void) {
   txCount++;
   printf("Transmission # : %d\r\n", txCount);
 
-  printf("Attempting to receive frames from anchors...\r\n");
+  printf("Attempting to receive response from all anchors...\r\n");
   anchorsCount = 0;
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
@@ -171,7 +174,7 @@ int dsInitRun(void) {
           printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
         } else {
           anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
-          printf("Received anchor %u\r\n", anchorID);
+          printf("Received Anchor ID: %u\r\n", anchorID);
           anchorsCount++;
         }
 
@@ -224,6 +227,8 @@ int dsInitRun(void) {
 
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+
+    printf("Exchange #%u completed.\r\n\r\n", exchangeSeqCount);
   }
 
   /* Execute a delay between ranging exchanges. */
@@ -282,7 +287,7 @@ static void finalMsgSetRxTs(uint8 *tsField) {
   for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
     ts = anchorsTimestamps[i];
     // We want to continuosly write all RX values which are all 4 bytes. So we start at multiples of 4.
-    for (j = i * 4; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
+    for (j = i * FINAL_MSG_TS_LEN; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
       tsField[j] = (uint8) ts;
       ts >>= 8;
     }
