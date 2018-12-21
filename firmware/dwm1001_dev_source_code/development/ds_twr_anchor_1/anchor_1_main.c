@@ -26,14 +26,16 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 
+/* Number representing the identification of this Anchor. 
+* Minimum of 1 and maximum of 256, ie. a 1-byte value. 
+* This number MUST be set in a successive order for all
+* anchors in the exchange system, starting from '1'. */
+////////////////////*** IMPORTANT ***/////////////////////
+///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
+#define ANCHORD_ID 2
 
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
 #define RNG_DELAY_MS 80
-
-/* Frames used in the ranging process. See NOTE 2,3 below. */
-static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
-static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -45,21 +47,12 @@ static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x2
 #define FINAL_MSG_TX_2_IDX 14
 #define FINAL_MSG_RX_1_IDX 18
 #define ANCHOR_ID_IDX 10
-#define FINAL_MSG_TS_LEN 4
 
-/* ID of this anchor. */
-#define ANCHORD_ID 2
-
-/* Exchange sequence number, incremented after each transmission of the final message. */
-static uint8 exchangeSeqCount = 0;
-
-/* Buffer to store received response message.
-* Its size is adjusted to longest frame that this example code is supposed to handle. */
+/* Length of buffer to store received messages. */
 #define RX_BUF_LEN 32
-static uint8 rxBuffer[RX_BUF_LEN];
 
-/* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
-static uint32 statusReg = 0;
+/* Length of all timestamp values. */
+#define FINAL_MSG_TS_LEN 4
 
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
 * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
@@ -78,6 +71,21 @@ static uint32 statusReg = 0;
 /* Receive final timeout. See NOTE 5 below. */
 #define FINAL_RX_TIMEOUT_UUS 3300
 
+/* Speed of light in air, in metres per second. */
+#define SPEED_OF_LIGHT 299702547
+
+/* Frames used in the ranging process. See NOTE 2,3 below. */
+static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
+static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+/* Buffer to store received response message.
+* Its size is adjusted to longest frame that this example code is supposed to handle. */
+static uint8 rxBuffer[RX_BUF_LEN];
+
+/* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
+static uint32 statusReg = 0;
+
 /* Timestamps of frames transmission/reception.
 * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
 typedef signed long long int64;
@@ -86,15 +94,15 @@ static uint64 respRxTimestamp1;
 static uint64 respTxTimestamp1;
 static uint64 respRxTimestamp2;
 
-/* Speed of light in air, in metres per second. */
-#define SPEED_OF_LIGHT 299702547
-
 /* Hold copies of computed time of flight and distance here for reference so that it can be examined at a debug breakpoint. */
 static double timeOfFlight;
 static double distanceMetre;
 
 /* Total number of anchors in this system, set by the tag. */
 static uint8 totalAnchors;
+
+/* Exchange sequence number, incremented after each transmission of the final message. */
+static uint8 exchangeSeqCount = 0;
 
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
