@@ -32,7 +32,7 @@
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORS_TOTAL_COUNT 2
+#define ANCHORS_TOTAL_COUNT 1
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 100
@@ -57,9 +57,6 @@
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
 * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
 #define UUS_TO_DWT_TIME 65536
-
-/* TX antenna delay */
-#define TX_ANT_DLY 16436
 
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
  * frame length of approximately 2.66 ms with above configuration. */

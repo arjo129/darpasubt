@@ -66,6 +66,10 @@ static dwt_config_t config = {
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 8
 
+/*Should be accurately calculated during calibration*/
+#define TX_ANT_DLY 16456
+#define RX_ANT_DLY 16456
+
 #ifdef USE_FREERTOS
   TaskHandle_t  ds_responder_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
   extern void ds_responder_task_function (void * pvParameter);
