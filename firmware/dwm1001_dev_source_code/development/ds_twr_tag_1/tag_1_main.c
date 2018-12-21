@@ -100,7 +100,6 @@ static void finalMsgSetRxTs(uint8 *tsField);
 
 /* TODO:
  *
- * 3. Adjust all delays and antenna delays so it matches their main.c as well as calibrate values to improve readings.
  * 4. Add proper comments NOTES to document this code.
  * /
 

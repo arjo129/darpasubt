@@ -135,7 +135,7 @@ int main(void)
 
   /*Initialization UART*/
   boUART_Init ();
-  printf("Double Sided Two Way Ranging Response Example \r\n");
+  printf("Anchor --- Double Sided Two Way Ranging\r\n");
 
   /* Reset DW1000 */
   reset_DW1000(); 
