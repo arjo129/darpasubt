@@ -74,6 +74,9 @@
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
 
+/* Use 10 readings to get the average value. */
+#define READINGS_COUNT_FOR_AVG 10
+
 /* Frames used in the ranging process. See NOTE 2,3 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -97,12 +100,16 @@ static uint64 respRxTimestamp2;
 /* Hold copies of computed time of flight and distance here for reference so that it can be examined at a debug breakpoint. */
 static double timeOfFlight;
 static double distanceMetre;
+static double totalDistances = 0;
 
 /* Total number of anchors in this system, set by the tag. */
 static uint8 totalAnchors;
 
 /* Exchange sequence number, incremented after each transmission of the final message. */
 static uint8 exchangeSeqCount = 0;
+
+/* A counter for the number of readings computed, so we can compute an average value. */
+static int readingCount = 0;
 
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
@@ -122,7 +129,7 @@ static void finalMsgGetTs(const uint8 *tsField, uint32 *ts);
 int ds_resp_run(void) {
 
   /* Notifies starting of reception. */
-  printf("Anchor ID #%d receiving...\r\n", ANCHORD_ID);
+  // printf("Anchor ID #%d receiving...\r\n", ANCHORD_ID);
 
   /* Clear reception timeout to start next ranging process. */
   dwt_setrxtimeout(0);
@@ -130,7 +137,7 @@ int ds_resp_run(void) {
   /* Activate reception immediately. */
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
   
-  printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
+  // printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -154,7 +161,7 @@ int ds_resp_run(void) {
       int ret;
 
       /* Notifies reception of exchange initiation message. */
-      printf("Initiation message received.\r\n");
+      // printf("Initiation message received.\r\n");
 
       /* Send ID of this anchor back to tag. */
       anchorMsg[ANCHOR_ID_IDX] = ANCHORD_ID;
@@ -188,7 +195,7 @@ int ds_resp_run(void) {
        * which will reply earlier with the anchor ID will go to receive mode faster. This causes the first anchor to receive the message from the second
        * anchor, preventing it from receiving the final message from the tag.
        */
-      printf("Attempting to receive final message...\r\n", ANCHORD_ID);
+      // printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
       while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -236,8 +243,18 @@ int ds_resp_run(void) {
 
           timeOfFlight = timeOfFlightInUnits * DWT_TIME_UNITS;
           distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
-
-          printf("Completed Exchange #%u --- Distance: %lf m\r\n\r\n", exchangeSeqCount, distanceMetre);
+          
+          totalDistances += distanceMetre;
+          readingCount++;
+          if (readingCount == (int)READINGS_COUNT_FOR_AVG) {
+            distanceMetre = totalDistances / (double)READINGS_COUNT_FOR_AVG;
+            printf("Completed Exchange #%u --- Distance: %f m\r\n\r\n", exchangeSeqCount, distanceMetre);
+            totalDistances = 0;
+            readingCount = 0;
+          } else {
+            // printf("Completed Exchange #%u\r\n\r\n");
+            printf("reading #%d\r\n", readingCount);
+          }
         } else {
           /* Clear RX error/timeout events in the DW1000 status register. */
           dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
