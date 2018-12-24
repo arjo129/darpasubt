@@ -47,6 +47,7 @@
 #define FINAL_MSG_TX_2_IDX 14
 #define FINAL_MSG_RX_1_IDX 18
 #define ANCHOR_ID_IDX 10
+#define ANCHOR_DIST_IDX 11
 
 /* Length of buffer to store received messages. */
 #define RX_BUF_LEN 32
@@ -79,7 +80,7 @@
 
 /* Frames used in the ranging process. See NOTE 2,3 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
-static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Buffer to store received response message.
@@ -111,10 +112,13 @@ static uint8 exchangeSeqCount = 0;
 /* A counter for the number of readings computed, so we can compute an average value. */
 static int readingCount = 0;
 
+int first = 1;
+
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
 static void finalMsgGetTs(const uint8 *tsField, uint32 *ts);
+static void writeDistance(uint8 *tsField, int64 ts);
 
 /*! ------------------------------------------------------------------------------------------------------------------
 * @fn main()
@@ -130,9 +134,14 @@ int ds_resp_run(void) {
   /* Notifies starting of reception. */
   printf("Anchor ID #%d receiving...\r\n", ANCHORD_ID);
 
-  /* Activate reception immediately. */
+  /* Clear reception timeout to start next ranging process. */
   dwt_setrxtimeout(0);
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
+  if (first) {
+    /* Activate reception immediately. */
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  }
+  
   
   printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
@@ -158,7 +167,7 @@ int ds_resp_run(void) {
       int ret;
 
       /* Notifies reception of exchange initiation message. */
-      // printf("Initiation message received.\r\n");
+      printf("Initiation message received.\r\n");
 
       /* Send ID of this anchor back to tag. */
       anchorMsg[ANCHOR_ID_IDX] = ANCHORD_ID;
@@ -187,7 +196,13 @@ int ds_resp_run(void) {
       if (ret == DWT_ERROR) {
           return;
       }
-
+      dwt_setrxtimeout(65000);
+      /********
+       * PROBLEM: In a 2 anchors system, since the second anchor has a longer delay when sending the reply message with anchor ID, the first anchor
+       * which will reply earlier with the anchor ID will go to receive mode faster. This causes the first anchor to receive the message from the second
+       * anchor, preventing it from receiving the final message from the tag.
+       */
+      printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
       printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
@@ -197,12 +212,13 @@ int ds_resp_run(void) {
       dwt_forcetrxoff(); // Make sure the device is in IDLE first before setting RX timeout. (see: user manual)
       dwt_setrxtimeout(0);
 
-      /* RX timeout was flagged earlier by polling. */
       if (statusReg & SYS_STATUS_ALL_RX_TO) {
+        first = 1;
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         printf("*** ERROR ***\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
         return 0;
       }
-
+      
       if (statusReg & SYS_STATUS_RXFCG) {
         /* Clear good RX frame event and TX frame sent in the DW1000 status register. */
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
@@ -248,17 +264,37 @@ int ds_resp_run(void) {
           timeOfFlight = timeOfFlightInUnits * DWT_TIME_UNITS;
           distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
           
-          totalDistances += distanceMetre;
-          readingCount++;
-          if (readingCount == (int)READINGS_COUNT_FOR_AVG) {
-            distanceMetre = totalDistances / (double)READINGS_COUNT_FOR_AVG;
-            printf("Completed Exchange #%u --- Distance: %f m\r\n\r\n", exchangeSeqCount, distanceMetre);
-            totalDistances = 0;
-            readingCount = 0;
-          } else {
-            // printf("Completed Exchange #%u\r\n\r\n");
-            printf("reading #%d\r\n", readingCount);
-          }
+          printf("Completed Exchange #%u --- Distance: %f m\r\n\r\n", exchangeSeqCount, distanceMetre);
+          // totalDistances += distanceMetre;
+          // readingCount++;
+          // if (readingCount == (int)READINGS_COUNT_FOR_AVG) {
+          //   distanceMetre = totalDistances / (double)READINGS_COUNT_FOR_AVG;
+          //   printf("Completed Exchange #%u --- Distance: %f m\r\n\r\n", exchangeSeqCount, distanceMetre);
+          //   totalDistances = 0;
+          //   readingCount = 0;
+          // } else {
+          //   printf("Completed Exchange #%u\r\n\r\n");
+          //   printf("reading #%d\r\n", readingCount);
+          // }
+
+          /* Write the distance to transmission message. */
+          // writeDistance(&anchorMsg[ANCHOR_DIST_IDX], timeOfFlightInUnits);
+          memcpy(&anchorMsg[ANCHOR_DIST_IDX], &distanceMetre, sizeof(double));
+
+          /* Set send time for response. See NOTE 9 below. */
+          respSendDelayTime = (respRxTimestamp2 + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+          respSendDelayTime = respSendDelayTime + ((ANCHORD_ID - 1) * ANCH_INTV_DLY);
+          dwt_setdelayedtrxtime(respSendDelayTime);
+
+          /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
+          uint32 rxDelay = (totalAnchors - ANCHORD_ID) * ANCH_RX_AFT_TX_DLY;
+          dwt_setrxaftertxdelay(rxDelay);
+          first = 0;
+          /* Write and send the response message. See NOTE 10 below. */
+          dwt_writetxdata(sizeof(anchorMsg), anchorMsg, 0);
+          dwt_writetxfctrl(sizeof(anchorMsg), 0, 1);
+          ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+          
         } else {
           /* Clear RX error/timeout events in the DW1000 status register. */
           dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
@@ -320,6 +356,15 @@ static uint64 getRxTimestampU64(void) {
     ts |= tsTab[i];
   }
   return ts;
+}
+
+static void writeDistance(uint8 *tsField, int64 ts) {
+  int i;
+  for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
+    tsField[i] = (uint8) ts;
+    ts 
+    >>= 8;
+  }
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
