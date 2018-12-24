@@ -32,7 +32,7 @@
 * anchors in the exchange system, starting from '1'. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORD_ID 1
+#define ANCHORD_ID 2
 
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
 #define RNG_DELAY_MS 80
@@ -127,17 +127,14 @@ static void finalMsgGetTs(const uint8 *tsField, uint32 *ts);
 */
 
 int ds_resp_run(void) {
-
   /* Notifies starting of reception. */
-  // printf("Anchor ID #%d receiving...\r\n", ANCHORD_ID);
-
-  /* Clear reception timeout to start next ranging process. */
-  dwt_setrxtimeout(0);
+  printf("Anchor ID #%d receiving...\r\n", ANCHORD_ID);
 
   /* Activate reception immediately. */
+  dwt_setrxtimeout(0);
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
   
-  // printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
+  printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
@@ -178,7 +175,8 @@ int ds_resp_run(void) {
       totalAnchors = rxBuffer[ANCH_COUNT_IDX];
       uint32 rxDelay = (totalAnchors - ANCHORD_ID) * ANCH_RX_AFT_TX_DLY;
       dwt_setrxaftertxdelay(rxDelay);
-      // dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+      /* 65ms RX timeout. If a final message from Tag was never received, we just abandon current exchange. */
+      dwt_setrxtimeout(65000);
 
       /* Write and send the response message. See NOTE 10 below. */
       dwt_writetxdata(sizeof(anchorMsg), anchorMsg, 0);
@@ -190,14 +188,20 @@ int ds_resp_run(void) {
           return;
       }
 
-      /********
-       * PROBLEM: In a 2 anchors system, since the second anchor has a longer delay when sending the reply message with anchor ID, the first anchor
-       * which will reply earlier with the anchor ID will go to receive mode faster. This causes the first anchor to receive the message from the second
-       * anchor, preventing it from receiving the final message from the tag.
-       */
-      // printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
+      printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+
+      /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
+       * Note: calling dwt_setrxtimeout(0) does not set the timeout period register with zero. (see: function description) */
+      dwt_forcetrxoff(); // Make sure the device is in IDLE first before setting RX timeout. (see: user manual)
+      dwt_setrxtimeout(0);
+
+      /* RX timeout was flagged earlier by polling. */
+      if (statusReg & SYS_STATUS_ALL_RX_TO) {
+        printf("*** ERROR ***\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
+        return 0;
+      }
 
       if (statusReg & SYS_STATUS_RXFCG) {
         /* Clear good RX frame event and TX frame sent in the DW1000 status register. */

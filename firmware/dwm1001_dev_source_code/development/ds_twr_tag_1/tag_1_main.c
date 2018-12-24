@@ -32,7 +32,7 @@
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORS_TOTAL_COUNT 1
+#define ANCHORS_TOTAL_COUNT 2
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 100
@@ -100,6 +100,8 @@ static void finalMsgSetRxTs(uint8 *tsField);
 
 /* TODO:
  *
+ * 2. Possibly use soft reset to restart clocks to reduce clock drift maybe?
+ * 3. Use timeouts to reset readings, make the operation more robust.
  * 4. Add proper comments NOTES to document this code.
  * /
 
@@ -136,14 +138,28 @@ int dsInitRun(void) {
   txCount++;
   printf("Transmission # : %d\r\n", txCount);
 
+  /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
+  dwt_setrxtimeout(65000);
   printf("Attempting to receive response from all anchors...\r\n");
   anchorsCount = 0;
-  /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
     while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
-    if (statusReg & SYS_STATUS_RXFCG) {	
+    if (statusReg & SYS_STATUS_RXRFTO) {
+      /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
+       * Note: calling dwt_setrxtimeout(0) does not set the timeout period register with zero. (see: function description) */
+      dwt_forcetrxoff(); // Ensure the device is in IDLE mode before setting RX timeout. (see: user manual)
+      dwt_setrxtimeout(0);
+
+      /* Clear RX timeout events before next exchange. */
+      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
+
+      printf("*** ERROR ***\r\nRX timeout occured from listening to anchors. Abandoning current exchange.\r\nMissing Anchors: %d\r\n*************\r\n", ANCHORS_TOTAL_COUNT - anchorsCount);
+      return;
+    }
+
+    if (statusReg & SYS_STATUS_RXFCG) {
       uint32 frameLen;
 
       /* Clear good RX frame event in the DW1000 status register. */
@@ -151,7 +167,6 @@ int dsInitRun(void) {
 
       /* A frame has been received, read it into the local buffer. */
       frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-    
       if (frameLen <= RX_BUF_LEN) {
         dwt_readrxdata(rxBuffer, frameLen, 0);
       }

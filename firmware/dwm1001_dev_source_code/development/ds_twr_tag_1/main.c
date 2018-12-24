@@ -164,7 +164,7 @@ int main(void)
   /* Set expected response's delay and timeout. 
   * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
   dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-  dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms  
+  dwt_setrxtimeout(0); // Maximum value timeout with DW1000 is 65ms.
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK

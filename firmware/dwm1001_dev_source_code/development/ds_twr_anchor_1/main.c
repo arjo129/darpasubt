@@ -163,8 +163,7 @@ int main(void)
 
   /* Set preamble timeout for expected frames.  */
   // dwt_setpreambledetecttimeout(PRE_TIMEOUT);
-
-  dwt_setrxtimeout(0);    // set to NO receive timeout for this simple example   
+  dwt_setrxtimeout(0);
 
   //-------------dw1000  ini------end---------------------------	
 
