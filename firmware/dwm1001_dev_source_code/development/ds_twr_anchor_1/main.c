@@ -66,6 +66,10 @@ static dwt_config_t config = {
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 8
 
+/*Should be accurately calculated during calibration*/
+#define TX_ANT_DLY 16456
+#define RX_ANT_DLY 16456
+
 #ifdef USE_FREERTOS
   TaskHandle_t  ds_responder_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
   extern void ds_responder_task_function (void * pvParameter);
@@ -131,7 +135,7 @@ int main(void)
 
   /*Initialization UART*/
   boUART_Init ();
-  printf("Double Sided Two Way Ranging Response Example \r\n");
+  printf("Anchor --- Double Sided Two Way Ranging\r\n");
 
   /* Reset DW1000 */
   reset_DW1000(); 
@@ -159,8 +163,9 @@ int main(void)
 
   /* Set preamble timeout for expected frames.  */
   // dwt_setpreambledetecttimeout(PRE_TIMEOUT);
+  dwt_setrxtimeout(0);
 
-  dwt_setrxtimeout(0);    // set to NO receive timeout for this simple example   
+  dwt_setdelayedtrxtime(0);
 
   //-------------dw1000  ini------end---------------------------	
 
