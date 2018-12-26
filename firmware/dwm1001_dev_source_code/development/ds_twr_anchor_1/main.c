@@ -165,6 +165,8 @@ int main(void)
   // dwt_setpreambledetecttimeout(PRE_TIMEOUT);
   dwt_setrxtimeout(0);
 
+  dwt_setdelayedtrxtime(0);
+
   //-------------dw1000  ini------end---------------------------	
 
   // IF WE GET HERE THEN THE LEDS WILL BLINK

@@ -32,7 +32,7 @@
 * anchors in the exchange system, starting from '1'. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORD_ID 3
+#define ANCHORD_ID 1
 
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
 #define RNG_DELAY_MS 80
@@ -112,8 +112,6 @@ static uint8 exchangeSeqCount = 0;
 /* A counter for the number of readings computed, so we can compute an average value. */
 static int readingCount = 0;
 
-int first = 1;
-
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
@@ -137,12 +135,9 @@ int ds_resp_run(void) {
   /* Clear reception timeout to start next ranging process. */
   dwt_setrxtimeout(0);
 
-  if (first) {
-    /* Activate reception immediately. */
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  }
-  
-  
+  /* Activate reception immediately. */
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
   printf("Attempting to receive initiation message...\r\n", ANCHORD_ID);
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
@@ -196,11 +191,6 @@ int ds_resp_run(void) {
       if (ret == DWT_ERROR) {
           return;
       }
-      /********
-       * PROBLEM: In a 2 anchors system, since the second anchor has a longer delay when sending the reply message with anchor ID, the first anchor
-       * which will reply earlier with the anchor ID will go to receive mode faster. This causes the first anchor to receive the message from the second
-       * anchor, preventing it from receiving the final message from the tag.
-       */
       printf("Attempting to receive final message...\r\n", ANCHORD_ID);
       /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
       printf("Attempting to receive final message...\r\n", ANCHORD_ID);
@@ -212,7 +202,6 @@ int ds_resp_run(void) {
       dwt_setrxtimeout(0);
 
       if (statusReg & SYS_STATUS_ALL_RX_TO) {
-        first = 1;
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         printf("*** ERROR ***\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
         return 0;
@@ -264,17 +253,6 @@ int ds_resp_run(void) {
           distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
           
           printf("Completed Exchange #%u --- Distance: %f m\r\n\r\n", exchangeSeqCount, distanceMetre);
-          // totalDistances += distanceMetre;
-          // readingCount++;
-          // if (readingCount == (int)READINGS_COUNT_FOR_AVG) {
-          //   distanceMetre = totalDistances / (double)READINGS_COUNT_FOR_AVG;
-          //   printf("Completed Exchange #%u --- Distance: %f m\r\n\r\n", exchangeSeqCount, distanceMetre);
-          //   totalDistances = 0;
-          //   readingCount = 0;
-          // } else {
-          //   printf("Completed Exchange #%u\r\n\r\n");
-          //   printf("reading #%d\r\n", readingCount);
-          // }
 
           /* Write the distance to transmission message. */
           // writeDistance(&anchorMsg[ANCHOR_DIST_IDX], timeOfFlightInUnits);
@@ -288,11 +266,10 @@ int ds_resp_run(void) {
           /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
           uint32 rxDelay = (totalAnchors - ANCHORD_ID) * ANCH_RX_AFT_TX_DLY;
           dwt_setrxaftertxdelay(rxDelay);
-          first = 0;
           /* Write and send the response message. See NOTE 10 below. */
           dwt_writetxdata(sizeof(anchorMsg), anchorMsg, 0);
           dwt_writetxfctrl(sizeof(anchorMsg), 0, 1);
-          ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+          ret = dwt_starttx(DWT_START_TX_DELAYED);
           
         } else {
           /* Clear RX error/timeout events in the DW1000 status register. */
