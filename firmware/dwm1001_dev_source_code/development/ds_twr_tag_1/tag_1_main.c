@@ -32,7 +32,7 @@
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORS_TOTAL_COUNT 2
+#define ANCHORS_TOTAL_COUNT 3
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 100
@@ -149,7 +149,7 @@ int dsInitRun(void) {
 
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   dwt_setrxtimeout(65000);
-  printf("Attempting to receive response from all anchors...\r\n");
+  // printf("Attempting to receive response from all anchors...\r\n");
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
@@ -325,7 +325,7 @@ int dsInitRun(void) {
       printf(",");
     }
   }
-  printf("\r\n");
+  printf(";\r\n");
 
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_MS);

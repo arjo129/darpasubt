@@ -32,7 +32,7 @@
 * anchors in the exchange system, starting from '1'. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORD_ID 2
+#define ANCHORD_ID 3
 
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
 #define RNG_DELAY_MS 80
@@ -196,7 +196,6 @@ int ds_resp_run(void) {
       if (ret == DWT_ERROR) {
           return;
       }
-      dwt_setrxtimeout(65000);
       /********
        * PROBLEM: In a 2 anchors system, since the second anchor has a longer delay when sending the reply message with anchor ID, the first anchor
        * which will reply earlier with the anchor ID will go to receive mode faster. This causes the first anchor to receive the message from the second
