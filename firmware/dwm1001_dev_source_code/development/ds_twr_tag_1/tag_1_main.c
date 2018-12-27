@@ -113,7 +113,7 @@ static void receiveDistanceMsgs(void);
 static void printDistance(void);
 
 /* TODO:
- *
+ * 1. Fix the timeout feature that is when unable to receive all responses from the anchors.
  * 2. Possibly use soft reset to restart clocks to reduce clock drift maybe?
  * 3. Use timeouts to reset readings, make the operation more robust.
  * 4. Add proper comments NOTES to document this code.
@@ -136,12 +136,12 @@ int dsInitRun(void) {
   memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
 
   /* Notifies initiating of measurement exchange. */
-  // printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
+  printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
   sendInitiationMsg();
 
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   dwt_setrxtimeout(65000);
-  // printf("Attempting to receive response from all anchors...\r\n");
+  printf("Attempting to receive response from all anchors...\r\n");
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     receiveAnchorResponse();
@@ -313,7 +313,7 @@ static void sendFinalMsg() {
   if (txStatus == DWT_SUCCESS) {
     /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
-
+    printf("final sent\r\n");
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
@@ -355,7 +355,7 @@ static void receiveAnchorResponse(void) {
     rxBuffer[EX_SEQ_COUNT_IDX] = 0;
     if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
       rxCount++;
-      // printf("Reception # : %d\r\n",rxCount);
+      printf("Reception # : %d\r\n",rxCount);
       uint8 anchorID;
 
       /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
