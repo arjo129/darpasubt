@@ -32,7 +32,7 @@
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORS_TOTAL_COUNT 3
+#define ANCHORS_TOTAL_COUNT 2
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 100
@@ -104,7 +104,13 @@ static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
 static void finalMsgSetTs(uint8 *tsField, uint64 ts);
 static void finalMsgSetRxTs(uint8 *tsField);
-static void readDistance(const uint8 *tsField, int64 *ts);
+static uint32 setFinalTxDelay(void);
+static void writeFinalMsg(uint32 tagSendDelayTime);
+static void sendInitiationMsg(void);
+static void sendFinalMsg(void);
+static void receiveAnchorResponse(void);
+static void receiveDistanceMsgs(void);
+static void printDistance(void);
 
 /* TODO:
  *
@@ -124,208 +130,36 @@ static void readDistance(const uint8 *tsField, int64 *ts);
 */
 int dsInitRun(void) {
   /* Loop forever initiating ranging exchanges. */
-
   uint32 tagSendDelayTime;
-  int txStatus;
 
   /* Clears the anchor timestamps temporary storage. */
   memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
 
   /* Notifies initiating of measurement exchange. */
   // printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
-
-  /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
-  tagFirstMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
-  tagFirstMsg[ANCH_COUNT_IDX] = (uint8) ANCHORS_TOTAL_COUNT;
-  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-  dwt_writetxdata(sizeof(tagFirstMsg), tagFirstMsg, 0); /* Zero offset in TX buffer. */
-  dwt_writetxfctrl(sizeof(tagFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
-
-  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent. */
-  dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
-  txCount++;
-  // printf("Transmission # : %d\r\n", txCount);
+  sendInitiationMsg();
 
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   dwt_setrxtimeout(65000);
   // printf("Attempting to receive response from all anchors...\r\n");
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
-    /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
-    while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
-
-    if (statusReg & SYS_STATUS_RXRFTO) {
-      /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
-       * Note: calling dwt_setrxtimeout(0) does not set the timeout period register with zero. (see: function description) */
-      dwt_forcetrxoff(); // Ensure the device is in IDLE mode before setting RX timeout. (see: user manual)
-      dwt_setrxtimeout(0);
-
-      /* Clear RX timeout events before next exchange. */
-      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
-
-      printf("*** ERROR ***\r\nRX timeout occured from listening to anchors. Abandoning current exchange.\r\nMissing Anchors: %d\r\n*************\r\n", ANCHORS_TOTAL_COUNT - anchorsCount);
-      return;
-    }
-
-    if (statusReg & SYS_STATUS_RXFCG) {
-      uint32 frameLen;
-
-      /* Clear good RX frame event in the DW1000 status register. */
-      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-
-      /* A frame has been received, read it into the local buffer. */
-      frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-      if (frameLen <= RX_BUF_LEN) {
-        dwt_readrxdata(rxBuffer, frameLen, 0);
-      }
-
-      /* Check that the frame is the expected response from the companion "DS TWR responder" example.
-      * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-      rxBuffer[EX_SEQ_COUNT_IDX] = 0;
-      if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
-        rxCount++;
-        // printf("Reception # : %d\r\n",rxCount);
-        uint8 anchorID;
-
-        /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
-        tagRxTimestamp1 = getRxTimestampU64();
-
-        /* Retrieve the anchor number embedded in the response message. */
-        anchorID = rxBuffer[ANCHOR_ID_IDX];
-
-        /* Temporarily store the timestamps specific to the retrieved anchor number. */
-        // Safety check
-        if (anchorID > ANCHORS_TOTAL_COUNT) {
-          // printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
-        } else {
-          anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
-          // printf("Received Anchor ID: %u\r\n", anchorID);
-          anchorsCount++;
-        }
-
-        /* We need to ensure we enable RX only when we expect another response from the anchors.
-         * This is crucial since enabling RX without receiving will cause any transmissions (final
-         * message transmission later) to be delayed for unusually long. */
-        if (anchorsCount < ANCHORS_TOTAL_COUNT) {
-          dwt_rxenable(DWT_START_RX_IMMEDIATE);
-        }
-
-      } else {
-        /* Clear RX error/timeout events in the DW1000 status register. */
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-
-        /* Reset RX to properly reinitialise LDE operation. */
-        dwt_rxreset();
-      }
-    }
+    receiveAnchorResponse();
   }
 
-  /* Retrieve the timestamp from when the initial message transmits. */
-  tagTxTimestamp1 = getTxTimestampU64();
+  tagSendDelayTime = setFinalTxDelay();
+  writeFinalMsg(tagSendDelayTime);
+  sendFinalMsg();
   
-  /* Compute final message transmission time. See NOTE 10 below. */
-  // Uses the RX timestamp from the last received anchor response to calculate the delay needed to transmit final message.
-  tagSendDelayTime = (anchorsTimestamps[ANCHORS_TOTAL_COUNT - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
-  dwt_setdelayedtrxtime(tagSendDelayTime);
-
-  /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
-
-  /* Write all the timestamps in the final message. See NOTE 11 below. */
-  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
-  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
-  finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
-
-  /* Increment frame sequence number after transmission of the final message (modulo 256). */
-  exchangeSeqCount++;
-
-  /* Write and send final message. See NOTE 8 below. */
-  tagFinalMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
-  dwt_writetxdata(sizeof(tagFinalMsg), tagFinalMsg, 0); /* Zero offset in TX buffer. */
-  dwt_writetxfctrl(sizeof(tagFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
-  txStatus = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-
-  /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
-  if (txStatus == DWT_SUCCESS) {
-    /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
-    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
-
-    /* Clear TXFRS event. */
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-    // printf("Exchange #%u completed.\r\n\r\n", exchangeSeqCount);
-  }
-  dwt_setrxtimeout(0);
   /* For for reception of the distances. */
+  /* We want to receive the distances indefinitely. */
+  dwt_setrxtimeout(0);
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
-    /* Poll for reception of distance from each anchor. */
-    while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
-
-    if (statusReg & SYS_STATUS_RXFCG) {	
-      uint32 frameLen;
-
-      /* Clear good RX frame event in the DW1000 status register. */
-      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
-
-      /* A frame has been received, read it into the local buffer. */
-      frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-    
-      if (frameLen <= RX_BUF_LEN) {
-        dwt_readrxdata(rxBuffer, frameLen, 0);
-      }
-
-      /* Check that the frame is the expected response from the companion "DS TWR responder" example.
-      * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-      rxBuffer[EX_SEQ_COUNT_IDX] = 0;
-      if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
-        rxCount++;
-        // printf("Distance Reception # : %d\r\n",rxCount);
-        double anchorDistance;
-        uint8 anchorID;
-
-        /* Retrieve the anchor number embedded in the response message. */
-        anchorID = rxBuffer[ANCHOR_ID_IDX];
-
-        /* Retrieve the distance. */
-        memcpy(&anchorDistance, &rxBuffer[ANCHOR_DIST_IDX], sizeof(double));
-
-        /* Temporarily store the timestamps specific to the retrieved anchor number. */
-        // Safety check
-        if (anchorID > ANCHORS_TOTAL_COUNT) {
-          // printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
-        } else {
-          anchorsDistances[anchorID - 1] = anchorDistance;
-          // printf("Received Anchor ID: %u\r\n", anchorID);
-          anchorsCount++;
-        }
-
-        /* We need to ensure we enable RX only when we expect another response from the anchors.
-         * This is crucial since enabling RX without receiving will cause any transmissions (final
-         * message transmission later) to be delayed for unusually long. */
-        if (anchorsCount < ANCHORS_TOTAL_COUNT) {
-          dwt_rxenable(DWT_START_RX_IMMEDIATE);
-        }
-
-      } else {
-        /* Clear RX error/timeout events in the DW1000 status register. */
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-
-        /* Reset RX to properly reinitialise LDE operation. */
-        dwt_rxreset();
-      }
-    }
+    receiveDistanceMsgs();
   }
-  int i = 0;
-  double dist;
-  for (int i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
-    printf("%lf", anchorsDistances[i]);
-    if (i < ANCHORS_TOTAL_COUNT - 1) {
-      printf(",");
-    }
-  }
-  printf(";\r\n");
+
+  printDistance();
 
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_MS);
@@ -390,12 +224,16 @@ static void finalMsgSetRxTs(uint8 *tsField) {
   }
 }
 
-static void readDistance(const uint8 *tsField, int64 *ts) {
-  int i;
-  *ts = 0;
-  for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-      *ts += tsField[i] << (i * 8);
+static void printDistance(void) {
+  int i = 0;
+  double dist;
+  for (int i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+    printf("%lf", anchorsDistances[i]);
+    if (i < ANCHORS_TOTAL_COUNT - 1) {
+      printf(",");
+    }
   }
+  printf(";\r\n");
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -415,6 +253,201 @@ static void finalMsgSetTs(uint8 *tsField, uint64 ts) {
         tsField[i] = (uint8) ts;
         ts >>= 8;
     }
+}
+
+static uint32 setFinalTxDelay(void) {
+  uint32 tagSendDelayTime;
+
+  /* Compute final message transmission time. See NOTE 10 below. */
+  // Uses the RX timestamp from the last received anchor response to calculate the delay needed to transmit final message.
+  tagSendDelayTime = (anchorsTimestamps[ANCHORS_TOTAL_COUNT - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+  dwt_setdelayedtrxtime(tagSendDelayTime);
+
+  return tagSendDelayTime;
+}
+
+static void writeFinalMsg(uint32 tagSendDelayTime) {
+  /* Retrieve the timestamp from when the initial message transmits. */
+  tagTxTimestamp1 = getTxTimestampU64();
+  
+  tagSendDelayTime = setFinalTxDelay();
+
+  /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
+  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+
+  /* Write all the timestamps in the final message. See NOTE 11 below. */
+  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
+  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
+  finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
+
+  /* Increment frame sequence number after transmission of the final message (modulo 256). */
+  exchangeSeqCount++;
+  tagFinalMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
+}
+
+static void sendInitiationMsg(void) {
+  /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
+  tagFirstMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
+  tagFirstMsg[ANCH_COUNT_IDX] = (uint8) ANCHORS_TOTAL_COUNT;
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+  dwt_writetxdata(sizeof(tagFirstMsg), tagFirstMsg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(tagFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
+
+  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+  /* Ensure transmission occurs. */
+  while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
+  txCount++;
+  // printf("Transmission # : %d\r\n", txCount);
+}
+
+static void sendFinalMsg() {
+  int txStatus;
+
+  /* Write and send final message. See NOTE 8 below. */
+  dwt_writetxdata(sizeof(tagFinalMsg), tagFinalMsg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(tagFinalMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
+  txStatus = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+
+  /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 12 below. */
+  if (txStatus == DWT_SUCCESS) {
+    /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
+    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
+
+    /* Clear TXFRS event. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+
+    // printf("Exchange #%u completed.\r\n\r\n", exchangeSeqCount);
+  }
+}
+
+static void receiveAnchorResponse(void) {
+  /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
+  while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+
+  if (statusReg & SYS_STATUS_RXRFTO) {
+    /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
+      * Note: calling dwt_setrxtimeout(0) does not set the timeout period register with zero. (see: function description) */
+    dwt_forcetrxoff(); // Ensure the device is in IDLE mode before setting RX timeout. (see: user manual)
+    dwt_setrxtimeout(0);
+
+    /* Clear RX timeout events before next exchange. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
+
+    printf("*** ERROR ***\r\nRX timeout occured from listening to anchors. Abandoning current exchange.\r\nMissing Anchors: %d\r\n*************\r\n", ANCHORS_TOTAL_COUNT - anchorsCount);
+    return;
+  }
+
+  if (statusReg & SYS_STATUS_RXFCG) {
+    uint32 frameLen;
+
+    /* Clear good RX frame event in the DW1000 status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+
+    /* A frame has been received, read it into the local buffer. */
+    frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+    if (frameLen <= RX_BUF_LEN) {
+      dwt_readrxdata(rxBuffer, frameLen, 0);
+    }
+
+    /* Check that the frame is the expected response from the companion "DS TWR responder" example.
+    * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    rxBuffer[EX_SEQ_COUNT_IDX] = 0;
+    if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
+      rxCount++;
+      // printf("Reception # : %d\r\n",rxCount);
+      uint8 anchorID;
+
+      /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
+      tagRxTimestamp1 = getRxTimestampU64();
+
+      /* Retrieve the anchor number embedded in the response message. */
+      anchorID = rxBuffer[ANCHOR_ID_IDX];
+
+      /* Temporarily store the timestamps specific to the retrieved anchor number. */
+      // Safety check
+      if (anchorID > ANCHORS_TOTAL_COUNT) {
+        // printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
+      } else {
+        anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
+        // printf("Received Anchor ID: %u\r\n", anchorID);
+        anchorsCount++;
+      }
+
+      /* We need to ensure we enable RX only when we expect another response from the anchors.
+        * This is crucial since enabling RX without receiving will cause any transmissions (final
+        * message transmission later) to be delayed for unusually long. */
+      if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+      }
+
+    } else {
+      /* Clear RX error/timeout events in the DW1000 status register. */
+      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+
+      /* Reset RX to properly reinitialise LDE operation. */
+      dwt_rxreset();
+    }
+  }
+}
+
+static void receiveDistanceMsgs() {
+  /* Poll for reception of distance from each anchor. */
+  while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+
+  if (statusReg & SYS_STATUS_RXFCG) {	
+    uint32 frameLen;
+
+    /* Clear good RX frame event in the DW1000 status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_TXFRS);
+
+    /* A frame has been received, read it into the local buffer. */
+    frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+  
+    if (frameLen <= RX_BUF_LEN) {
+      dwt_readrxdata(rxBuffer, frameLen, 0);
+    }
+
+    /* Check that the frame is the expected response from the companion "DS TWR responder" example.
+    * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    rxBuffer[EX_SEQ_COUNT_IDX] = 0;
+    if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
+      rxCount++;
+      // printf("Distance Reception # : %d\r\n",rxCount);
+      double anchorDistance;
+      uint8 anchorID;
+
+      /* Retrieve the anchor number embedded in the response message. */
+      anchorID = rxBuffer[ANCHOR_ID_IDX];
+
+      /* Retrieve the distance. */
+      memcpy(&anchorDistance, &rxBuffer[ANCHOR_DIST_IDX], sizeof(double));
+
+      /* Temporarily store the timestamps specific to the retrieved anchor number. */
+      // Safety check
+      if (anchorID > ANCHORS_TOTAL_COUNT) {
+        // printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
+      } else {
+        anchorsDistances[anchorID - 1] = anchorDistance;
+        // printf("Received Anchor ID: %u\r\n", anchorID);
+        anchorsCount++;
+      }
+
+      /* We need to ensure we enable RX only when we expect another response from the anchors.
+        * This is crucial since enabling RX without receiving will cause any transmissions (final
+        * message transmission later) to be delayed for unusually long. */
+      if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
+      }
+
+    } else {
+      /* Clear RX error/timeout events in the DW1000 status register. */
+      dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+
+      /* Reset RX to properly reinitialise LDE operation. */
+      dwt_rxreset();
+    }
+  }
 }
 
 /**@brief SS TWR Initiator task entry function.
