@@ -32,7 +32,7 @@
 * anchors in the exchange system, starting from '1'. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHOR_ID 1
+#define ANCHOR_ID 3
 
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
 #define RNG_DELAY_MS 80
