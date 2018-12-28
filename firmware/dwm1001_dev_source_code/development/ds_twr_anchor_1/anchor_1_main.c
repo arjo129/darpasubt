@@ -50,6 +50,7 @@
 #define ANCHOR_DIST_IDX 11
 
 /* Values to help determine if message transmitted or received. */
+#define INITIATION_TIMEOUT 2
 #define INITIATION_SUCCESS 1
 #define INITIATION_FAILURE 0
 #define RESPONSE_SUCCESS 1
@@ -59,6 +60,7 @@
 #define FINAL_FAILURE 0
 #define DISTANCE_SUCCESS 1
 #define DISTANCE_FAILURE 0
+#define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
 
@@ -168,7 +170,7 @@ int ds_resp_run(void) {
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
   receiveInitiation = receiveInitiationMsg();
-  if (receiveInitiation == INITIATION_FAILURE) {
+  if (receiveInitiation == INITIATION_FAILURE || receiveInitiation == INITIATION_TIMEOUT) {
     return EXCHANGE_FAILURE;
   }
 
@@ -183,12 +185,18 @@ int ds_resp_run(void) {
   /* 65ms RX timeout. If a final message from Tag was never received, we just abandon current exchange. */
   dwt_setrxtimeout(65000);
   printf("Timeout value: %u\r\n", dwt_read32bitreg(RX_FWTO_ID));
-  receiveFinal = FINAL_FAILURE;
-  while (receiveFinal == FINAL_FAILURE) {
+  int pollForFinal = 1;
+  while (pollForFinal) {
     receiveFinal = receiveFinalMsg();
-  }
-  if (receiveFinal == FINAL_TIMEOUT) {
-    return EXCHANGE_FAILURE;
+    switch(receiveFinal) {
+      case FINAL_SUCCESS:
+        pollForFinal = 0;
+        break;
+      case FINAL_TIMEOUT:
+        return EXCHANGE_TIMEOUT;
+      default:
+        break;
+    }
   }
 
   computeDistance();
@@ -342,6 +350,12 @@ static int receiveInitiationMsg(void) {
   printf("Attempting to receive initiation message...\r\n", ANCHOR_ID);
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
+  if (statusReg & SYS_STATUS_ALL_RX_TO) {
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
+    printf("=== ERROR ===\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
+    return INITIATION_TIMEOUT;
+  }
+
   if (statusReg & SYS_STATUS_RXFCG) {
     uint32 frameLen;
 
@@ -380,7 +394,14 @@ static int receiveInitiationMsg(void) {
     printf("=== Error === Tag Initiation Frame Incorrect\r\n");
     return INITIATION_FAILURE;
   }
-  printf("=== Error === Frame Received Error (Initiation Message)\r\n");
+
+  if (statusReg & SYS_STATUS_ALL_RX_ERR) {
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+    printf("=== Error === Frame Received Error (Initiation Message)\r\n");
+    return RESPONSE_FAILURE;
+  }
+
+  /* Default return. */
   return RESPONSE_FAILURE;
 }
 
@@ -395,7 +416,7 @@ static int receiveFinalMsg(void) {
   dwt_setrxtimeout(0);
 
   if (statusReg & SYS_STATUS_ALL_RX_TO) {
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
     printf("=== ERROR ===r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
     return FINAL_TIMEOUT;
   }
@@ -442,7 +463,14 @@ static int receiveFinalMsg(void) {
       return FINAL_FAILURE;
     }
   }
-  printf("=== Error === Frame Received Error (Final Message)\r\n");
+
+  if (statusReg & SYS_STATUS_ALL_RX_ERR) {
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+    printf("=== Error === Frame Received Error (Final Message)\r\n");
+    return FINAL_FAILURE;
+  }
+
+  /* Default return. */
   return FINAL_FAILURE;
 }
 
