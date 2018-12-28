@@ -182,6 +182,7 @@ int ds_resp_run(void) {
 
   /* 65ms RX timeout. If a final message from Tag was never received, we just abandon current exchange. */
   dwt_setrxtimeout(65000);
+  printf("Timeout value: %u\r\n", dwt_read32bitreg(RX_FWTO_ID));
   receiveFinal = FINAL_FAILURE;
   while (receiveFinal == FINAL_FAILURE) {
     receiveFinal = receiveFinalMsg();
@@ -375,8 +376,11 @@ static int receiveInitiationMsg(void) {
 
     /* Reset RX to properly reinitialise LDE operation. */
     dwt_rxreset();
-  }
 
+    printf("=== Error === Tag Initiation Frame Incorrect\r\n");
+    return INITIATION_FAILURE;
+  }
+  printf("=== Error === Frame Received Error (Initiation Message)\r\n");
   return RESPONSE_FAILURE;
 }
 
@@ -392,7 +396,7 @@ static int receiveFinalMsg(void) {
 
   if (statusReg & SYS_STATUS_ALL_RX_TO) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-    printf("*** ERROR ***\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
+    printf("=== ERROR ===r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
     return FINAL_TIMEOUT;
   }
 
@@ -434,9 +438,12 @@ static int receiveFinalMsg(void) {
       /* Reset RX to properly reinitialise LDE operation. */
       dwt_rxreset();
 
+      printf("=== Error === Tag Final Frame Incorrect\r\n");
       return FINAL_FAILURE;
     }
   }
+  printf("=== Error === Frame Received Error (Final Message)\r\n");
+  return FINAL_FAILURE;
 }
 
 static void computeDistance(void) {

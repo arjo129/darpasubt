@@ -138,6 +138,7 @@ static void printDistance(void);
  * 2. Possibly use soft reset to restart clocks to reduce clock drift maybe?
  * 3. Use timeouts to reset readings, make the operation more robust.
  * 4. Add proper comments NOTES to document this code.
+ * 5. Handle RX errors. This is causing communications to stop.
  * /
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -155,6 +156,7 @@ int dsInitRun(void) {
 
   /* Clears the anchor timestamps temporary storage. */
   memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
+  memset(anchorsDistances, 0, sizeof anchorsDistances);
 
   /* Notifies initiating of measurement exchange. */
   // printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
@@ -166,7 +168,6 @@ int dsInitRun(void) {
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   /* We want to know if we failed to receive from any anchor, so we set the RX timeout here. */
   dwt_setrxtimeout(65000);
-  // printf("Attempting to receive response from all anchors...\r\n");
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     anchorReceive = receiveAnchorResponse();
@@ -338,7 +339,7 @@ static int sendInitiationMsg(void) {
     /* Ensure transmission occurs. */
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
     txCount++;
-    // printf("Transmission # : %d\r\n", txCount);
+    printf("Transmission # : %d\r\n", txCount);
     return INITIATION_SUCCESS;
   } else {
     // printf("Transmission # : %d - FAILURE\r\n", txCount);
@@ -358,7 +359,7 @@ static int sendFinalMsg() {
   if (txStatus == DWT_SUCCESS) {
     /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
-    // printf("final sent\r\n");
+    printf("Final Frame Sent\r\n");
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
@@ -371,7 +372,9 @@ static int sendFinalMsg() {
 }
 
 static int receiveAnchorResponse(void) {
+  /* PROBLEM: Sometimes it does not timeout. */
   /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
+  printf("Attempting to receive response from all anchors...\r\n");
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
   if (statusReg & SYS_STATUS_RXRFTO) {
@@ -383,7 +386,16 @@ static int receiveAnchorResponse(void) {
     /* Clear RX timeout events before next exchange. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
 
-    // printf("*** ERROR ***\r\nRX timeout occured from listening to anchors. Abandoning current exchange.\r\nMissing Anchors: %d\r\n*************\r\n", ANCHORS_TOTAL_COUNT - anchorsCount);
+    printf("=== ERROR ===\r\nRX timeout occured from listening responses. Abandoning current exchange.\r\n");
+    printf("Missing Anchors:");
+    int i;
+    for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+      if (anchorsTimestamps[i] == 0) {
+        printf("% d |", i + 1);
+      }
+    }
+    printf("\r\n");
+    printf("*************\r\n");
     return ANCHOR_RECEIVE_TIMEOUT;
   }
 
@@ -416,10 +428,10 @@ static int receiveAnchorResponse(void) {
       /* Temporarily store the timestamps specific to the retrieved anchor number. */
       // Safety check
       if (anchorID > ANCHORS_TOTAL_COUNT) {
-        // printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
+        printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
-        // printf("Received Anchor ID: %u\r\n", anchorID);
+        printf("Received Anchor ID: %u\r\n", anchorID);
         anchorsCount++;
       }
 
@@ -438,10 +450,12 @@ static int receiveAnchorResponse(void) {
       /* Reset RX to properly reinitialise LDE operation. */
       dwt_rxreset();
 
+      printf("=== Error === Anchor Response Frame Incorrect\r\n");
       return ANCHOR_RECEIVE_FAILURE;
     }
   }
 
+  printf("=== Error === Frame Received Error (Anchor Response)\r\n");
   return ANCHOR_RECEIVE_FAILURE;
 }
 
@@ -458,8 +472,17 @@ static int receiveDistanceMsgs() {
     /* Clear RX timeout events before next exchange. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
 
-    // printf("*** ERROR ***\r\nRX timeout occured from listening to anchors. Abandoning current exchange.\r\nMissing Anchors: %d\r\n*************\r\n", ANCHORS_TOTAL_COUNT - anchorsCount);
-    return ANCHOR_RECEIVE_TIMEOUT;
+    printf("=== ERROR ===\r\nRX timeout occured from listening distances. Abandoning current exchange.\r\n");
+    printf("Missing Anchors:");
+    int i;
+    for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+      if (anchorsDistances[i] == 0) {
+        printf("% d |", i + 1);
+      }
+    }
+    printf("\r\n");
+    printf("*************\r\n");
+    return DISTANCE_RECEIVE_TIMEOUT;
   }
 
   if (statusReg & SYS_STATUS_RXFCG) {	
@@ -493,10 +516,10 @@ static int receiveDistanceMsgs() {
       /* Temporarily store the timestamps specific to the retrieved anchor number. */
       // Safety check
       if (anchorID > ANCHORS_TOTAL_COUNT) {
-        // printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
+        printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsDistances[anchorID - 1] = anchorDistance;
-        // printf("Received Anchor ID: %u\r\n", anchorID);
+        printf("Received Anchor ID: %u\r\n", anchorID);
         anchorsCount++;
       }
 
@@ -507,7 +530,7 @@ static int receiveDistanceMsgs() {
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
 
-      return EXCHANGE_SUCCESS; 
+      return DISTANCE_RECEIVE_SUCCESS;
     } else {
       /* Clear RX error/timeout events in the DW1000 status register. */
       dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
@@ -515,9 +538,13 @@ static int receiveDistanceMsgs() {
       /* Reset RX to properly reinitialise LDE operation. */
       dwt_rxreset();
 
-      return EXCHANGE_FAILURE;
+      printf("=== Error === Anchor Distance Frame Incorrect\r\n");
+      return DISTANCE_RECEIVE_FAILURE;;
     }
   }
+
+  printf("=== Error === Frame Received Error (Anchor Response)\r\n");
+  return DISTANCE_RECEIVE_FAILURE;
 }
 
 /**@brief SS TWR Initiator task entry function.
