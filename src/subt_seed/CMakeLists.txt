@@ -18,6 +18,8 @@ find_package(catkin REQUIRED
     roscpp
     pcl_ros
     tf2
+    octomap
+    octomap_ros
 )
 
 find_package(gazebo REQUIRED)
