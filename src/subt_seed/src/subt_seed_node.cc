@@ -27,6 +27,7 @@
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl_ros/transforms.h>
+#include <nav_msgs/Odometry.h>
 
 #include <string>
 
@@ -59,13 +60,17 @@ class Controller
   private: ros::NodeHandle n;
   tf::TransformListener listener;
   LocalMap* localMap;
+  LocalMap3d* localMap3d;
+  octomap::point3d* sensor_origin;
 
   private: void handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
+  void handleOdom(const nav_msgs::Odometry& odom_msg);
 
   /// \brief publisher to send cmd_vel
   private: ros::Publisher velPub, mapPub;
 
   private: ros::Subscriber sub;
+  ros::Subscriber odomSub;
 
   /// \brief Communication client.
   private: std::unique_ptr<subt::CommsClient> client;
@@ -83,7 +88,9 @@ Controller::Controller(const std::string &_name)
   this->mapPub = this->n.advertise<nav_msgs::OccupancyGrid>(_name+"/local_map",1);
   this->sub = this->n.subscribe(_name + "/points", 1, &Controller::handlePointCloud, this);
   this->localMap = new LocalMap(_name+"/base_link");
-  
+  this->localMap3d = new LocalMap3d(_name+"/local_map_3d");
+  this->odomSub = this->n.subscribe(_name + "/odom", 1, &Controller::handleOdom, this);
+
   ROS_INFO("Initiallizing call backs");
 }
 
@@ -103,9 +110,18 @@ void Controller::handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_
   pcl::PointCloud<pcl::PointXYZI>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);
   localMap->update(*temp_cloud);
+  localMap3d->insert(cloud_msg, *(this->sensor_origin));
+  localMap3d->update();
   nav_msgs::OccupancyGrid grid;
   localMap->toOccupancyGrid(grid);
   mapPub.publish(grid);
+}
+
+void Controller::handleOdom(const nav_msgs::Odometry& odom_msg) {
+  this->sensor_origin = new octomap::point3d(
+    odom_msg.pose.pose.position.x,
+    odom_msg.pose.pose.position.y,
+    odom_msg.pose.pose.position.z);
 }
 
 /////////////////////////////////////////////////

@@ -24,6 +24,8 @@ find_package(gazebo REQUIRED)
 
 find_package(PCL REQUIRED COMPONENTS common io)
 
+find_package(octomap REQUIRED)
+
 catkin_package(
   CATKIN_DEPENDS message_runtime
 )
@@ -39,9 +41,10 @@ catkin_package(
 ###########
 
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
-  include
+  ${OCTOMAP_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -49,9 +52,23 @@ link_directories(
 )
 
 ## Declare a C++ executable
-add_executable(subt_seed_node src/subt_seed_node.cc src/localmap.cpp)
-add_dependencies(subt_seed_node ${catkin_EXPORTED_TARGETS})
-target_link_libraries(subt_seed_node ${catkin_LIBRARIES} ${PCL_COMMON_LIBRARIES})
+add_executable(
+  subt_seed_node
+  src/subt_seed_node.cc
+  src/localmap.cpp
+  src/localmap3d.cpp
+)
+
+add_dependencies(
+  subt_seed_node
+  ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(
+  subt_seed_node
+  ${catkin_LIBRARIES}
+  ${PCL_COMMON_LIBRARIES}
+  ${OCTOMAP_LIBRARIES}
+)
 
 ###########
 ## Tests ##

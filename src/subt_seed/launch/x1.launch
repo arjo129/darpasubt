@@ -32,4 +32,12 @@
   <node name="$(arg robot_2_name)_control" pkg="subt_seed" type="subt_seed_node" args="$(arg robot_2_name)" />
   -->
 
+  <!-- OctoMap
+  <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+		<param name="resolution" value="0.05" />
+		<param name="frame_id" type="string" value="/X1_1/x1_velocity_controller/odom" />
+		<param name="sensor_model/max_range" value="5.0" />
+		<remap from="cloud_in" to="/X1_1/points" />
+  </node> -->
+
 </launch>

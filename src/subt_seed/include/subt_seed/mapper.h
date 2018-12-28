@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <limits>
 #include <string>
+#include <octomap/octomap.h>
+#include <octomap_ros/conversions.h>
+#include <octomap/OcTree.h>
 
 class MapCell {
 public:
@@ -30,6 +33,17 @@ public:
     LocalMap(std::string referenceFrame);
     void update(pcl::PointCloud<pcl::PointXYZI>& pcl);
     void toOccupancyGrid(nav_msgs::OccupancyGrid& occupancy);
+};
+
+class LocalMap3d {
+private:
+    std::string frame;
+    octomap::OcTree *tree;
+public:    
+    LocalMap3d(std::string referenceFrame);
+    void print_query_info(octomap::point3d query, octomap::OcTreeNode* node);
+    void insert(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, octomap::point3d& sensor_origin);
+    void update();
 };
 
 #endif

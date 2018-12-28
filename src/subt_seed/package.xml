@@ -15,7 +15,10 @@
   <depend>subt_gazebo</depend>
 
   <build_depend>message_generation</build_depend>
+  <build_depend>octomap</build_depend>
+  <exec_depend>octomap_ros</exec_depend>
   <exec_depend>message_runtime</exec_depend>
+
 
   <export>
     <!-- path to models -->
