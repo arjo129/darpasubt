@@ -67,7 +67,7 @@ class Controller
   void handleOdom(const nav_msgs::Odometry& odom_msg);
 
   /// \brief publisher to send cmd_vel
-  private: ros::Publisher velPub, mapPub;
+  private: ros::Publisher velPub, mapPub, map3dPub;
 
   private: ros::Subscriber sub;
   ros::Subscriber odomSub;
@@ -86,6 +86,7 @@ Controller::Controller(const std::string &_name)
   // Create a cmd_vel publisher to control a vehicle.
   this->velPub = this->n.advertise<geometry_msgs::Twist>(_name + "/cmd_vel", 1);
   this->mapPub = this->n.advertise<nav_msgs::OccupancyGrid>(_name+"/local_map",1);
+  this->map3dPub = this->n.advertise<nav_msgs::OccupancyGrid>(_name+"/local_map_3d",1);
   this->sub = this->n.subscribe(_name + "/points", 1, &Controller::handlePointCloud, this);
   this->localMap = new LocalMap(_name+"/base_link");
   this->localMap3d = new LocalMap3d(_name+"/local_map_3d");
@@ -106,15 +107,18 @@ void Controller::CommClientCallback(const std::string &/*_srcAddress*/,
 
 void Controller::handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
   pcl::PCLPointCloud2 pcl_pc2;
+  octomap_msgs::Octomap octomap_msg;
   pcl_conversions::toPCL(*cloud_msg,pcl_pc2);
   pcl::PointCloud<pcl::PointXYZI>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);
   localMap->update(*temp_cloud);
   localMap3d->insert(cloud_msg, *(this->sensor_origin));
   localMap3d->update();
+  octomap_msgs::readTree(localMap3d->tree, octomap_msg);
+  this->map3dPub.publish(octomap_msg);
   nav_msgs::OccupancyGrid grid;
   localMap->toOccupancyGrid(grid);
-  mapPub.publish(grid);
+  this->mapPub.publish(grid);
 }
 
 void Controller::handleOdom(const nav_msgs::Odometry& odom_msg) {
