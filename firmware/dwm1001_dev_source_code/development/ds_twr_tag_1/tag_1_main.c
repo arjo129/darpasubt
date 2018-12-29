@@ -35,7 +35,9 @@
 #define ANCHORS_TOTAL_COUNT 3
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 100
+#define RNG_DELAY_SUCCESS_MS 100
+/* Failure delay of 150ms is the lowest value that allows successful self recovery. */
+#define RNG_DELAY_FAILURE_MS 150
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -169,8 +171,11 @@ int dsInitRun(void) {
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     anchorReceive = receiveAnchorResponse();
-    if (anchorReceive == ANCHOR_RECEIVE_TIMEOUT || anchorReceive == ANCHOR_RECEIVE_FAILURE) {
+    if (anchorReceive == ANCHOR_RECEIVE_TIMEOUT) {
       return EXCHANGE_TIMEOUT;
+    }
+    if (anchorReceive == ANCHOR_RECEIVE_FAILURE) {
+      return EXCHANGE_FAILURE;
     }
   }
 
@@ -186,15 +191,18 @@ int dsInitRun(void) {
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     distanceReceive = receiveDistanceMsgs();
-    if (distanceReceive == DISTANCE_RECEIVE_TIMEOUT || distanceReceive == DISTANCE_RECEIVE_FAILURE) {
+    if (distanceReceive == DISTANCE_RECEIVE_TIMEOUT) {
       return EXCHANGE_TIMEOUT;
+    }
+    if (distanceReceive == DISTANCE_RECEIVE_FAILURE) {
+      return EXCHANGE_FAILURE;
     }
   }
 
   printDistance();
 
   /* Execute a delay between ranging exchanges. */
-  // deca_sleep(RNG_DELAY_MS);
+  // deca_sleep(RNG_DELAY_SUCCESS_MS);
 
   return INITIATION_SUCCESS;
 }
@@ -546,14 +554,20 @@ static int receiveDistanceMsgs() {
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
 */
 void ds_initiator_task_function (void * pvParameter) {
+  int result;
   UNUSED_PARAMETER(pvParameter);
 
   dwt_setleds(DWT_LEDS_ENABLE);
 
   while (true) {
-    dsInitRun();
-    /* Delay a task for a given number of ticks */
-    vTaskDelay(RNG_DELAY_MS);
+    result = dsInitRun();
+    
+    if (result == EXCHANGE_SUCCESS) {
+      /* Delay a task for a given number of ticks */
+      vTaskDelay(RNG_DELAY_SUCCESS_MS);
+    } else {
+      vTaskDelay(RNG_DELAY_FAILURE_MS);
+    }
     /* Tasks must be implemented to never return... */
   }
 }

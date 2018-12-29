@@ -157,7 +157,6 @@ int main(void)
   /* Apply default antenna delay value. See NOTE 2 below. */
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
-  dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms.
 
   /* Set preamble timeout for expected frames. See NOTE 3 below. */
   //dwt_setpreambledetecttimeout(0); // PRE_TIMEOUT
@@ -165,6 +164,7 @@ int main(void)
   /* Set expected response's delay and timeout. 
   * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
   dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+  dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms.
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
