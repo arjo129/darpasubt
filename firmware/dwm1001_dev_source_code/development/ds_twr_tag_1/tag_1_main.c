@@ -37,7 +37,7 @@
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_SUCCESS_MS 100
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
-#define RNG_DELAY_FAILURE_MS 150
+#define RNG_DELAY_FAILURE_MS 100
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -87,6 +87,7 @@
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0};
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this application is supposed to handle. */
@@ -161,7 +162,7 @@ int dsInitRun(void) {
   memset(anchorsDistances, 0, sizeof anchorsDistances);
 
   /* Notifies initiating of measurement exchange. */
-  // printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
+  printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
   sendInitiation = sendInitiationMsg();
   if (sendInitiation == INITIATION_FAILURE) {
     return EXCHANGE_FAILURE;
@@ -309,11 +310,13 @@ static uint32 setFinalTxDelay(void) {
 static void writeFinalMsg(uint32 tagSendDelayTime) {
   /* Retrieve the timestamp from when the initial message transmits. */
   tagTxTimestamp1 = getTxTimestampU64();
+  printf("Tag TX 1 = %u\r\n", (uint32)tagTxTimestamp1);
   
   tagSendDelayTime = setFinalTxDelay();
 
   /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
   tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+  printf("Tag TX 2 = %u\r\n", (uint32)tagTxTimestamp2);
 
   /* Write all the timestamps in the final message. See NOTE 11 below. */
   finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
@@ -383,6 +386,8 @@ static int receiveAnchorResponse(void) {
     /* Clear RX timeout events before next exchange. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
 
+    dwt_rxreset();
+
     printf("=== ERROR ===\r\nRX timeout occured from listening responses. Abandoning current exchange.\r\n");
     printf("Missing Anchors:");
     int i;
@@ -418,6 +423,7 @@ static int receiveAnchorResponse(void) {
 
       /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
       tagRxTimestamp1 = getRxTimestampU64();
+      printf("Tag RX 1 = %u\r\n", (uint32)tagRxTimestamp1);
 
       /* Retrieve the anchor number embedded in the response message. */
       anchorID = rxBuffer[ANCHOR_ID_IDX];
@@ -453,6 +459,8 @@ static int receiveAnchorResponse(void) {
   }
 
   if (statusReg & SYS_STATUS_ALL_RX_ERR) {
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+    dwt_rxreset();
     printf("=== Error === Frame Received Error (Anchor Response)\r\n");
     return ANCHOR_RECEIVE_FAILURE;
   }
@@ -468,6 +476,8 @@ static int receiveDistanceMsgs() {
   if (statusReg & SYS_STATUS_RXRFTO) {
     /* Clear RX timeout events before next exchange. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
+
+    dwt_rxreset();
 
     printf("=== ERROR ===\r\nRX timeout occured from listening distances. Abandoning current exchange.\r\n");
     printf("Missing Anchors:");
@@ -541,6 +551,8 @@ static int receiveDistanceMsgs() {
   }
 
   if (statusReg & SYS_STATUS_ALL_RX_ERR) {
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+    dwt_rxreset();
     printf("=== Error === Frame Received Error (Anchor Distance)\r\n");
     return DISTANCE_RECEIVE_FAILURE;
   }
