@@ -194,8 +194,10 @@ int ds_resp_run(void) {
         break;
       case FINAL_TIMEOUT:
         return EXCHANGE_TIMEOUT;
+      case FINAL_FAILURE:
+        return EXCHANGE_FAILURE;
       default:
-        break;
+        return EXCHANGE_FAILURE;
     }
   }
 
