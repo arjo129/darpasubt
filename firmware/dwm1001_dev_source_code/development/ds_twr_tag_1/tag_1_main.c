@@ -171,7 +171,7 @@ int dsInitRun(void) {
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     anchorReceive = receiveAnchorResponse();
-    if (anchorReceive == ANCHOR_RECEIVE_TIMEOUT) {
+    if (anchorReceive == ANCHOR_RECEIVE_TIMEOUT || anchorReceive == ANCHOR_RECEIVE_FAILURE) {
       return EXCHANGE_TIMEOUT;
     }
   }
@@ -543,7 +543,7 @@ static int receiveDistanceMsgs() {
     }
   }
 
-  printf("=== Error === Frame Received Error (Anchor Response)\r\n");
+  printf("=== Error === Frame Received Error (Anchor Distance)\r\n");
   return DISTANCE_RECEIVE_FAILURE;
 }
 
