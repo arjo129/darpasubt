@@ -186,7 +186,7 @@ int dsInitRun(void) {
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     distanceReceive = receiveDistanceMsgs();
-    if (distanceReceive == DISTANCE_RECEIVE_TIMEOUT) {
+    if (distanceReceive == DISTANCE_RECEIVE_TIMEOUT || distanceReceive == DISTANCE_RECEIVE_FAILURE) {
       return EXCHANGE_TIMEOUT;
     }
   }
@@ -333,7 +333,7 @@ static int sendInitiationMsg(void) {
     /* Ensure transmission occurs. */
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
     txCount++;
-    printf("Transmission # : %d\r\n", txCount);
+    // printf("Transmission # : %d\r\n", txCount);
     return INITIATION_SUCCESS;
   } else {
     // printf("Transmission # : %d - FAILURE\r\n", txCount);
@@ -353,7 +353,7 @@ static int sendFinalMsg() {
   if (txStatus == DWT_SUCCESS) {
     /* Poll DW1000 until TX frame sent event set. See NOTE 9 below. */
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
-    printf("Final Frame Sent\r\n");
+    // printf("Final Frame Sent\r\n");
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
@@ -368,7 +368,7 @@ static int sendFinalMsg() {
 static int receiveAnchorResponse(void) {
   /* PROBLEM: Sometimes it does not timeout. */
   /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
-  printf("Attempting to receive response from all anchors...\r\n");
+  // printf("Attempting to receive response from all anchors...\r\n");
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
   if (statusReg & SYS_STATUS_RXRFTO) {
@@ -420,7 +420,7 @@ static int receiveAnchorResponse(void) {
         printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
-        printf("Received Anchor ID: %u\r\n", anchorID);
+        // printf("Received Anchor ID: %u\r\n", anchorID);
         anchorsCount++;
       }
 
@@ -444,7 +444,12 @@ static int receiveAnchorResponse(void) {
     }
   }
 
-  printf("=== Error === Frame Received Error (Anchor Response)\r\n");
+  if (statusReg & SYS_STATUS_ALL_RX_ERR) {
+    printf("=== Error === Frame Received Error (Anchor Response)\r\n");
+    return ANCHOR_RECEIVE_FAILURE;
+  }
+
+  /* Default return value. */
   return ANCHOR_RECEIVE_FAILURE;
 }
 
@@ -503,7 +508,7 @@ static int receiveDistanceMsgs() {
         printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsDistances[anchorID - 1] = anchorDistance;
-        printf("Received Anchor ID: %u\r\n", anchorID);
+        // printf("Received Anchor ID: %u\r\n", anchorID);
         anchorsCount++;
       }
 
@@ -527,7 +532,12 @@ static int receiveDistanceMsgs() {
     }
   }
 
-  printf("=== Error === Frame Received Error (Anchor Distance)\r\n");
+  if (statusReg & SYS_STATUS_ALL_RX_ERR) {
+    printf("=== Error === Frame Received Error (Anchor Distance)\r\n");
+    return DISTANCE_RECEIVE_FAILURE;
+  }
+
+  /* Default return value. */
   return DISTANCE_RECEIVE_FAILURE;
 }
 
