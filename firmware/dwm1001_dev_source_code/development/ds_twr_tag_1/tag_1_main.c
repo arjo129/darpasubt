@@ -166,8 +166,6 @@ int dsInitRun(void) {
   }
 
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
-  /* We want to know if we failed to receive from any anchor, so we set the RX timeout here. */
-  dwt_setrxtimeout(65000);
   anchorsCount = 0;
   while (anchorsCount < ANCHORS_TOTAL_COUNT) {
     anchorReceive = receiveAnchorResponse();
@@ -194,10 +192,6 @@ int dsInitRun(void) {
   }
 
   printDistance();
-
-  /* Reset the RX timeout to DISABLED. */
-  dwt_forcetrxoff(); // Ensure the device is in IDLE mode before setting RX timeout. (see: user manual)
-  dwt_setrxtimeout(0);
 
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_MS);
@@ -378,11 +372,6 @@ static int receiveAnchorResponse(void) {
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
   if (statusReg & SYS_STATUS_RXRFTO) {
-    /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
-      * Note: calling dwt_setrxtimeout(0) does not set the timeout period register with zero. (see: function description) */
-    dwt_forcetrxoff(); // Ensure the device is in IDLE mode before setting RX timeout. (see: user manual)
-    dwt_setrxtimeout(0);
-
     /* Clear RX timeout events before next exchange. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
 
@@ -464,11 +453,6 @@ static int receiveDistanceMsgs() {
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
   if (statusReg & SYS_STATUS_RXRFTO) {
-    /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
-      * Note: calling dwt_setrxtimeout(0) does not set the timeout period register with zero. (see: function description) */
-    dwt_forcetrxoff(); // Ensure the device is in IDLE mode before setting RX timeout. (see: user manual)
-    dwt_setrxtimeout(0);
-
     /* Clear RX timeout events before next exchange. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
 
