@@ -52,8 +52,8 @@
 #define ANCHOR_DIST_IDX 11
 
 /* Values to help determine if message transmitted or received. */
-#define INITIATION_SUCCESS 1
-#define INITIATION_FAILURE 0
+#define INITIATION_SEND_SUCCESS 1
+#define INITIATION_SEND_FAILURE 0
 #define ANCHOR_RECEIVE_TIMEOUT 2
 #define ANCHOR_RECEIVE_SUCCESS 1
 #define ANCHOR_RECEIVE_FAILURE 0
@@ -137,11 +137,8 @@ static int receiveDistanceMsgs(void);
 static void printDistance(void);
 
 /* TODO:
- * 1. Fix the timeout feature that is when unable to receive all responses from the anchors.
  * 2. Possibly use soft reset to restart clocks to reduce clock drift maybe?
- * 3. Use timeouts to reset readings, make the operation more robust.
  * 4. Add proper comments NOTES to document this code.
- * 5. Handle RX errors. This is causing communications to stop.
  * /
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -164,7 +161,7 @@ int dsInitRun(void) {
   /* Notifies initiating of measurement exchange. */
   printf("Initiating Exchange #%u\r\n", exchangeSeqCount + 1);
   sendInitiation = sendInitiationMsg();
-  if (sendInitiation == INITIATION_FAILURE) {
+  if (sendInitiation == INITIATION_SEND_FAILURE) {
     return EXCHANGE_FAILURE;
   }
 
@@ -205,7 +202,7 @@ int dsInitRun(void) {
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_SUCCESS_MS);
 
-  return INITIATION_SUCCESS;
+  return INITIATION_SEND_SUCCESS;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -252,12 +249,23 @@ static uint64 getRxTimestampU64(void) {
     return ts;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn finalMsgSetRxTs()
+ *
+ * @brief Fill the final message witt RX timestamp values of all Anchors. In the timestamp fields of the final message,
+ *        the least significant byte is at the lower address.
+ *
+ * @param  tsField  pointer on the first byte of the timestamp field to fill
+ *         ts timestamp value
+ *
+ * @return none
+ */
 static void finalMsgSetRxTs(uint8 *tsField) {
   int i, j = 0;
   uint64 ts;
   for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
     ts = anchorsTimestamps[i];
-    // We want to continuosly write all RX values which are all 4 bytes. So we start at multiples of 4.
+    // We want to continuosly write all RX timestamps which are 4 bytes each. So we start at multiples of 4.
     for (j = i * FINAL_MSG_TS_LEN; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
       tsField[j] = (uint8) ts;
       ts >>= 8;
@@ -265,6 +273,15 @@ static void finalMsgSetRxTs(uint8 *tsField) {
   }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn printDistance()
+ *
+ * @brief Prints all the distances gathered from every Anchors in the system.
+ *
+ * @param  none
+ *
+ * @return none
+ */
 static void printDistance(void) {
   int i = 0;
   double dist;
@@ -296,6 +313,15 @@ static void finalMsgSetTs(uint8 *tsField, uint64 ts) {
     }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn setFinalTxDelay()
+ *
+ * @brief Set the TX delay for sending the final message. The calculated value is based on the last anchor ID.
+ *
+ * @param  none
+ *
+ * @return none
+ */
 static uint32 setFinalTxDelay(void) {
   uint32 tagSendDelayTime;
 
@@ -307,6 +333,15 @@ static uint32 setFinalTxDelay(void) {
   return tagSendDelayTime;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn writeFinalMsg()
+ *
+ * @brief Fill the final message with all TX/RX timestamp values and frame sequence number.
+ *
+ * @param  tagSendDelayTime the TX delay for transmitting the final message.
+ *
+ * @return none
+ */
 static void writeFinalMsg(uint32 tagSendDelayTime) {
   /* Retrieve the timestamp from when the initial message transmits. */
   tagTxTimestamp1 = getTxTimestampU64();
@@ -328,6 +363,15 @@ static void writeFinalMsg(uint32 tagSendDelayTime) {
   tagFinalMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn sendInitiationMsg()
+ *
+ * @brief Transmit the initiation message to begin exchange.
+ *
+ * @param  none
+ *
+ * @return the status code of transmission
+ */
 static int sendInitiationMsg(void) {
   int ret;
 
@@ -345,13 +389,22 @@ static int sendInitiationMsg(void) {
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
     txCount++;
     // printf("Transmission # : %d\r\n", txCount);
-    return INITIATION_SUCCESS;
+    return INITIATION_SEND_SUCCESS;
   } else {
     // printf("Transmission # : %d - FAILURE\r\n", txCount);
-    return INITIATION_FAILURE;
+    return INITIATION_SEND_FAILURE;
   }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn sendFinalMsg()
+ *
+ * @brief Transmit the final message to deliver TX/RX timestamps to respective Anchors.
+ *
+ * @param  none
+ *
+ * @return the status code of transmission
+ */
 static int sendFinalMsg() {
   int txStatus;
 
@@ -376,6 +429,15 @@ static int sendFinalMsg() {
   }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn receiveAnchorResponse()
+ *
+ * @brief Poll for reception of responses from Anchors after transmission of initiation message.
+ *
+ * @param  none
+ *
+ * @return the status code of reception
+ */
 static int receiveAnchorResponse(void) {
   /* PROBLEM: Sometimes it does not timeout. */
   /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 9 below. */
@@ -469,6 +531,15 @@ static int receiveAnchorResponse(void) {
   return ANCHOR_RECEIVE_FAILURE;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn receiveDistanceMsgs()
+ *
+ * @brief Poll for reception of distance values from every Anchors for current exchange.
+ *
+ * @param  none
+ *
+ * @return the status code of reception
+ */
 static int receiveDistanceMsgs() {
   /* Poll for reception of distance from each anchor. */
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
@@ -561,7 +632,7 @@ static int receiveDistanceMsgs() {
   return DISTANCE_RECEIVE_FAILURE;
 }
 
-/**@brief SS TWR Initiator task entry function.
+/**@brief DS TWR Tag task entry function.
 *
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
 */

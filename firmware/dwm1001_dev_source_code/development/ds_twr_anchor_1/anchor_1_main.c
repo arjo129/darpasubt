@@ -50,16 +50,16 @@
 #define ANCHOR_DIST_IDX 11
 
 /* Values to help determine if message transmitted or received. */
-#define INITIATION_TIMEOUT 2
-#define INITIATION_SUCCESS 1
-#define INITIATION_FAILURE 0
-#define RESPONSE_SUCCESS 1
-#define RESPONSE_FAILURE 0
-#define FINAL_TIMEOUT 2
-#define FINAL_SUCCESS 1
-#define FINAL_FAILURE 0
-#define DISTANCE_SUCCESS 1
-#define DISTANCE_FAILURE 0
+#define INITIATION_RECEIVE_TIMEOUT 2
+#define INITIATION_RECEIVE_SUCCESS 1
+#define INITIATION_RECEIVE_FAILURE 0
+#define RESPONSE_SEND_SUCCESS 1
+#define RESPONSE_SEND_FAILURE 0
+#define FINAL_RECEIVE_TIMEOUT 2
+#define FINAL_RECEIVE_SUCCESS 1
+#define FINAL_RECEIVE_FAILURE 0
+#define DISTANCE_SEND_SUCCESS 1
+#define DISTANCE_SEND_FAILURE 0
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
@@ -171,14 +171,14 @@ int ds_resp_run(void) {
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
   receiveInitiation = receiveInitiationMsg();
-  if (receiveInitiation == INITIATION_FAILURE || receiveInitiation == INITIATION_TIMEOUT) {
+  if (receiveInitiation == INITIATION_RECEIVE_FAILURE || receiveInitiation == INITIATION_RECEIVE_TIMEOUT) {
     return EXCHANGE_FAILURE;
   }
 
   writeResponseMsg();
   setResponseDelays(respRxTimestamp1);
   sendResponse = sendResponseMsg();
-  if (sendResponse == RESPONSE_FAILURE) {
+  if (sendResponse == RESPONSE_SEND_FAILURE) {
     printf("failed to send\r\n");
     return EXCHANGE_FAILURE;
   }
@@ -190,12 +190,12 @@ int ds_resp_run(void) {
   while (pollForFinal) {
     receiveFinal = receiveFinalMsg();
     switch(receiveFinal) {
-      case FINAL_SUCCESS:
+      case FINAL_RECEIVE_SUCCESS:
         pollForFinal = 0;
         break;
-      case FINAL_TIMEOUT:
+      case FINAL_RECEIVE_TIMEOUT:
         return EXCHANGE_TIMEOUT;
-      case FINAL_FAILURE:
+      case FINAL_RECEIVE_FAILURE:
         return EXCHANGE_FAILURE;
       default:
         return EXCHANGE_FAILURE;
@@ -208,7 +208,7 @@ int ds_resp_run(void) {
   writeDistanceMsg();
   setResponseDelays(respRxTimestamp2);
   sendDistance = sendDistanceMsg();
-  if (sendDistance == DISTANCE_SUCCESS) {
+  if (sendDistance == DISTANCE_SEND_SUCCESS) {
     printf("Sent back distance.\r\n\r\n");
   }
 
@@ -278,17 +278,45 @@ static void finalMsgGetTs(const uint8 *tsField, uint32 *ts) {
     }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn writeResponseMsg()
+ *
+ * @brief Fill the response message with this Anchor's ID.
+ *
+ * @param  none
+ *
+ * @return none
+ */
 static void writeResponseMsg(void) {
   /* Send ID of this anchor back to tag. */
   anchorMsg[ANCHOR_ID_IDX] = ANCHOR_ID;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn writeDistanceMsg()
+ *
+ * @brief Fill the distance message with this Anchor's ID and calculated distance.
+ *
+ * @param  none
+ *
+ * @return none
+ */
 static void writeDistanceMsg(void) {
   /* Write the ID and distance to transmission message. */
   anchorDistMsg[ANCHOR_ID_IDX] = ANCHOR_ID;
   memcpy(&anchorDistMsg[ANCHOR_DIST_IDX], &distanceMetre, sizeof(double));
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn setResponseDelays()
+ *
+ * @brief Set the TX delay and RX after TX delay for sending the response message. The calculated values is designed to
+ *        stagger the TX moment of each anchor based on their ID.
+ *
+ * @param  timestampToDelayFrom the RX timestamp used to calculate the delay
+ *
+ * @return none
+ */
 static void setResponseDelays(uint64 timestampToDelayFrom) {
   uint32 respSendDelayTime, rxDelay;
   uint64 delay_64, rxDelay64;
@@ -304,6 +332,15 @@ static void setResponseDelays(uint64 timestampToDelayFrom) {
   dwt_setrxaftertxdelay(rxDelay);
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn sendResponseMsg()
+ *
+ * @brief Transmit the response message after reception of initiation message from Tag.
+ *
+ * @param  none
+ *
+ * @return the status code of transmission
+ */
 static int sendResponseMsg(void) {
   int ret;
 
@@ -320,13 +357,22 @@ static int sendResponseMsg(void) {
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
     printf("response sent\r\n");
-    return RESPONSE_SUCCESS;
+    return RESPONSE_SEND_SUCCESS;
   } else {
     printf("failure\r\n");
-    return RESPONSE_FAILURE;
+    return RESPONSE_SEND_FAILURE;
   }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn sendDistanceMsg()
+ *
+ * @brief Transmit the distance message after reception of final message from Tag.
+ *
+ * @param  none
+ *
+ * @return the status code of transmission
+ */
 static int sendDistanceMsg(void) {
   int ret;
 
@@ -343,12 +389,21 @@ static int sendDistanceMsg(void) {
     /* Clear TXFRS event. */
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
-    return DISTANCE_SUCCESS;
+    return DISTANCE_SEND_SUCCESS;
   } else {
-    return DISTANCE_FAILURE;
+    return DISTANCE_SEND_FAILURE;
   }
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn receiveInitiationMsg()
+ *
+ * @brief Poll for reception of initiation from Tag to begin exchange.
+ *
+ * @param  none
+ *
+ * @return the status code of reception
+ */
 static int receiveInitiationMsg(void) {
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   printf("Attempting to receive initiation message...\r\n", ANCHOR_ID);
@@ -357,7 +412,7 @@ static int receiveInitiationMsg(void) {
   if (statusReg & SYS_STATUS_ALL_RX_TO) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
     printf("=== ERROR ===\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
-    return INITIATION_TIMEOUT;
+    return INITIATION_RECEIVE_TIMEOUT;
   }
 
   if (statusReg & SYS_STATUS_RXFCG) {
@@ -386,7 +441,7 @@ static int receiveInitiationMsg(void) {
       /* Notifies reception of exchange initiation message. */
       printf("Initiation message received.\r\n");
 
-      return INITIATION_SUCCESS;
+      return INITIATION_RECEIVE_SUCCESS;
     }
   } else {
     /* Clear RX error events in the DW1000 status register. */
@@ -396,19 +451,28 @@ static int receiveInitiationMsg(void) {
     dwt_rxreset();
 
     printf("=== Error === Tag Initiation Frame Incorrect\r\n");
-    return INITIATION_FAILURE;
+    return INITIATION_RECEIVE_FAILURE;
   }
 
   if (statusReg & SYS_STATUS_ALL_RX_ERR) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
     printf("=== Error === Frame Received Error (Initiation Message)\r\n");
-    return RESPONSE_FAILURE;
+    return RESPONSE_SEND_FAILURE;
   }
 
   /* Default return. */
-  return RESPONSE_FAILURE;
+  return RESPONSE_SEND_FAILURE;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn receiveFinalMsg()
+ *
+ * @brief Poll for reception of final message from Tag to retrieve all TX/RX timestamps.
+ *
+ * @param  none
+ *
+ * @return the status code of reception
+ */
 static int receiveFinalMsg(void) {
   /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
   printf("Attempting to receive final message...\r\n", ANCHOR_ID);
@@ -422,7 +486,7 @@ static int receiveFinalMsg(void) {
   if (statusReg & SYS_STATUS_ALL_RX_TO) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
     printf("=== ERROR ===r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
-    return FINAL_TIMEOUT;
+    return FINAL_RECEIVE_TIMEOUT;
   }
 
   if (statusReg & SYS_STATUS_RXFCG) {
@@ -455,7 +519,7 @@ static int receiveFinalMsg(void) {
       finalMsgGetTs(&rxBuffer[FINAL_MSG_TX_2_IDX], &initTxTimestamp2);
       finalMsgGetTs(&rxBuffer[FINAL_MSG_RX_1_IDX + ((ANCHOR_ID - 1) * FINAL_MSG_TS_LEN)], &initRxTimestamp1);
 
-      return FINAL_SUCCESS;
+      return FINAL_RECEIVE_SUCCESS;
     } else {
       /* Clear RX error/timeout events in the DW1000 status register. */
       dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
@@ -464,20 +528,30 @@ static int receiveFinalMsg(void) {
       dwt_rxreset();
 
       printf("=== Error === Tag Final Frame Incorrect\r\n");
-      return FINAL_FAILURE;
+      return FINAL_RECEIVE_FAILURE;
     }
   }
 
   if (statusReg & SYS_STATUS_ALL_RX_ERR) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
     printf("=== Error === Frame Received Error (Final Message)\r\n");
-    return FINAL_FAILURE;
+    return FINAL_RECEIVE_FAILURE;
   }
 
   /* Default return. */
-  return FINAL_FAILURE;
+  return FINAL_RECEIVE_FAILURE;
 }
 
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn computeDistance()
+ *
+ * @brief Calculate the approximate distance between this Anchor and target Tag using the TX/RX timestamp values
+ *        received from the final message.
+ *
+ * @param  none
+ *
+ * @return none
+ */
 static void computeDistance(void) {
   uint32 respRxTimestamp1_32, respTxTimestamp1_32, respRxTimestamp2_32;
   double roundTrip1, roundTrip2, replyTrip2, replyTrip1;
@@ -498,7 +572,7 @@ static void computeDistance(void) {
   distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
 }
 
-/**@brief SS TWR Initiator task entry function.
+/**@brief DS TWR Anchor task entry function.
 *
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
 */
