@@ -85,9 +85,9 @@
 
 /* Frames used in the ranging process. See NOTE 2 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
-static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0};
+static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this application is supposed to handle. */
@@ -508,7 +508,7 @@ static int receiveDistanceMsgs() {
     /* Check that the frame is the expected response from the companion "DS TWR responder" example.
     * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
     rxBuffer[EX_SEQ_COUNT_IDX] = 0;
-    if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
+    if (memcmp(rxBuffer, anchorDistMsg, ALL_MSG_COMMON_LEN) == 0) {
       rxCount++;
       // printf("Distance Reception # : %d\r\n",rxCount);
       double anchorDistance;

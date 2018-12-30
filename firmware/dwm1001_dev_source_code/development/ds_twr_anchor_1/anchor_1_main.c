@@ -95,8 +95,9 @@
 
 /* Frames used in the ranging process. See NOTE 2,3 below. */
 static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
-static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
@@ -283,8 +284,9 @@ static void writeResponseMsg(void) {
 }
 
 static void writeDistanceMsg(void) {
-  /* Write the distance to transmission message. */
-  memcpy(&anchorMsg[ANCHOR_DIST_IDX], &distanceMetre, sizeof(double));
+  /* Write the ID and distance to transmission message. */
+  anchorDistMsg[ANCHOR_ID_IDX] = ANCHOR_ID;
+  memcpy(&anchorDistMsg[ANCHOR_DIST_IDX], &distanceMetre, sizeof(double));
 }
 
 static void setResponseDelays(uint64 timestampToDelayFrom) {
@@ -329,8 +331,8 @@ static int sendDistanceMsg(void) {
   int ret;
 
   /* Write and send the response message. See NOTE 10 below. */
-  dwt_writetxdata(sizeof(anchorMsg), anchorMsg, 0);
-  dwt_writetxfctrl(sizeof(anchorMsg), 0, 1);
+  dwt_writetxdata(sizeof(anchorDistMsg), anchorDistMsg, 0);
+  dwt_writetxfctrl(sizeof(anchorDistMsg), 0, 1);
   ret = dwt_starttx(DWT_START_TX_DELAYED);
 
   /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
