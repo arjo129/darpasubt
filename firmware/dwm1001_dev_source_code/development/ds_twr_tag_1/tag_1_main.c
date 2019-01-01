@@ -25,6 +25,7 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
+#include "UART.h"
 
 #define APP_NAME "DS TWR TAG"
 
@@ -37,7 +38,7 @@
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_SUCCESS_MS 100
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
-#define RNG_DELAY_FAILURE_MS 100
+#define RNG_DELAY_FAILURE_MS 1000
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -123,6 +124,15 @@ static int anchorReceive = 0;
 static int finalSend = 0;
 static int distanceReceive = 0;
 
+/* Buffer to receive commands from UART RX buffer. */
+char commandString[UART_RX_BUF_SIZE] = {0};
+
+/* Flag to notify that there is data in UART RX. */
+static bool hasRxData = false;
+
+/* The type of operation for this node. */
+static int operationMode;
+
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
@@ -135,6 +145,13 @@ static int sendFinalMsg(void);
 static int receiveAnchorResponse(void);
 static int receiveDistanceMsgs(void);
 static void printDistance(void);
+
+/* Enumerations */
+enum OperationMode {
+  MODE_TAG = 1,
+  MODE_ANCHOR = 2,
+  MODE_GATEWAY = 4
+};
 
 /* TODO:
  * 2. Possibly use soft reset to restart clocks to reduce clock drift maybe?
@@ -632,19 +649,48 @@ static int receiveDistanceMsgs() {
   return DISTANCE_RECEIVE_FAILURE;
 }
 
+void setRxData(uint8_t *data) {
+  memcpy(commandString, data, sizeof commandString);
+  hasRxData = true;
+}
+
+static void decodeRxData(void) {
+  if (commandString[0] == 't') {
+    operationMode = MODE_TAG;
+  } else if (commandString[0] == 'a') {
+    operationMode = MODE_ANCHOR;
+  } else {
+    operationMode = 0;
+  }
+}
+
 /**@brief DS TWR Tag task entry function.
 *
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
 */
 void ds_initiator_task_function (void * pvParameter) {
   int result;
+  /* Default mode */
+  operationMode = MODE_TAG;
+
   UNUSED_PARAMETER(pvParameter);
 
   dwt_setleds(DWT_LEDS_ENABLE);
 
   while (true) {
+    // Check if there is data in UART RX
+    if (hasRxData) {
+      decodeRxData();
+      memset(commandString, 0, sizeof commandString);
+      hasRxData = false;
+    }
+
+    if (!(operationMode & (MODE_TAG | MODE_ANCHOR))) {
+      vTaskDelay(RNG_DELAY_FAILURE_MS);
+      continue;
+    }
+
     result = dsInitRun();
-    
     if (result == EXCHANGE_SUCCESS) {
       /* Delay a task for a given number of ticks */
       vTaskDelay(RNG_DELAY_SUCCESS_MS);
