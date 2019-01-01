@@ -59,11 +59,14 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="18" y="134" useTextEdit="1" useBinaryEdit="0" left="0" path="../main.c" selected="1" top="106" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="4" y="104" useTextEdit="1" useBinaryEdit="0" left="0" path="../ds_resp_main.c" selected="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="160" useTextEdit="1" useBinaryEdit="0" left="0" path="../main.c" selected="0" top="142" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="324" useTextEdit="1" useBinaryEdit="0" left="0" path="../ds_resp_main.c" selected="1" top="431" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="71" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../nRF5_SDK_14.2.0/external/fprintf/nrf_fprintf_format.c" selected="0" top="40" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="46" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../nRF5_SDK_14.2.0/components/libraries/uart/retarget.c" selected="0" top="28" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="8738" useTextEdit="1" useBinaryEdit="0" left="0" path="../config/sdk_config.h" selected="0" top="8719" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="2548" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../deca_driver/deca_device.c" selected="0" top="2530" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="163" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../deca_driver/deca_regs.h" selected="0" top="147" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="44" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../deca_driver/port/port_platform.h" selected="0" top="20" codecName="Default"/>
  </Files>
- <ARMCrossStudioWindow activeProject="ss_twr_resp" fileDialogDefaultFilter="" autoConnectTarget="J-Link" buildConfiguration="nrf52832_xxaa" debugSearchFileMap="" fileDialogInitialDirectory="C:/Users/hashi/Desktop/temp/darpasubt/firmware/dwm1001_dev_source_code/examples/ds_twr_resp" debugSearchPath="" autoConnectCapabilities="3711"/>
+ <ARMCrossStudioWindow activeProject="ss_twr_resp" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="nrf52832_xxaa" debugSearchFileMap="" fileDialogInitialDirectory="C:/Users/hashi/Desktop/temp/darpasubt/firmware/dwm1001_dev_source_code/examples/ds_twr_resp" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>

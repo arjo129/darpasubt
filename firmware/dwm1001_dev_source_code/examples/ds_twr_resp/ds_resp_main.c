@@ -30,8 +30,11 @@
 #define RNG_DELAY_MS 80
 
 /* Frames used in the ranging process. See NOTE 2,3 below. */
-static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
+static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0 ,0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -41,6 +44,8 @@ static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE
 #define RESP_MSG_POLL_RX_TS_IDX 10
 #define RESP_MSG_RESP_TX_TS_IDX 14
 #define RESP_MSG_TS_LEN 4	
+
+int state = 0;
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -60,7 +65,9 @@ static uint32 status_reg = 0;
 // Not enough time to write the data so TX timeout extended for nRF operation.
 // Might be able to get away with 800 uSec but would have to test
 // See note 6 at the end of this file
+//#define POLL_RX_TO_RESP_TX_DLY_UUS  1100
 #define POLL_RX_TO_RESP_TX_DLY_UUS  1100
+
 
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
@@ -71,17 +78,157 @@ typedef signed long long int64;
 typedef unsigned long long uint64;
 static uint64 poll_rx_ts;
 
+static uint64 Tround1;
+static uint64 Tround2;
+static uint64 Treply1;
+static uint64 Treply2;
+
 /* Declaration of static functions. */
 //static uint64 get_tx_timestamp_u64(void);
 static uint64 get_rx_timestamp_u64(void);
 static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
 //static void final_msg_get_ts(const uint8 *ts_field, uint32 *ts);
 
+
+/* Declaration of static functions. */
+static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
+
+
+
 /* Timestamps of frames transmission/reception.
 * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
 typedef unsigned long long uint64;
 static uint64 poll_rx_ts;
 static uint64 resp_tx_ts;
+
+#define UUS_TO_DWT_TIME 65536
+
+/* Speed of light in air, in metres per second. */
+#define SPEED_OF_LIGHT 299702547
+
+/* Hold copies of computed time of flight and distance here for reference so that it can be examined at a debug breakpoint. */
+static double tof;
+static double tof1;
+static double distance;
+static double distance1;
+
+
+/*Transactions Counters */
+static volatile int tx_count = 0 ; // Successful transmit counter
+static volatile int rx_count = 0 ; // Successful receive counter 
+
+
+
+int ss_init_run(void)
+{
+
+
+  /* Loop forever initiating ranging exchanges. */
+
+
+  /* Write frame data to DW1000 and prepare transmission. See NOTE 3 below. */
+  tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+  dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
+
+  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent and the delay
+  * set by dwt_setrxaftertxdelay() has elapsed. */
+  dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+  tx_count++;
+  printf("Transmission # : %d\r\n",tx_count);
+
+
+  /* We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout. See NOTE 4 below. */
+  while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
+  {};
+
+  //printf("kjfsvjef");
+    #if 0  // include if required to help debug timeouts.
+    int temp = 0;		
+    if(status_reg & SYS_STATUS_RXFCG )
+    temp =1;
+    else if(status_reg & SYS_STATUS_ALL_RX_TO )
+    temp =2;
+    if(status_reg & SYS_STATUS_ALL_RX_ERR )
+    temp =3;
+    #endif
+
+  /* Increment frame sequence number after transmission of the poll message (modulo 256). */
+  frame_seq_nb++;
+
+  if (status_reg & SYS_STATUS_RXFCG)
+  {		
+    uint32 frame_len;
+
+    /* Clear good RX frame event in the DW1000 status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
+
+    /* A frame has been received, read it into the local buffer. */
+    frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+   
+    if (frame_len <= RX_BUF_LEN)
+    {
+      dwt_readrxdata(rx_buffer, frame_len, 0);
+    }
+
+    /* Check that the frame is the expected response from the companion "SS TWR responder" example.
+    * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    rx_buffer[ALL_MSG_SN_IDX] = 0;
+    if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
+    {	
+      rx_count++;
+      printf("Reception # : %d\r\n",rx_count);
+      uint32 poll_tx_ts, resp_rx_ts, poll_rx_ts, resp_tx_ts;
+      int32 rtd_init, rtd_resp;
+      float clockOffsetRatio ;
+
+      /* Retrieve poll transmission and response reception timestamps. See NOTE 5 below. */
+      poll_tx_ts = dwt_readtxtimestamplo32();
+      resp_rx_ts = dwt_readrxtimestamplo32();
+
+      /* Read carrier integrator value and calculate clock offset ratio. See NOTE 7 below. */
+      clockOffsetRatio = dwt_readcarrierintegrator() * (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6) ;
+
+      /* Get timestamps embedded in response message. */
+      resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &Tround1);
+      resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &Treply2);
+
+      /* Compute time of flight and distance, using clock offset ratio to correct for differing local and remote clock rates */
+      rtd_init = resp_rx_ts - poll_tx_ts;
+
+      Tround2 = rtd_init;
+
+      //rtd_resp = resp_tx_ts - poll_rx_ts;
+
+      tof = (Tround1 * Tround2 - Treply1*Treply2)/(Tround1+Tround2+Treply1+Treply2) * DWT_TIME_UNITS;
+
+      tof1 = ((rtd_init - Treply2 * (1.0f - clockOffsetRatio)) / 2.0f) * DWT_TIME_UNITS; // Specifying 1.0f and 2.0f are floats to clear warning 
+      distance = tof * SPEED_OF_LIGHT;
+      distance1 = tof1 * SPEED_OF_LIGHT;
+      printf("Distance double : %f\r\n",distance);
+      printf("Distance single : %f\r\n",distance1);
+
+      printf("Tround : %d\t Treply : %d", rtd_init , rtd_resp);
+      state = 0;
+    }
+  }
+  else
+  {
+    /* Clear RX error/timeout events in the DW1000 status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+
+    /* Reset RX to properly reinitialise LDE operation. */
+    dwt_rxreset();
+  }
+
+  /* Execute a delay between ranging exchanges. */
+  //     deca_sleep(RNG_DELAY_MS);
+
+  //	return(1);
+}
+
+
 
 /*! ------------------------------------------------------------------------------------------------------------------
 * @fn main()
@@ -95,7 +242,7 @@ static uint64 resp_tx_ts;
 
 int ss_resp_run(void)
 {
-
+  state = 0;
   /* Activate reception immediately. */
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
@@ -142,7 +289,7 @@ int ss_resp_run(void)
       dwt_setdelayedtrxtime(resp_tx_time);
 
       /* Response TX timestamp is the transmission time we programmed plus the antenna delay. */
-      resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+      resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFEUL)) << 8) + 16456;
 
       /* Write all timestamps in the final message. See NOTE 8 below. */
       resp_msg_set_ts(&tx_resp_msg[RESP_MSG_POLL_RX_TS_IDX], poll_rx_ts);
@@ -154,11 +301,23 @@ int ss_resp_run(void)
       dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1); /* Zero offset in TX buffer, ranging. */
       ret = dwt_starttx(DWT_START_TX_DELAYED);
 
-      //ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
 
+
+      //ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+    //  uint64 temp = dwt_readtxtimestamplo32();
+
+    //  printf("ksdf: %d\n" ,temp);
+
+      Treply1 = resp_tx_ts- poll_rx_ts;
+
+     
+     
       /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. */
       if (ret == DWT_SUCCESS)
       {
+        
+       state = 1;
+
       /* Poll DW1000 until TX frame sent event set. See NOTE 5 below. */
       while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
       {};
@@ -242,6 +401,29 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts)
 }
 
 
+/*! ------------------------------------------------------------------------------------------------------------------
+* @fn resp_msg_get_ts()
+*
+* @brief Read a given timestamp value from the response message. In the timestamp fields of the response message, the
+*        least significant byte is at the lower address.
+*
+* @param  ts_field  pointer on the first byte of the timestamp field to get
+*         ts  timestamp value
+*
+* @return none
+*/
+static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
+{
+  int i;
+  *ts = 0;
+  for (i = 0; i < RESP_MSG_TS_LEN; i++)
+  {
+    *ts += ts_field[i] << (i * 8);
+  }
+}
+
+
+
 /**@brief SS TWR Initiator task entry function.
 *
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
@@ -254,10 +436,25 @@ void ss_responder_task_function (void * pvParameter)
 
   while (true)
   {
-    ss_resp_run();
-    /* Delay a task for a given number of ticks */
-    vTaskDelay(RNG_DELAY_MS);
-    /* Tasks must be implemented to never return... */
+    
+    if(state == 0){
+      printf("responding\n");
+      dwt_setrxtimeout(0);
+      ss_resp_run();
+      /* Delay a task for a given number of ticks */
+      vTaskDelay(RNG_DELAY_MS);
+      /* Tasks must be implemented to never return... */
+    }else{
+     
+    printf("initiating\n");
+    dwt_setrxtimeout(65000);
+      ss_init_run();
+      /* Delay a task for a given number of ticks */
+      vTaskDelay(RNG_DELAY_MS);
+      /* Tasks must be implemented to never return... */
+    
+    }
+   
   }
 }
 /*****************************************************************************************************************************************************
