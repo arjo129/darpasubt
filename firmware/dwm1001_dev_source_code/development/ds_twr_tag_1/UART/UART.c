@@ -19,6 +19,7 @@
 #include "UART.h"
 #include "bsp.h"
 #include "boards.h"
+#include "command.h"
 
 #define NO_PARITY	false
 
@@ -37,7 +38,7 @@ const app_uart_comm_params_t comm_params =
 // local functions
 static void vHandleUartInternalErrors (uint32_t u32Error);
 static void vUartErrorHandle					(app_uart_evt_t * p_event);
-static void getRxData(uint8_t *data);
+static void getRxData(char *data);
 
 /**
  * @brief Public interface, initialise the FIFO UART.
@@ -79,9 +80,12 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
     {
         vHandleUartInternalErrors(p_event->evt_type);
     } else if (p_event -> evt_type == APP_UART_DATA_READY) {
-      uint8_t data[UART_RX_BUF_SIZE] = {0};
-      getRxData(data);
-      setRxData(data);
+      char dataString[UART_RX_BUF_SIZE + 1] = {0}; // +1 for null termination
+      struct Command command;
+
+      getRxData(dataString);
+      command = constructCommand(dataString);
+      setCommand(command);
     }
 }
 
@@ -90,7 +94,7 @@ static void vHandleUartInternalErrors (uint32_t u32Error)
 	// notify app of error - LED ?
 }
 
-static void getRxData(uint8_t *data) {
+static void getRxData(char *data) {
   char byte;
   int i = 0;
   bool hasChar = false;
@@ -100,4 +104,6 @@ static void getRxData(uint8_t *data) {
     data[i] = byte;
     i++;
   }
+
+  data[i] = '\0';
 }

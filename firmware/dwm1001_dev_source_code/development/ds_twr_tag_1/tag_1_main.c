@@ -26,6 +26,7 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "UART.h"
+#include "command.h"
 
 #define APP_NAME "DS TWR TAG"
 
@@ -39,6 +40,8 @@
 #define RNG_DELAY_SUCCESS_MS 100
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
 #define RNG_DELAY_FAILURE_MS 1000
+/* Stop operation delay. */
+#define RNG_DELAY_STOP_MS 100
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -125,13 +128,10 @@ static int finalSend = 0;
 static int distanceReceive = 0;
 
 /* Buffer to receive commands from UART RX buffer. */
-char commandString[UART_RX_BUF_SIZE] = {0};
+static struct Command command;
 
 /* Flag to notify that there is data in UART RX. */
-static bool hasRxData = false;
-
-/* The type of operation for this node. */
-static int operationMode;
+static bool hasCommand = false;
 
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
@@ -145,12 +145,17 @@ static int sendFinalMsg(void);
 static int receiveAnchorResponse(void);
 static int receiveDistanceMsgs(void);
 static void printDistance(void);
+void setCommand(struct Command data);
+static void interpretCommand(int *operationMode);
 
 /* Enumerations */
 enum OperationMode {
-  MODE_TAG = 1,
-  MODE_ANCHOR = 2,
-  MODE_GATEWAY = 4
+  MODE_START = 1,
+  MODE_STOP = 2,
+  MODE_UNKNOWN = 4,
+  MODE_TAG = 8,
+  MODE_ANCHOR = 16,
+  MODE_GATEWAY = 32
 };
 
 /* TODO:
@@ -649,18 +654,56 @@ static int receiveDistanceMsgs() {
   return DISTANCE_RECEIVE_FAILURE;
 }
 
-void setRxData(uint8_t *data) {
-  memcpy(commandString, data, sizeof commandString);
-  hasRxData = true;
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn setCommand()
+ *
+ * @brief Set the command structure so the device can execute it when the current exchange ends.
+ *
+ * @param  command the Command struct to set with
+ *
+ * @return none
+ */
+void setCommand(struct Command data) {
+  command = data;
+  hasCommand = true;
 }
 
-static void decodeRxData(void) {
-  if (commandString[0] == 't') {
-    operationMode = MODE_TAG;
-  } else if (commandString[0] == 'a') {
-    operationMode = MODE_ANCHOR;
-  } else {
-    operationMode = 0;
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn interpretCommand()
+ *
+ * @brief Deconstruct the received command struct and set the operation mode accordingly.
+ *
+ * @param  operationMode pointer to the operation mode value to change.
+ *
+ * @return none
+ */
+static void interpretCommand(int *operationMode) {
+  switch(command.key) {
+    case TAG_KEY:
+      *operationMode |= MODE_TAG;
+      *operationMode &= ~MODE_ANCHOR;
+      printf("Switched to Tag: 1\r\n");
+      break;
+    case ANCHOR_KEY:
+      *operationMode |= MODE_ANCHOR;
+      *operationMode &= ~MODE_TAG;
+      printf("Switched to Anchor: 1\r\n");
+      break;
+    case START_KEY:
+      *operationMode |= MODE_START;
+      *operationMode &= ~MODE_STOP;
+      printf("Begin ranging.\r\n");
+      break;
+    case STOP_KEY:
+      *operationMode |= MODE_STOP;
+      *operationMode &= ~MODE_START;
+      printf("Stop ranging.\r\n");
+      break;
+    default:
+      // Do nothing
+      // *operationMode = 0;
+      // *operationMode |= MODE_UNKNOWN;
+      printf("Unknown command.\r\n");
   }
 }
 
@@ -670,29 +713,30 @@ static void decodeRxData(void) {
 */
 void ds_initiator_task_function (void * pvParameter) {
   int result;
-  /* Default mode */
-  operationMode = MODE_TAG;
+  /* The type of operation for this node. */
+  int operationMode = MODE_TAG | MODE_START; // Default
 
   UNUSED_PARAMETER(pvParameter);
 
   dwt_setleds(DWT_LEDS_ENABLE);
-
   while (true) {
-    // Check if there is data in UART RX
-    if (hasRxData) {
-      decodeRxData();
-      memset(commandString, 0, sizeof commandString);
-      hasRxData = false;
+    if (hasCommand) {
+      interpretCommand(&operationMode);
+      memset(&command, 0, sizeof command); // Clear the command
+      hasCommand = false;
     }
 
-    if (!(operationMode & (MODE_TAG | MODE_ANCHOR))) {
-      vTaskDelay(RNG_DELAY_FAILURE_MS);
+    if ((operationMode & MODE_TAG) && (operationMode & MODE_START)) {
+      result = dsInitRun();
+    } else if ((operationMode & MODE_ANCHOR) && (operationMode & MODE_START)) {
+      // Implement anchor code
+    } else {
+      vTaskDelay(RNG_DELAY_STOP_MS);
       continue;
     }
 
-    result = dsInitRun();
-    if (result == EXCHANGE_SUCCESS) {
       /* Delay a task for a given number of ticks */
+    if (result == EXCHANGE_SUCCESS) {
       vTaskDelay(RNG_DELAY_SUCCESS_MS);
     } else {
       vTaskDelay(RNG_DELAY_FAILURE_MS);
