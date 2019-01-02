@@ -21,7 +21,7 @@ void LocalMap3d::insert(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, octom
   // Discretize into octree key cells
   octomap::Pointcloud octo_cloud;
   octomap::pointCloud2ToOctomap(*cloud_msg, octo_cloud);
-  this->tree->insertPointCloud(octo_cloud, sensor_origin, -1, true, true);
+  this->tree->insertPointCloud(octo_cloud, sensor_origin, 100, true, true);
 }
 
 void LocalMap3d::update() {

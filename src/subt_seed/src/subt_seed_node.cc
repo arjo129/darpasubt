@@ -33,6 +33,9 @@
 
 #include <subt_gazebo/CommsClient.hh>
 #include <subt_seed/mapper.h>
+
+#include <tf/transform_broadcaster.h>
+
 /// \brief. Example control class, running as a ROS node to control a robot.
 class Controller
 {
@@ -60,7 +63,8 @@ class Controller
   private: ros::NodeHandle n;
   tf::TransformListener listener;
   LocalMap* localMap;
-  LocalMap3d* localMap3d;
+  //LocalMap3d* localMap3d;
+  std::string name;
   octomap::point3d* sensor_origin;
 
   private: void handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
@@ -79,6 +83,7 @@ class Controller
 /////////////////////////////////////////////////
 Controller::Controller(const std::string &_name)
 {
+  name = _name;
   // Create subt communication client
   this->client.reset(new subt::CommsClient(_name));
   this->client->Bind(&Controller::CommClientCallback, this);
@@ -89,8 +94,8 @@ Controller::Controller(const std::string &_name)
   this->map3dPub = this->n.advertise<octomap_msgs::Octomap>(_name+"/local_map_3d",1);
   this->sub = this->n.subscribe(_name + "/points", 1, &Controller::handlePointCloud, this);
   this->localMap = new LocalMap(_name+"/base_link");
-  this->localMap3d = new LocalMap3d(_name+"/local_map_3d");
-  this->odomSub = this->n.subscribe(_name + "/odom", 1, &Controller::handleOdom, this);
+  //this->localMap3d = new LocalMap3d(_name+"/base_link");
+  this->odomSub = this->n.subscribe(_name + "/x1_velocity_controller/odom", 1, &Controller::handleOdom, this);
 
   ROS_INFO("Initiallizing call backs");
 }
@@ -108,14 +113,14 @@ void Controller::CommClientCallback(const std::string &/*_srcAddress*/,
 void Controller::handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
   pcl::PCLPointCloud2 pcl_pc2;
   octomap_msgs::Octomap octomap_msg;
-  pcl_conversions::toPCL(*cloud_msg,pcl_pc2);
+  pcl_conversions::toPCL(*cloud_msg, pcl_pc2);
   pcl::PointCloud<pcl::PointXYZI>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZI>);
   pcl::fromPCLPointCloud2(pcl_pc2, *temp_cloud);
   localMap->update(*temp_cloud);
-  localMap3d->insert(cloud_msg, *(this->sensor_origin));
-  localMap3d->update();
-  octomap_msgs::fullMapToMsg(*localMap3d->tree, octomap_msg);
-  this->map3dPub.publish(octomap_msg);
+  //localMap3d->insert(cloud_msg, *(this->sensor_origin));
+  //localMap3d->update();
+  //octomap_msgs::fullMapToMsg(*localMap3d->tree, octomap_msg);
+  //this->map3dPub.publish(octomap_msg);
   nav_msgs::OccupancyGrid grid;
   localMap->toOccupancyGrid(grid);
   this->mapPub.publish(grid);
@@ -126,6 +131,13 @@ void Controller::handleOdom(const nav_msgs::Odometry& odom_msg) {
     odom_msg.pose.pose.position.x,
     odom_msg.pose.pose.position.y,
     odom_msg.pose.pose.position.z);
+
+  static tf::TransformBroadcaster br;
+  tf::Transform transform;
+  transform.setOrigin( tf::Vector3(odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y, 0.0) );
+  tf::Quaternion q(odom_msg.pose.pose.orientation.x, odom_msg.pose.pose.orientation.y, odom_msg.pose.pose.orientation.z, odom_msg.pose.pose.orientation.w);
+  transform.setRotation(q);
+  br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", name+"/base_link"));
 }
 
 /////////////////////////////////////////////////
