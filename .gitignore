@@ -2,3 +2,6 @@
 **/SES/Output/**
 **/*.emSession
 /firmware/dwm1001_dev_source_code/.vscode/
+*.d
+*.o
+*.elf
