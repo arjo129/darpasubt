@@ -265,7 +265,7 @@ void ds_initiator_task_function (void * pvParameter) {
       }
 
       if (operationMode == MODE_ANCHOR) {
-        // Run anchor code
+        result = ds_resp_run();
       }
 
       /* Delay a task for a given number of ticks */
