@@ -9,11 +9,11 @@
 #define DELIMITER ';'
 
 enum CommandKey {
+    UNKNOWN_KEY,
     TAG_KEY,
     ANCHOR_KEY,
     START_KEY,
-    STOP_KEY,
-    UNKNOWN_KEY
+    STOP_KEY
 };
 
 struct Command {

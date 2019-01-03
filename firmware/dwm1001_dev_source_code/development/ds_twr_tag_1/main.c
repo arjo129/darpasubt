@@ -68,6 +68,8 @@ static dwt_config_t config = {
 #define RNG_DELAY_FAILURE_MS 1000
 /* Stop operation delay. */
 #define RNG_DELAY_STOP_MS 100
+/* Receive command success. */
+#define RNG_DELAY_CMD_SUCCESS_MS 50
 
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
@@ -90,18 +92,27 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 /* Buffer to receive commands from UART RX buffer. */
 static struct Command command;
 
-/* Flag to notify that there is data in UART RX. */
-static bool hasCommand = false;
-
 /* Enumerations */
 enum OperationMode {
-  MODE_START = 1,
-  MODE_STOP = 2,
-  MODE_UNKNOWN = 4,
-  MODE_TAG = 8,
-  MODE_ANCHOR = 16,
-  MODE_GATEWAY = 32
+  MODE_UNKNOWN,
+  MODE_TAG,
+  MODE_ANCHOR
 };
+
+/* States to instruct the device of the next action. */
+enum DeviceState {
+  STATE_STANDBY,
+  STATE_RECEIVE_HOST_CMD,
+  STATE_DISTRB_SYS_CMD,
+  STATE_EXEC_SYS_CMD,
+  STATE_RECEIVE_SYS_CMD
+};
+
+/* Device's default state. */
+static enum DeviceState defaultDeviceState;
+
+/* Indicates the state of device. */
+static enum DeviceState state;
 
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
@@ -199,6 +210,9 @@ int main(void)
   dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
   dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms.
 
+  /* Set the device's default state. */
+  defaultDeviceState = STATE_STANDBY;
+
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
 
@@ -227,34 +241,42 @@ int main(void)
 void ds_initiator_task_function (void * pvParameter) {
   int result;
   /* The type of operation for this node. */
-  int operationMode = MODE_TAG | MODE_START; // Default
+  int operationMode = MODE_TAG; // Default
+  state = defaultDeviceState;
 
   UNUSED_PARAMETER(pvParameter);
 
   dwt_setleds(DWT_LEDS_ENABLE);
-  while (true) {
-    if (hasCommand) {
-      interpretCommand(&operationMode);
-      memset(&command, 0, sizeof command); // Clear the command
-      hasCommand = false;
-    }
 
-    if ((operationMode & MODE_TAG) && (operationMode & MODE_START)) {
-      result = dsInitRun();
-    } else if ((operationMode & MODE_ANCHOR) && (operationMode & MODE_START)) {
-      // Implement anchor code
-    } else {
+  while (true) {
+    if (state == STATE_RECEIVE_HOST_CMD) {
+      interpretCommand(&operationMode); // Set device to the next correct state
+      memset(&command, 0, sizeof command); // Clear the command
+      vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
+    } else if (state == STATE_STANDBY) {
       vTaskDelay(RNG_DELAY_STOP_MS);
-      continue;
-    }
+    } else if (state == STATE_RECEIVE_SYS_CMD) {
+      // poll to receive sys cmd
+    } else if (state == STATE_DISTRB_SYS_CMD) {
+      // send sys cmd to all nodes
+    } else if (state == STATE_EXEC_SYS_CMD) {
+      if (operationMode == MODE_TAG) {
+        result = dsInitRun();
+      }
+
+      if (operationMode == MODE_ANCHOR) {
+        // Run anchor code
+      }
 
       /* Delay a task for a given number of ticks */
-    if (result == EXCHANGE_SUCCESS) {
-      vTaskDelay(RNG_DELAY_SUCCESS_MS);
+      if (result == EXCHANGE_SUCCESS) {
+        vTaskDelay(RNG_DELAY_SUCCESS_MS);
+      } else {
+        vTaskDelay(RNG_DELAY_FAILURE_MS);
+      }
     } else {
-      vTaskDelay(RNG_DELAY_FAILURE_MS);
+
     }
-    /* Tasks must be implemented to never return... */
   }
 }
 
@@ -269,7 +291,7 @@ void ds_initiator_task_function (void * pvParameter) {
  */
 void setCommand(struct Command data) {
   command = data;
-  hasCommand = true;
+  state = STATE_RECEIVE_HOST_CMD;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -284,30 +306,28 @@ void setCommand(struct Command data) {
 static void interpretCommand(int *operationMode) {
   switch(command.key) {
     case TAG_KEY:
-      *operationMode |= MODE_TAG;
-      *operationMode &= ~MODE_ANCHOR;
+      *operationMode = MODE_TAG;
+      state = STATE_STANDBY;
       printf("Switched to Tag: 1\r\n");
       break;
     case ANCHOR_KEY:
-      *operationMode |= MODE_ANCHOR;
-      *operationMode &= ~MODE_TAG;
+      *operationMode = MODE_ANCHOR;
+      state = STATE_STANDBY;
       printf("Switched to Anchor: 1\r\n");
       break;
     case START_KEY:
-      *operationMode |= MODE_START;
-      *operationMode &= ~MODE_STOP;
+      state = STATE_EXEC_SYS_CMD;
       printf("Begin ranging.\r\n");
       break;
     case STOP_KEY:
-      *operationMode |= MODE_STOP;
-      *operationMode &= ~MODE_START;
+      state = STATE_STANDBY;
       printf("Stop ranging.\r\n");
       break;
     default:
       // Do nothing
-      // *operationMode = 0;
-      // *operationMode |= MODE_UNKNOWN;
+      state = STATE_STANDBY;
       printf("Unknown command.\r\n");
+      break;
   }
 }
 
