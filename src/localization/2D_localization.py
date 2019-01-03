@@ -25,12 +25,10 @@ RANGE_STD = 3.0  # standard deviation for observation gaussian distribution
 
 # grid map param
 XY_RESO = 0.5  # xy grid resolutions
-MINX = -15.0
-MINY = -5.0
-MINZ = 0.0
-MAXX = 15.0
-MAXY = 25.0
-MAXZ = 10.0
+MINX = 0.0
+MINY = 0.0
+MAXX = 10.0
+MAXY = 10.0
 
 # simulation paramters
 NOISE_RANGE = 2.0  # [m] 1σ range noise parameter
@@ -53,6 +51,23 @@ class grid_map():
         self.yw = None
         self.dx = 0.0  # movement distance
         self.dy = 0.0  # movement distance
+
+def and_probabilities(pdf_array):
+
+    total_pdf = [[0.0 for i in range(MAXX)] for i in range(MAXY)]
+
+    for ipdf in range(pdf_array):
+        for ix in range(MAXX):
+            for iy in range(MAXY):
+                total_pdf[ix][iy] += ipdf[ix][iy]
+
+    total_pdf = normalize_probability(total_pdf)
+
+    return total_pdf
+
+def p_grid(gmap, x, y):
+
+    return gmap.data[x][y]
 
 
 def histogram_filter_localization(gmap, u, z, yaw):
@@ -218,10 +233,10 @@ def main():
     print(__file__ + " start!!")
 
     # RFID positions [x, y]
-    RFID = np.array([[15.0, 0.0],
-                     [15.0, 20.0],
-                     [-15.0, 20.0],
-                     [-15.0, 0.0]])
+    RFID = np.array([[5.0, 1.0],
+                     [5.0, 7.0],
+                     [8.0, 3.0],
+                     [10.0, 5.0]])
 
     time = 0.0
 
@@ -232,6 +247,8 @@ def main():
     while SIM_TIME >= time:
         time += DT
         print("Time:", time)
+
+        print("Probability at point 0.0,0.0:", p_grid(gmap,0,0))
 
         u = calc_input()
 

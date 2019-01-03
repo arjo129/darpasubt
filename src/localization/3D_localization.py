@@ -173,8 +173,8 @@ def normalize_probability(gmap):
             for ix in range(gmap.xw):
                 sump += gmap.data[ix][iy][iz] 
     # sump = sum([sum(igmap) for igmap in gmap.data])
-    # print(sump)
-    # print(gmap.data)
+    print(sump)
+    print(gmap.data)
 
     for ix in range(gmap.xw):
         for iy in range(gmap.yw):
