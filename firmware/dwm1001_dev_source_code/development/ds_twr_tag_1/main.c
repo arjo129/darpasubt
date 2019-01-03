@@ -133,7 +133,7 @@ int main(void)
   
   /*Initialization UART*/
   boUART_Init ();
-  // printf("TAG --- Double Sided Two Way Ranging\r\n");
+  printf("TAG --- Double Sided Two Way Ranging\r\n");
   
   /* Reset DW1000 */
   reset_DW1000(); 

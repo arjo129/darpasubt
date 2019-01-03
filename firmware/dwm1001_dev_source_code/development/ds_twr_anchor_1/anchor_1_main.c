@@ -25,6 +25,7 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
+#include "UART.h"
 
 /* Number representing the identification of this Anchor. 
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. 
@@ -35,7 +36,8 @@
 #define ANCHOR_ID 3
 
 /* Inter-ranging delay period, in milliseconds. See NOTE 1*/
-#define RNG_DELAY_MS 80
+#define RNG_DELAY_SUCCESS_MS 80
+#define RNG_DELAY_FAILURE_MS 80
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -137,6 +139,15 @@ static int sendResponse = 0;
 static int receiveFinal = 0;
 static int sendDistance = 0;
 
+/* Buffer to receive commands from UART RX buffer. */
+char commandString[UART_RX_BUF_SIZE] = {0};
+
+/* Flag to notify that there is data in UART RX. */
+static bool hasRxData = false;
+
+/* The type of operation for this node. */
+static int operationMode;
+
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
@@ -149,6 +160,13 @@ static int receiveFinalMsg(void);
 static int sendResponseMsg(void);
 static int sendDistanceMsg(void);
 static void computeDistance(void);
+
+/* Enumerations */
+enum OperationMode {
+  MODE_TAG = 1,
+  MODE_ANCHOR = 2,
+  MODE_GATEWAY = 4
+};
 
 /*! ------------------------------------------------------------------------------------------------------------------
 * @fn main()
@@ -572,19 +590,49 @@ static void computeDistance(void) {
   distanceMetre = timeOfFlight * SPEED_OF_LIGHT;
 }
 
+void setRxData(uint8_t *data) {
+  memcpy(commandString, data, sizeof commandString);
+  hasRxData = true;
+}
+
+static void decodeRxData(void) {
+  if (commandString[0] == 't') {
+    operationMode = MODE_TAG;
+  } else if (commandString[0] == 'a') {
+    operationMode = MODE_ANCHOR;
+  } else {
+    operationMode = 0;
+  }
+}
+
 /**@brief DS TWR Anchor task entry function.
 *
 * @param[in] pvParameter   Pointer that will be used as the parameter for the task.
 */
 void ds_responder_task_function (void * pvParameter) {
+  /* Default mode */
+  operationMode = MODE_ANCHOR;
+
   UNUSED_PARAMETER(pvParameter);
 
   dwt_setleds(DWT_LEDS_ENABLE);
 
   while (true) {
+    // Check if there is data in UART RX
+    if (hasRxData) {
+      decodeRxData();
+      memset(commandString, 0, sizeof commandString);
+      hasRxData = false;
+    }
+
+    if (!(operationMode & (MODE_TAG | MODE_ANCHOR))) {
+      vTaskDelay(RNG_DELAY_FAILURE_MS);
+      continue;
+    }
+
     ds_resp_run();
     /* Delay a task for a given number of ticks */
-    vTaskDelay(RNG_DELAY_MS);
+    vTaskDelay(RNG_DELAY_SUCCESS_MS);
     /* Tasks must be implemented to never return... */
   }
 }

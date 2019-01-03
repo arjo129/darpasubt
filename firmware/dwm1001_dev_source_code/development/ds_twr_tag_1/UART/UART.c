@@ -19,12 +19,9 @@
 #include "UART.h"
 #include "bsp.h"
 #include "boards.h"
+#include "command.h"
 
 #define NO_PARITY	false
-
-// UART circular buffers - Tx and Rx size
-#define UART_TX_BUF_SIZE 512
-#define UART_RX_BUF_SIZE 32
 
 // UART initialisation structure
 const app_uart_comm_params_t comm_params =
@@ -41,6 +38,7 @@ const app_uart_comm_params_t comm_params =
 // local functions
 static void vHandleUartInternalErrors (uint32_t u32Error);
 static void vUartErrorHandle					(app_uart_evt_t * p_event);
+static void getRxData(char *data);
 
 /**
  * @brief Public interface, initialise the FIFO UART.
@@ -81,6 +79,13 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
     else if (p_event->evt_type == APP_UART_FIFO_ERROR)
     {
         vHandleUartInternalErrors(p_event->evt_type);
+    } else if (p_event -> evt_type == APP_UART_DATA_READY) {
+      char dataString[UART_RX_BUF_SIZE + 1] = {0}; // +1 for null termination
+      struct Command command;
+
+      getRxData(dataString);
+      command = constructCommand(dataString);
+      setCommand(command);
     }
 }
 
@@ -89,3 +94,16 @@ static void vHandleUartInternalErrors (uint32_t u32Error)
 	// notify app of error - LED ?
 }
 
+static void getRxData(char *data) {
+  char byte;
+  int i = 0;
+  bool hasChar = false;
+
+  // Get each byte until RX buffer is empty
+  while (boUART_getc(&byte) == true) {
+    data[i] = byte;
+    i++;
+  }
+
+  data[i] = '\0';
+}
