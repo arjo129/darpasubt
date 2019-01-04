@@ -52,6 +52,7 @@
 #define ANCHOR_DIST_IDX 11
 
 /* Values to help determine if message transmitted or received. */
+#define INITIATION_RECEIVE_INTERRUPTED 3
 #define INITIATION_RECEIVE_TIMEOUT 2
 #define INITIATION_RECEIVE_SUCCESS 1
 #define INITIATION_RECEIVE_FAILURE 0
@@ -62,6 +63,7 @@
 #define FINAL_RECEIVE_FAILURE 0
 #define DISTANCE_SEND_SUCCESS 1
 #define DISTANCE_SEND_FAILURE 0
+#define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
@@ -148,6 +150,8 @@ static bool hasRxData = false;
 /* The type of operation for this node. */
 static int operationMode;
 
+extern bool hasInterruptEvent;
+
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
@@ -178,7 +182,7 @@ enum OperationMode {
 * @return none
 */
 
-int ds_resp_run(void) {
+int dsRespRun(void) {
   /* Notifies starting of reception. */
   printf("Anchor ID #%d receiving...\r\n", ANCHOR_ID);
 
@@ -189,8 +193,11 @@ int ds_resp_run(void) {
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
   receiveInitiation = receiveInitiationMsg();
-  if (receiveInitiation == INITIATION_RECEIVE_FAILURE || receiveInitiation == INITIATION_RECEIVE_TIMEOUT) {
+  if (receiveInitiation == INITIATION_RECEIVE_FAILURE
+      || receiveInitiation == INITIATION_RECEIVE_TIMEOUT) {
     return EXCHANGE_FAILURE;
+  } else if (receiveInitiation == INITIATION_RECEIVE_INTERRUPTED) {
+    return EXCHANGE_INTERRUPTED;
   }
 
   writeResponseMsg();
@@ -425,7 +432,15 @@ static int sendDistanceMsg(void) {
 static int receiveInitiationMsg(void) {
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
   printf("Attempting to receive initiation message...\r\n", ANCHOR_ID);
-  while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
+  printf("at anchor: interrupt = %d\r\n", hasInterruptEvent);
+  while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))
+      && !hasInterruptEvent) {};
+
+  if (hasInterruptEvent) {
+    printf("interrupt detected\r\n");
+    hasInterruptEvent = false;
+    return INITIATION_RECEIVE_INTERRUPTED;
+  }
 
   if (statusReg & SYS_STATUS_ALL_RX_TO) {
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);

@@ -71,6 +71,7 @@ static dwt_config_t config = {
 /* Receive command success. */
 #define RNG_DELAY_CMD_SUCCESS_MS 50
 
+#define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
@@ -91,6 +92,9 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Buffer to receive commands from UART RX buffer. */
 static struct Command command;
+
+/* Flag to indicate if an event has happened and needs to interrupt all current activities. */
+bool hasInterruptEvent;
 
 /* Enumerations */
 enum OperationMode {
@@ -212,6 +216,7 @@ int main(void)
 
   /* Set the device's default state. */
   defaultDeviceState = STATE_STANDBY;
+  hasInterruptEvent = false;
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -252,6 +257,7 @@ void ds_initiator_task_function (void * pvParameter) {
     if (state == STATE_RECEIVE_HOST_CMD) {
       interpretCommand(&operationMode); // Set device to the next correct state
       memset(&command, 0, sizeof command); // Clear the command
+      hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
     } else if (state == STATE_STANDBY) {
       vTaskDelay(RNG_DELAY_STOP_MS);
@@ -265,12 +271,15 @@ void ds_initiator_task_function (void * pvParameter) {
       }
 
       if (operationMode == MODE_ANCHOR) {
-        result = ds_resp_run();
+        result = dsRespRun();
       }
 
       /* Delay a task for a given number of ticks */
       if (result == EXCHANGE_SUCCESS) {
         vTaskDelay(RNG_DELAY_SUCCESS_MS);
+      } else if (result == EXCHANGE_INTERRUPTED) {
+        state = STATE_RECEIVE_HOST_CMD;
+        vTaskDelay(RNG_DELAY_FAILURE_MS);
       } else {
         vTaskDelay(RNG_DELAY_FAILURE_MS);
       }
@@ -292,6 +301,8 @@ void ds_initiator_task_function (void * pvParameter) {
 void setCommand(struct Command data) {
   command = data;
   state = STATE_RECEIVE_HOST_CMD;
+  hasInterruptEvent = true;
+  printf("received interrupt\r\n");
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

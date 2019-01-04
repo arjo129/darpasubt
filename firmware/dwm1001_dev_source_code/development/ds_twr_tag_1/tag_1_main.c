@@ -119,6 +119,8 @@ static int anchorReceive = 0;
 static int finalSend = 0;
 static int distanceReceive = 0;
 
+extern bool hasInterruptEvent;
+
 /* Declaration of static functions. */
 static uint64 getTxTimestampU64(void);
 static uint64 getRxTimestampU64(void);
