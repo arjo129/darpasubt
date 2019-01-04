@@ -152,6 +152,9 @@ int dsInitRun(void) {
   /* Loop forever initiating ranging exchanges. */
   uint32 tagSendDelayTime;
 
+  /* Resets the RX timeout for Tag mode. */
+  dwt_setrxtimeout(65000);
+
   /* Clears the anchor timestamps temporary storage. */
   memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
   memset(anchorsDistances, 0, sizeof anchorsDistances);

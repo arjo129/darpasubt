@@ -195,8 +195,10 @@ int dsRespRun(void) {
   receiveInitiation = receiveInitiationMsg();
   if (receiveInitiation == INITIATION_RECEIVE_FAILURE
       || receiveInitiation == INITIATION_RECEIVE_TIMEOUT) {
+    dwt_forcetrxoff(); // Ensure transceiver is off for future usage
     return EXCHANGE_FAILURE;
   } else if (receiveInitiation == INITIATION_RECEIVE_INTERRUPTED) {
+    dwt_forcetrxoff(); // Ensure transceiver is off for future usage
     return EXCHANGE_INTERRUPTED;
   }
 

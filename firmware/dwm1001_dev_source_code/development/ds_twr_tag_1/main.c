@@ -212,7 +212,6 @@ int main(void)
   /* Set expected response's delay and timeout. 
   * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
   dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-  dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms.
 
   /* Set the device's default state. */
   defaultDeviceState = STATE_STANDBY;
