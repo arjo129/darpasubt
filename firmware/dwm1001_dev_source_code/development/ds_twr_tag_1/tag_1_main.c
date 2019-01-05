@@ -150,10 +150,10 @@ static void printDistance(void);
 *
 * @return none
 */
-int dsInitRun(uint8 *tagId, uint8 *anchorsTotalCount) {
+int dsInitRun(uint8 *tagId, uint8 *totalAnchors) {
   /* Loop forever initiating ranging exchanges. */
   uint32 tagSendDelayTime;
-  anchorsTotalCount = anchorsTotalCount;
+  anchorsTotalCount = *totalAnchors;
 
   /* Resets the RX timeout for Tag mode. */
   dwt_setrxtimeout(65000);

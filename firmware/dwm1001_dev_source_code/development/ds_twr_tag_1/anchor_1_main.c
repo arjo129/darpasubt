@@ -103,6 +103,8 @@ static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1,
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+static int anchorIdNum;
+
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this example code is supposed to handle. */
 static uint8 rxBuffer[RX_BUF_LEN];
@@ -182,9 +184,11 @@ enum OperationMode {
 * @return none
 */
 
-int dsRespRun(void) {
+int dsRespRun(uint8 *anchorId, uint8 *anchorsTotalCount) {
+  anchorIdNum = *anchorId;
+  printf("id = %d\r\n", anchorIdNum);
   /* Notifies starting of reception. */
-  printf("Anchor ID #%d receiving...\r\n", ANCHOR_ID);
+  printf("Anchor ID #%d receiving...\r\n", anchorIdNum);
 
   /* Clear reception timeout to start next ranging process. */
   dwt_setrxtimeout(0);
@@ -316,7 +320,7 @@ static void finalMsgGetTs(const uint8 *tsField, uint32 *ts) {
  */
 static void writeResponseMsg(void) {
   /* Send ID of this anchor back to tag. */
-  anchorMsg[ANCHOR_ID_IDX] = ANCHOR_ID;
+  anchorMsg[ANCHOR_ID_IDX] = anchorIdNum;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -330,7 +334,7 @@ static void writeResponseMsg(void) {
  */
 static void writeDistanceMsg(void) {
   /* Write the ID and distance to transmission message. */
-  anchorDistMsg[ANCHOR_ID_IDX] = ANCHOR_ID;
+  anchorDistMsg[ANCHOR_ID_IDX] = anchorIdNum;
   memcpy(&anchorDistMsg[ANCHOR_DIST_IDX], &distanceMetre, sizeof(double));
 }
 
@@ -350,12 +354,12 @@ static void setResponseDelays(uint64 timestampToDelayFrom) {
 
   /* Set send time for response. See NOTE 9 below. */
   delay_64 = timestampToDelayFrom + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME);
-  delay_64 = delay_64 + ((ANCHOR_ID - 1) * (ANCH_RX_AFT_TX_DLY * UUS_TO_DWT_TIME));
+  delay_64 = delay_64 + ((anchorIdNum - 1) * (ANCH_RX_AFT_TX_DLY * UUS_TO_DWT_TIME));
   respSendDelayTime = (delay_64) >> 8;
   dwt_setdelayedtrxtime(respSendDelayTime);
 
   /* Set the delay to turn on receiver after transmission of respone message. */
-  rxDelay = ((totalAnchors - ANCHOR_ID) * ANCH_RX_AFT_TX_DLY) + POLL_RX_TO_RESP_TX_DLY_UUS;
+  rxDelay = ((totalAnchors - anchorIdNum) * ANCH_RX_AFT_TX_DLY) + POLL_RX_TO_RESP_TX_DLY_UUS;
   dwt_setrxaftertxdelay(rxDelay);
 }
 
@@ -433,7 +437,7 @@ static int sendDistanceMsg(void) {
  */
 static int receiveInitiationMsg(void) {
   /* Poll for reception of a frame or error/timeout. See NOTE 8 below. */
-  printf("Attempting to receive initiation message...\r\n", ANCHOR_ID);
+  printf("Attempting to receive initiation message...\r\n", anchorIdNum);
   printf("at anchor: interrupt = %d\r\n", hasInterruptEvent);
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))
       && !hasInterruptEvent) {};
@@ -510,7 +514,7 @@ static int receiveInitiationMsg(void) {
  */
 static int receiveFinalMsg(void) {
   /* Poll for reception of expected "final" frame or error/timeout. See NOTE 8 below. */
-  printf("Attempting to receive final message...\r\n", ANCHOR_ID);
+  printf("Attempting to receive final message...\r\n", anchorIdNum);
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {};
 
   /* Disable RX timeout since we want to look for Tag messages indefinitely after this.
@@ -552,7 +556,7 @@ static int receiveFinalMsg(void) {
       /* Get timestamps embedded in the final message. */
       finalMsgGetTs(&rxBuffer[FINAL_MSG_TX_1_IDX], &initTxTimestamp1);
       finalMsgGetTs(&rxBuffer[FINAL_MSG_TX_2_IDX], &initTxTimestamp2);
-      finalMsgGetTs(&rxBuffer[FINAL_MSG_RX_1_IDX + ((ANCHOR_ID - 1) * FINAL_MSG_TS_LEN)], &initRxTimestamp1);
+      finalMsgGetTs(&rxBuffer[FINAL_MSG_RX_1_IDX + ((anchorIdNum - 1) * FINAL_MSG_TS_LEN)], &initRxTimestamp1);
 
       return FINAL_RECEIVE_SUCCESS;
     } else {

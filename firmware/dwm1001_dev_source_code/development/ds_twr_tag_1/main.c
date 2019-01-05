@@ -52,6 +52,8 @@ static dwt_config_t config = {
     (129 + 8 - 8)     /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
+#define GATEWAY_DEVICE true
+
 /* Preamble timeout, in multiple of PAC size. See NOTE 3 below. */
 #define PRE_TIMEOUT 1000
 
@@ -121,7 +123,7 @@ static enum DeviceState state;
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
 void setCommand(struct Command data);
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount);
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway);
 
 #ifdef USE_FREERTOS
 
@@ -244,6 +246,7 @@ int main(void)
 */
 void ds_initiator_task_function (void * pvParameter) {
   int result;
+  bool isGateway = GATEWAY_DEVICE;
   /* The type of operation for this node. */
   int operationMode = MODE_TAG; // Default
   uint8 deviceId = 0, anchorsTotalCount = 0;
@@ -255,7 +258,7 @@ void ds_initiator_task_function (void * pvParameter) {
 
   while (true) {
     if (state == STATE_RECEIVE_HOST_CMD) {
-      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount); // Set device to the next correct state
+      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount, &isGateway); // Set device to the next correct state
       memset(&command, 0, sizeof command); // Clear the command
       hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
@@ -271,7 +274,7 @@ void ds_initiator_task_function (void * pvParameter) {
       }
 
       if (operationMode == MODE_ANCHOR) {
-        result = dsRespRun();
+        result = dsRespRun(&deviceId, &anchorsTotalCount);
       }
 
       /* Delay a task for a given number of ticks */
@@ -327,20 +330,28 @@ void setCommand(struct Command data) {
  *
  * @return none
  */
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount) {
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway) {
   switch(command.key) {
     case TAG_KEY:
       *operationMode = MODE_TAG;
       *deviceId = command.thisId;
       *anchorsTotalCount = command.anchorsTotalCount;
-      state = STATE_STANDBY;
+      if (isGateway) {
+        state = STATE_STANDBY;
+      } else {
+        state = STATE_RECEIVE_SYS_CMD;
+      }
       printf("Switched to Tag ID: %u\r\n", *deviceId);
       break;
     case ANCHOR_KEY:
       *operationMode = MODE_ANCHOR;
       *deviceId = command.thisId;
       *anchorsTotalCount = command.anchorsTotalCount;
-      state = STATE_STANDBY;
+      if (isGateway) {
+        state = STATE_STANDBY;
+      } else {
+        state = STATE_RECEIVE_SYS_CMD;
+      }
       printf("Switched to Anchor ID: %u\r\n", *deviceId);
       break;
     case START_KEY:
@@ -348,13 +359,22 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
       printf("Begin ranging.\r\n");
       break;
     case STOP_KEY:
-      state = STATE_STANDBY;
+      if (isGateway) {
+        state = STATE_STANDBY;
+      } else {
+        state = STATE_RECEIVE_SYS_CMD;
+      }
       printf("Stop ranging.\r\n");
       break;
     case SWITCH_KEY:
+      state = STATE_DISTRB_SYS_CMD;
     case ADDRESS_KEY:
       *deviceId = command.thisId;
-      state = STATE_STANDBY;
+      if (isGateway) {
+        state = STATE_STANDBY;
+      } else {
+        state = STATE_RECEIVE_SYS_CMD;
+      }
       printf("Set device ID: %u\r\n", *deviceId);
       break;
     default:
