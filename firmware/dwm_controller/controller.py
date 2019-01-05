@@ -4,15 +4,26 @@ import sys, termios
 
 # Variables to be used
 devicePort = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
-needMenu = False
+needMenu = True
 selection = 0
-MAX_SELECTIONS = 4
+
+# Constants
+MAX_SELECTIONS = 7
+SELECTION_OUTPUT = 1
+SELECTION_START = 2
+SELECTION_STOP = 3
+SELECTION_TAG = 4
+SELECTION_ANCHOR = 5
+SELECTION_ADDRESS = 6
+SELECTION_SWITCH = 7
 
 # Data bytes to be sent over the port
 startData = b"b;"
 stopData = b"s;"
 tagData = b"t03;"
 anchorData = b"a13;"
+addressData = b"d0;"
+switchData = b"w00t;"
 
 def readDistance():
     line = devicePort.readline()
@@ -30,11 +41,13 @@ def readDistance():
 
 def printMenu():
     print("")
-    print("1. Display PORT output")
-    print("2. Send START command")
-    print("3. Send STOP command")
-    print("4. Send TAG command")
-    print("5. Send ANCHOR command")
+    print("%d. Display PORT output" % SELECTION_OUTPUT)
+    print("%d. Send START command" % SELECTION_START)
+    print("%d. Send STOP command" % SELECTION_STOP)
+    print("%d. Send TAG command" % SELECTION_TAG)
+    print("%d. Send ANCHOR command" % SELECTION_ANCHOR)
+    print("%d. Send ADDRESS command" % SELECTION_ADDRESS)
+    print("%d. Send SWITCH command" % SELECTION_SWITCH)
     pass
 
 
@@ -67,18 +80,34 @@ def sendAnchor():
     pass
 
 
+def sendAddress():
+    devicePort.write(addressData)
+    print("Switched device to ID:\n")
+    pass
+
+
+def sendSwitch():
+    devicePort.write(switchData)
+    print("Executed switches:\n")
+    pass
+
+
 def parseSelection():
-    if selection == 1:
+    if selection == SELECTION_OUTPUT:
         global needMenu
         needMenu = False
-    elif selection == 2:
+    elif selection == SELECTION_START:
         sendStart()
-    elif selection == 3:
+    elif selection == SELECTION_STOP:
         sendStop()
-    elif selection == 4:
+    elif selection == SELECTION_TAG:
         sendTag()
-    elif selection == 5:
+    elif selection == SELECTION_ANCHOR:
         sendAnchor()
+    elif selection == SELECTION_ADDRESS:
+        sendAddress()
+    elif selection == SELECTION_SWITCH:
+        sendSwitch()
     else:
         print("Invalid selection.\n")
 

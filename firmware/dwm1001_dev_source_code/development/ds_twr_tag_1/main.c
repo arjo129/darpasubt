@@ -334,12 +334,14 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
       *deviceId = command.thisId;
       *anchorsTotalCount = command.anchorsTotalCount;
       state = STATE_STANDBY;
-      printf("Switched to Tag: 1\r\n");
+      printf("Switched to Tag ID: %u\r\n", *deviceId);
       break;
     case ANCHOR_KEY:
       *operationMode = MODE_ANCHOR;
+      *deviceId = command.thisId;
+      *anchorsTotalCount = command.anchorsTotalCount;
       state = STATE_STANDBY;
-      printf("Switched to Anchor: 1\r\n");
+      printf("Switched to Anchor ID: %u\r\n", *deviceId);
       break;
     case START_KEY:
       state = STATE_EXEC_SYS_CMD;
@@ -348,6 +350,12 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
     case STOP_KEY:
       state = STATE_STANDBY;
       printf("Stop ranging.\r\n");
+      break;
+    case SWITCH_KEY:
+    case ADDRESS_KEY:
+      *deviceId = command.thisId;
+      state = STATE_STANDBY;
+      printf("Set device ID: %u\r\n", *deviceId);
       break;
     default:
       // Do nothing
