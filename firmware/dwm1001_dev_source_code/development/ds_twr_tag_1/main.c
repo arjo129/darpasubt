@@ -121,7 +121,7 @@ static enum DeviceState state;
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
 void setCommand(struct Command data);
-static void interpretCommand(int *operationMode);
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount);
 
 #ifdef USE_FREERTOS
 
@@ -246,6 +246,7 @@ void ds_initiator_task_function (void * pvParameter) {
   int result;
   /* The type of operation for this node. */
   int operationMode = MODE_TAG; // Default
+  uint8 deviceId = 0, anchorsTotalCount = 0;
   state = defaultDeviceState;
 
   UNUSED_PARAMETER(pvParameter);
@@ -254,7 +255,7 @@ void ds_initiator_task_function (void * pvParameter) {
 
   while (true) {
     if (state == STATE_RECEIVE_HOST_CMD) {
-      interpretCommand(&operationMode); // Set device to the next correct state
+      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount); // Set device to the next correct state
       memset(&command, 0, sizeof command); // Clear the command
       hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
@@ -266,7 +267,7 @@ void ds_initiator_task_function (void * pvParameter) {
       // send sys cmd to all nodes
     } else if (state == STATE_EXEC_SYS_CMD) {
       if (operationMode == MODE_TAG) {
-        result = dsInitRun();
+        result = dsInitRun(&deviceId, &anchorsTotalCount);
       }
 
       if (operationMode == MODE_ANCHOR) {
@@ -288,6 +289,18 @@ void ds_initiator_task_function (void * pvParameter) {
   }
 }
 
+void printCommand(void) {
+  printf("key = %d\r\n", command.key);
+  printf("id  = %u\r\n", command.thisId);
+  printf("atc = %u\r\n", command.anchorsTotalCount);
+  printf("nds :\r\n");
+  int i;
+  for (i = 0; i < 6; i++) {
+    struct NodeSwitch s = command.nodeSwitches[i];
+    printf("%u %u %c\r\n", s.currentId, s.newId, s.newRole);
+  }
+}
+
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn setCommand()
  *
@@ -299,6 +312,7 @@ void ds_initiator_task_function (void * pvParameter) {
  */
 void setCommand(struct Command data) {
   command = data;
+  printCommand();
   state = STATE_RECEIVE_HOST_CMD;
   hasInterruptEvent = true;
   printf("received interrupt\r\n");
@@ -313,10 +327,12 @@ void setCommand(struct Command data) {
  *
  * @return none
  */
-static void interpretCommand(int *operationMode) {
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount) {
   switch(command.key) {
     case TAG_KEY:
       *operationMode = MODE_TAG;
+      *deviceId = command.thisId;
+      *anchorsTotalCount = command.anchorsTotalCount;
       state = STATE_STANDBY;
       printf("Switched to Tag: 1\r\n");
       break;

@@ -80,6 +80,7 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
     {
         vHandleUartInternalErrors(p_event->evt_type);
     } else if (p_event -> evt_type == APP_UART_DATA_READY) {
+      /* PROBLEM: APP_UART_DATA_READY is set for EVERY CHARACTER placed in the register. Hence, we need to determine a way to indicate the start and end of a stream of input. */
       char dataString[UART_RX_BUF_SIZE + 1] = {0}; // +1 for null termination
       struct Command command;
 
@@ -100,7 +101,7 @@ static void getRxData(char *data) {
   bool hasChar = false;
 
   // Get each byte until RX buffer is empty
-  while (boUART_getc(&byte) == true) {
+  while (boUART_getc(&byte)) {
     data[i] = byte;
     i++;
   }

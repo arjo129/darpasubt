@@ -11,33 +11,69 @@
 #include <string.h>
 #include "command.h"
 
+static void getSwitches(struct NodeSwitch *switches, char *paramString);
+
 /* Construct a Command structure based on a given string. */
 struct Command constructCommand(char *inputString) {
   struct Command result;
   char inputKey;
-  char *inputParam;
 
-  inputKey = inputString[0];
-  inputParam = strchr(inputString, DELIMITER);
-  inputParam++; // We do not want the delimiter character
+  inputKey = inputString[KEY_INDEX];
 
   switch(inputKey) {
-    case 't':
+    case TAG_CHAR:
       result.key = TAG_KEY;
+      result.thisId = (uint8) inputString[ID_INDEX] - '0';
+      result.anchorsTotalCount = inputString[ANCHORS_COUNT_INDEX] - '0';
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
       break;
-    case 'a':
+    case ANCHOR_CHAR:
       result.key = ANCHOR_KEY;
+      result.thisId = inputString[ID_INDEX] - '0';
+      result.anchorsTotalCount = inputString[ANCHORS_COUNT_INDEX] - '0';
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
       break;
-    case 's':
+    case STOP_CHAR:
       result.key = STOP_KEY;
+      result.thisId = 0; // Irrelevant so we clear
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
       break;
-    case 'b':
+    case START_CHAR:
       result.key = START_KEY;
+      result.thisId = 0; // Irrelevant so we clear
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
+      break;
+    case SWITCH_CHAR:
+      result.key = SWITCH_KEY;
+      getSwitches(&result.nodeSwitches, &inputString[NODE_SWITCH_INDEX]);
+      result.thisId = 0; // Irrelevant so we clear
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      break;
+    case ADDRESS_CHAR:
+      result.key = ADDRESS_KEY;
+      result.thisId = inputString[ID_INDEX] - '0';
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
       break;
     default:
       result.key = UNKNOWN_KEY;
+      result.thisId = 0; // Irrelevant so we clear
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
   }
-  result.param = inputParam;
-  
   return result;
+}
+
+static void getSwitches(struct NodeSwitch *switches, char *paramString) {
+  int i, j;
+  int numberOfSwitches = paramString[0]; // Number of switches is at the first position
+
+  j = 1;
+  for (i = 0; i < numberOfSwitches; i++) {
+    switches->currentId = paramString[j++] - '0';
+    switches->newId = paramString[j++] - '0';
+    switches->newRole = paramString[j++];
+  }
 }

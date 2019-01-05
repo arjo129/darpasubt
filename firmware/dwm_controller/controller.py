@@ -3,7 +3,7 @@ import keyboard
 import sys, termios
 
 # Variables to be used
-devicePort = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+devicePort = serial.Serial('/dev/ttyACM1', 115200, timeout=1)
 needMenu = False
 selection = 0
 MAX_SELECTIONS = 4
@@ -11,7 +11,7 @@ MAX_SELECTIONS = 4
 # Data bytes to be sent over the port
 startData = b"b"
 stopData = b"s"
-tagData = b"t"
+tagData = b"t03"
 anchorData = b"a"
 
 def readDistance():

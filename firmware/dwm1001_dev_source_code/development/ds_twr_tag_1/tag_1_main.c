@@ -33,7 +33,7 @@
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORS_TOTAL_COUNT 3
+#define MAX_ANCHORS_COUNT 3
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
@@ -85,15 +85,17 @@ static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1,
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+static int anchorsTotalCount;
+
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this application is supposed to handle. */
 static uint8 rxBuffer[RX_BUF_LEN];
 
 /* Temporary storage for the timestamps to be sent to anchors. */
-static uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT];
+static uint64 anchorsTimestamps[MAX_ANCHORS_COUNT];
 
 /* Temporary storage for the distances. */
-static double anchorsDistances[ANCHORS_TOTAL_COUNT];
+static double anchorsDistances[MAX_ANCHORS_COUNT];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32 statusReg = 0;
@@ -148,9 +150,10 @@ static void printDistance(void);
 *
 * @return none
 */
-int dsInitRun(void) {
+int dsInitRun(uint8 *tagId, uint8 *anchorsTotalCount) {
   /* Loop forever initiating ranging exchanges. */
   uint32 tagSendDelayTime;
+  anchorsTotalCount = anchorsTotalCount;
 
   /* Resets the RX timeout for Tag mode. */
   dwt_setrxtimeout(65000);
@@ -168,7 +171,7 @@ int dsInitRun(void) {
 
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   anchorsCount = 0;
-  while (anchorsCount < ANCHORS_TOTAL_COUNT) {
+  while (anchorsCount < anchorsTotalCount) {
     anchorReceive = receiveAnchorResponse();
     if (anchorReceive == ANCHOR_RECEIVE_TIMEOUT) {
       return EXCHANGE_TIMEOUT;
@@ -188,7 +191,7 @@ int dsInitRun(void) {
   
   /* For for reception of the distances. */
   anchorsCount = 0;
-  while (anchorsCount < ANCHORS_TOTAL_COUNT) {
+  while (anchorsCount < anchorsTotalCount) {
     distanceReceive = receiveDistanceMsgs();
     if (distanceReceive == DISTANCE_RECEIVE_TIMEOUT) {
       return EXCHANGE_TIMEOUT;
@@ -264,7 +267,7 @@ static uint64 getRxTimestampU64(void) {
 static void finalMsgSetRxTs(uint8 *tsField) {
   int i, j = 0;
   uint64 ts;
-  for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+  for (i = 0; i < anchorsTotalCount; i++) {
     ts = anchorsTimestamps[i];
     // We want to continuosly write all RX timestamps which are 4 bytes each. So we start at multiples of 4.
     for (j = i * FINAL_MSG_TS_LEN; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
@@ -286,9 +289,9 @@ static void finalMsgSetRxTs(uint8 *tsField) {
 static void printDistance(void) {
   int i = 0;
   double dist;
-  for (int i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+  for (int i = 0; i < anchorsTotalCount; i++) {
     printf("%lf", anchorsDistances[i]);
-    if (i < ANCHORS_TOTAL_COUNT - 1) {
+    if (i < anchorsTotalCount - 1) {
       printf(",");
     }
   }
@@ -328,7 +331,7 @@ static uint32 setFinalTxDelay(void) {
 
   /* Compute final message transmission time. See NOTE 10 below. */
   // Uses the RX timestamp from the last received anchor response to calculate the delay needed to transmit final message.
-  tagSendDelayTime = (anchorsTimestamps[ANCHORS_TOTAL_COUNT - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+  tagSendDelayTime = (anchorsTimestamps[anchorsTotalCount - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
   dwt_setdelayedtrxtime(tagSendDelayTime);
 
   return tagSendDelayTime;
@@ -378,7 +381,7 @@ static int sendInitiationMsg(void) {
 
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
   tagFirstMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
-  tagFirstMsg[ANCH_COUNT_IDX] = (uint8) ANCHORS_TOTAL_COUNT;
+  tagFirstMsg[ANCH_COUNT_IDX] = anchorsTotalCount;
   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
   dwt_writetxdata(sizeof(tagFirstMsg), tagFirstMsg, 0); /* Zero offset in TX buffer. */
   dwt_writetxfctrl(sizeof(tagFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
@@ -454,7 +457,7 @@ static int receiveAnchorResponse(void) {
     printf("=== ERROR ===\r\nRX timeout occured from listening responses. Abandoning current exchange.\r\n");
     printf("Missing Anchors:");
     int i;
-    for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+    for (i = 0; i < anchorsTotalCount; i++) {
       if (anchorsTimestamps[i] == 0) {
         printf("% d |", i + 1);
       }
@@ -493,7 +496,7 @@ static int receiveAnchorResponse(void) {
 
       /* Temporarily store the timestamps specific to the retrieved anchor number. */
       // Safety check
-      if (anchorID > ANCHORS_TOTAL_COUNT) {
+      if (anchorID > anchorsTotalCount) {
         printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
@@ -504,7 +507,7 @@ static int receiveAnchorResponse(void) {
       /* We need to ensure we enable RX only when we expect another response from the anchors.
         * This is crucial since enabling RX without receiving will cause any transmissions (final
         * message transmission later) to be delayed for unusually long. */
-      if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+      if (anchorsCount < anchorsTotalCount) {
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
 
@@ -554,7 +557,7 @@ static int receiveDistanceMsgs() {
     printf("=== ERROR ===\r\nRX timeout occured from listening distances. Abandoning current exchange.\r\n");
     printf("Missing Anchors:");
     int i;
-    for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+    for (i = 0; i < anchorsTotalCount; i++) {
       if (anchorsDistances[i] == 0) {
         printf("% d |", i + 1);
       }
@@ -594,7 +597,7 @@ static int receiveDistanceMsgs() {
 
       /* Temporarily store the timestamps specific to the retrieved anchor number. */
       // Safety check
-      if (anchorID > ANCHORS_TOTAL_COUNT) {
+      if (anchorID > anchorsTotalCount) {
         printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsDistances[anchorID - 1] = anchorDistance;
@@ -605,7 +608,7 @@ static int receiveDistanceMsgs() {
       /* We need to ensure we enable RX only when we expect another response from the anchors.
         * This is crucial since enabling RX without receiving will cause any transmissions (final
         * message transmission later) to be delayed for unusually long. */
-      if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+      if (anchorsCount < anchorsTotalCount) {
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
 
