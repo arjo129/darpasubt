@@ -9,10 +9,10 @@ selection = 0
 MAX_SELECTIONS = 4
 
 # Data bytes to be sent over the port
-startData = b"b"
-stopData = b"s"
-tagData = b"t03"
-anchorData = b"a"
+startData = b"b;"
+stopData = b"s;"
+tagData = b"t03;"
+anchorData = b"a13;"
 
 def readDistance():
     line = devicePort.readline()

@@ -8,6 +8,8 @@
 
 #include "deca_types.h"
 
+#define MSG_END_CHAR ';'
+
 #define TAG_CHAR 't'
 #define ANCHOR_CHAR 'a'
 #define STOP_CHAR 's'
