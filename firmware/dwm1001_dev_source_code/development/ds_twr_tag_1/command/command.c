@@ -68,12 +68,13 @@ struct Command constructCommand(char *inputString) {
 
 static void getSwitches(struct NodeSwitch *switches, char *paramString) {
   int i, j;
-  int numberOfSwitches = paramString[0]; // Number of switches is at the first position
+  int numberOfSwitches = paramString[0] - '0'; // Number of switches is at the first position
+  memset(switches, 0, (sizeof *switches) * MAX_NODE_SWITCHES); // Clear to null first
 
   j = 1;
   for (i = 0; i < numberOfSwitches; i++) {
-    switches->currentId = paramString[j++] - '0';
-    switches->newId = paramString[j++] - '0';
-    switches->newRole = paramString[j++];
+    switches[i].currentId = paramString[j++] - '0';
+    switches[i].newId = paramString[j++] - '0';
+    switches[i].newRole = paramString[j++];
   }
 }
