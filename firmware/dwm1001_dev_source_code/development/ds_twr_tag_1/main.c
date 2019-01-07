@@ -73,10 +73,16 @@ static dwt_config_t config = {
 /* Receive command success. */
 #define RNG_DELAY_CMD_SUCCESS_MS 50
 
+#define SYS_CMD_IDX 10
+
+#define EXCHANGE_SYS_CMD 4
 #define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
+
+#define SWITCH_ANCHOR_CHAR 'a'
+#define SWITCH_TAG_CHAR 't'
 
 //--------------dw1000---end---------------
 
@@ -114,6 +120,9 @@ enum DeviceState {
   STATE_RECEIVE_SYS_CMD
 };
 
+// TODO: come up with a msg format to store the sys cmds that is to be read by all other nodes
+static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
 /* Device's default state. */
 static enum DeviceState defaultDeviceState;
 
@@ -123,7 +132,8 @@ static enum DeviceState state;
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
 void setCommand(struct Command data);
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway);
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct NodeSwitch *switches);
+static void distributeSysCmd(struct NodeSwitch *switches);
 
 #ifdef USE_FREERTOS
 
@@ -250,6 +260,7 @@ void ds_initiator_task_function (void * pvParameter) {
   /* The type of operation for this node. */
   int operationMode = MODE_TAG; // Default
   uint8 deviceId = 0, anchorsTotalCount = 0;
+  struct NodeSwitch switches[MAX_NODE_SWITCHES] = {0};
   state = defaultDeviceState;
 
   UNUSED_PARAMETER(pvParameter);
@@ -258,16 +269,19 @@ void ds_initiator_task_function (void * pvParameter) {
 
   while (true) {
     if (state == STATE_RECEIVE_HOST_CMD) {
-      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount, &isGateway); // Set device to the next correct state
+      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount, &isGateway, switches); // Set device to the next correct state
       memset(&command, 0, sizeof command); // Clear the command
       hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
     } else if (state == STATE_STANDBY) {
       vTaskDelay(RNG_DELAY_STOP_MS);
     } else if (state == STATE_RECEIVE_SYS_CMD) {
-      // poll to receive sys cmd
+      printf("Executing sys cmd\r\n");
+      state = STATE_EXEC_SYS_CMD;
     } else if (state == STATE_DISTRB_SYS_CMD) {
-      // send sys cmd to all nodes
+      distributeSysCmd(switches);
+      memset(switches, 0, sizeof switches);
+      state = STATE_EXEC_SYS_CMD;
     } else if (state == STATE_EXEC_SYS_CMD) {
       if (operationMode == MODE_TAG) {
         result = dsInitRun(&deviceId, &anchorsTotalCount);
@@ -282,6 +296,9 @@ void ds_initiator_task_function (void * pvParameter) {
         vTaskDelay(RNG_DELAY_SUCCESS_MS);
       } else if (result == EXCHANGE_INTERRUPTED) {
         state = STATE_RECEIVE_HOST_CMD;
+        vTaskDelay(RNG_DELAY_FAILURE_MS);
+      } else if (result == EXCHANGE_SYS_CMD) {
+        state = STATE_RECEIVE_SYS_CMD;
         vTaskDelay(RNG_DELAY_FAILURE_MS);
       } else {
         vTaskDelay(RNG_DELAY_FAILURE_MS);
@@ -330,7 +347,7 @@ void setCommand(struct Command data) {
  *
  * @return none
  */
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway) {
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct NodeSwitch *switches) {
   switch(command.key) {
     case TAG_KEY:
       *operationMode = MODE_TAG;
@@ -367,7 +384,9 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
       printf("Stop ranging.\r\n");
       break;
     case SWITCH_KEY:
+      memcpy(switches, command.nodeSwitches, sizeof command.nodeSwitches);
       state = STATE_DISTRB_SYS_CMD;
+      break;
     case ADDRESS_KEY:
       *deviceId = command.thisId;
       if (isGateway) {
@@ -382,6 +401,46 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
       state = STATE_STANDBY;
       printf("Unknown command.\r\n");
       break;
+  }
+}
+
+static void writeNodeSwitches(uint8 *field, struct NodeSwitch *switches) {
+  int i = 0, j = 0;
+  uint8 currentId, newId;
+  char newRole;
+
+  do {
+    currentId = switches[i].currentId;
+    newId = switches[i].newId;
+    newRole = switches[i].newRole;
+    if (newRole == SWITCH_TAG_CHAR || newRole == SWITCH_ANCHOR_CHAR) {
+      field[j++] = currentId;
+      field[j++] = newId;
+      field[j++] = newRole;
+    }
+    i++;
+  } while (newRole == SWITCH_TAG_CHAR || newRole == SWITCH_ANCHOR_CHAR);
+}
+
+static void distributeSysCmd(struct NodeSwitch *switches) {
+  int ret;
+
+  writeNodeSwitches(&sysCmdMsg[SYS_CMD_IDX], switches);
+
+  /* Write data to TX buffer and prepare for transmission. */
+  dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+  dwt_writetxdata(sizeof(sysCmdMsg), sysCmdMsg, 0); /* Zero offset in TX buffer. */
+  dwt_writetxfctrl(sizeof(sysCmdMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
+
+  /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent. */
+  ret = dwt_starttx(DWT_START_TX_IMMEDIATE);
+  if (ret == DWT_SUCCESS) {
+    /* Ensure transmission occurs. */
+    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
+    dwt_forcetrxoff();
+    printf("Distribute command success");
+  } else {
+    printf("Distribute command failure");
   }
 }
 

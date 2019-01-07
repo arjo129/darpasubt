@@ -52,6 +52,7 @@
 #define ANCHOR_DIST_IDX 11
 
 /* Values to help determine if message transmitted or received. */
+#define INITIATION_RECEIVE_SYS_CMD 4
 #define INITIATION_RECEIVE_INTERRUPTED 3
 #define INITIATION_RECEIVE_TIMEOUT 2
 #define INITIATION_RECEIVE_SUCCESS 1
@@ -63,6 +64,7 @@
 #define FINAL_RECEIVE_FAILURE 0
 #define DISTANCE_SEND_SUCCESS 1
 #define DISTANCE_SEND_FAILURE 0
+#define EXCHANGE_SYS_CMD 4
 #define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
@@ -102,6 +104,7 @@ static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static int anchorIdNum;
 
@@ -204,6 +207,9 @@ int dsRespRun(uint8 *anchorId, uint8 *anchorsTotalCount) {
   } else if (receiveInitiation == INITIATION_RECEIVE_INTERRUPTED) {
     dwt_forcetrxoff(); // Ensure transceiver is off for future usage
     return EXCHANGE_INTERRUPTED;
+  } else if (receiveInitiation == INITIATION_RECEIVE_SYS_CMD) {
+    dwt_forcetrxoff(); // Ensure transceiver is off for future usage
+    return EXCHANGE_SYS_CMD;
   }
 
   writeResponseMsg();
@@ -466,9 +472,16 @@ static int receiveInitiationMsg(void) {
       dwt_readrxdata(rxBuffer, frameLen, 0);
     }
 
-    /* Check that the frame is a poll sent by "SS TWR initiator" example.
-    * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    /* As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
     rxBuffer[EX_SEQ_COUNT_IDX] = 0;
+
+    /* Check if the frame is a command message. */
+    if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
+      printf("Received command message\r\n");
+      return INITIATION_RECEIVE_SYS_CMD;
+    }
+
+    /* Check that the frame is a poll sent by the Tag. */
     if (memcmp(rxBuffer, tagFirstMsg, ALL_MSG_COMMON_LEN) == 0) {
       int ret;
 
