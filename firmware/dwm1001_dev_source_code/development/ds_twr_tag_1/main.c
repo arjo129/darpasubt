@@ -36,7 +36,14 @@
 #include "deca_device_api.h"
 #include "UART.h"
 #include "command.h"
-	
+
+#define DEFAULT_TAG_ID 0
+#define DEFAULT_ANCHOR_ID 3
+#define DEFAULT_DEVICE_STATE STATE_STANDBY
+#define DEFAULT_OPERATION_MODE MODE_TAG
+#define DEFAULT_ANCHORS_COUNT 3
+#define GATEWAY_DEVICE true
+
 //-----------------dw1000----------------------------
 
 static dwt_config_t config = {
@@ -52,7 +59,6 @@ static dwt_config_t config = {
     (129 + 8 - 8)     /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
-#define GATEWAY_DEVICE true
 
 /* Preamble timeout, in multiple of PAC size. See NOTE 3 below. */
 #define PRE_TIMEOUT 1000
@@ -105,7 +111,6 @@ char sysCmdString[MAX_CMD_SERIAL_LEN];
 
 /* Enumerations */
 enum OperationMode {
-  MODE_UNKNOWN,
   MODE_TAG,
   MODE_ANCHOR
 };
@@ -132,8 +137,8 @@ static enum DeviceState state;
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
 void setCommand(struct Command data);
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand);
-static void interpretSysCommand(int *operationMode, uint8 *deviceId);
+static void interpretCommand(enum OperationMode *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand);
+static void interpretSysCommand(enum OperationMode *operationMode, uint8 *deviceId);
 static void distributeSysCmd(struct Command *sysCommand);
 
 #ifdef USE_FREERTOS
@@ -259,10 +264,14 @@ void ds_initiator_task_function (void * pvParameter) {
   int result;
   bool isGateway = GATEWAY_DEVICE;
   /* The type of operation for this node. */
-  int operationMode = MODE_TAG; // Default
-  uint8 deviceId = 0, anchorsTotalCount = 0;
+  enum OperationMode operationMode;
+  uint8 deviceId, anchorsTotalCount;
   struct Command sysCommand;
-  state = defaultDeviceState;
+
+  operationMode = DEFAULT_OPERATION_MODE;
+  state = DEFAULT_DEVICE_STATE;
+  anchorsTotalCount = DEFAULT_ANCHORS_COUNT;
+  (operationMode == MODE_TAG) ? (deviceId = DEFAULT_TAG_ID) : (deviceId = DEFAULT_ANCHOR_ID);
 
   UNUSED_PARAMETER(pvParameter);
 
@@ -349,7 +358,7 @@ void setCommand(struct Command data) {
  *
  * @return none
  */
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand) {
+static void interpretCommand(enum OperationMode *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand) {
   switch(command.key) {
     case TAG_KEY:
       *operationMode = MODE_TAG;
@@ -432,7 +441,7 @@ static void setRoleFromSysCmd(int *operationMode, uint8 *deviceId) {
   }
 }
 
-static void interpretSysCommand(int *operationMode, uint8 *deviceId) {
+static void interpretSysCommand(enum OperationMode *operationMode, uint8 *deviceId) {
   char key = sysCmdString[KEY_INDEX]; // Command key is at the first position.
 
   switch(key) {
