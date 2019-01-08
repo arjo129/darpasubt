@@ -26,6 +26,7 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "UART.h"
+#include "command.h"
 
 /* Number representing the identification of this Anchor. 
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. 
@@ -50,6 +51,7 @@
 #define FINAL_MSG_RX_1_IDX 18
 #define ANCHOR_ID_IDX 10
 #define ANCHOR_DIST_IDX 11
+#define SYS_CMD_IDX 10
 
 /* Values to help determine if message transmitted or received. */
 #define INITIATION_RECEIVE_SYS_CMD 4
@@ -104,7 +106,7 @@ static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static int anchorIdNum;
 
@@ -148,6 +150,8 @@ static int sendDistance = 0;
 
 /* Buffer to receive commands from UART RX buffer. */
 char commandString[UART_RX_BUF_SIZE] = {0};
+
+extern char sysCmdString[MAX_CMD_SERIAL_LEN];
 
 /* Flag to notify that there is data in UART RX. */
 static bool hasRxData = false;
@@ -478,6 +482,7 @@ static int receiveInitiationMsg(void) {
     /* Check if the frame is a command message. */
     if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
       printf("Received command message\r\n");
+      memcpy(sysCmdString, &rxBuffer[SYS_CMD_IDX], MAX_CMD_SERIAL_LEN);
       return INITIATION_RECEIVE_SYS_CMD;
     }
 

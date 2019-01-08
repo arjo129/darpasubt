@@ -11,6 +11,7 @@
 #include <string.h>
 #include "command.h"
 
+static void serializeSwitches(uint8 *field, struct NodeSwitch *switches, int numberOfSwitches);
 static void getSwitches(struct NodeSwitch *switches, char *paramString);
 
 /* Construct a Command structure based on a given string. */
@@ -47,6 +48,7 @@ struct Command constructCommand(char *inputString) {
       break;
     case SWITCH_CHAR:
       result.key = SWITCH_KEY;
+      result.numberOfSwitches = inputString[NODE_SWITCH_INDEX] - '0';
       getSwitches(&result.nodeSwitches, &inputString[NODE_SWITCH_INDEX]);
       result.thisId = 0; // Irrelevant so we clear
       result.anchorsTotalCount = 0; // Irrelevant so we clear
@@ -64,6 +66,49 @@ struct Command constructCommand(char *inputString) {
       memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
   }
   return result;
+}
+
+void serializeCommand(struct Command command, uint8 *serialData) {
+  memset(serialData, 0, MAX_CMD_SERIAL_LEN); // Clear to null first
+
+  switch(command.key) {
+    case TAG_KEY:
+      serialData[KEY_INDEX] = TAG_CHAR;
+      serialData[ID_INDEX] = command.thisId + '0';
+      serialData[ANCHORS_COUNT_INDEX] = command.anchorsTotalCount + '0';
+      break;
+    case ANCHOR_KEY:
+      serialData[KEY_INDEX] = ANCHOR_CHAR;
+      serialData[ID_INDEX] = command.thisId + '0';
+      serialData[ANCHORS_COUNT_INDEX] = command.anchorsTotalCount + '0';
+      break;
+    case STOP_KEY:
+      serialData[KEY_INDEX] = STOP_CHAR;
+      break;
+    case START_KEY:
+      serialData[KEY_INDEX] = START_CHAR;
+      break;
+    case SWITCH_KEY:
+      serialData[KEY_INDEX] = SWITCH_CHAR;
+      serialData[NODE_SWITCH_INDEX] = command.numberOfSwitches + '0';
+      serializeSwitches(&serialData[SWITCH_DATA_INDEX], command.nodeSwitches, command.numberOfSwitches);
+      break;
+    case ADDRESS_KEY:
+      serialData[KEY_INDEX] = ADDRESS_CHAR;
+      serialData[ID_INDEX] = command.thisId + '0';
+      break;
+    default:
+      break; // Unknown key so we return empty serialData
+  }
+}
+
+static void serializeSwitches(uint8 *field, struct NodeSwitch *switches, int numberOfSwitches) {
+  int i, j = 0;
+  for (i = 0; i < numberOfSwitches; i++) {
+    field[j++] = switches[i].currentId + '0';
+    field[j++] = switches[i].newId + '0';
+    field[j++] = switches[i].newRole;
+  }
 }
 
 static void getSwitches(struct NodeSwitch *switches, char *paramString) {

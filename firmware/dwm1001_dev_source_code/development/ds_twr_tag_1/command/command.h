@@ -22,8 +22,11 @@
 #define ANCHORS_COUNT_INDEX 2
 #define NODE_SWITCH_INDEX 1
 #define ADDRESS_INDEX 1
+#define SWITCH_DATA_INDEX 2
 
 #define MAX_NODE_SWITCHES 6
+#define MAX_CMD_SERIAL_LEN 20
+#define SWITCH_SET_SIZE 3
 
 enum CommandKey {
   UNKNOWN_KEY,
@@ -45,7 +48,9 @@ struct Command {
   enum CommandKey key;
   uint8 thisId;
   uint8 anchorsTotalCount;
+  uint8 numberOfSwitches;
   struct NodeSwitch nodeSwitches[MAX_NODE_SWITCHES];
 };
 
 struct Command constructCommand(char *inputString);
+void serializeCommand(struct Command command, uint8 *serialData);

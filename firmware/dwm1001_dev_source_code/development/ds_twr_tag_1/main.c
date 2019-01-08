@@ -81,9 +81,6 @@ static dwt_config_t config = {
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
 
-#define SWITCH_ANCHOR_CHAR 'a'
-#define SWITCH_TAG_CHAR 't'
-
 //--------------dw1000---end---------------
 
 
@@ -104,6 +101,8 @@ static struct Command command;
 /* Flag to indicate if an event has happened and needs to interrupt all current activities. */
 bool hasInterruptEvent;
 
+char sysCmdString[MAX_CMD_SERIAL_LEN];
+
 /* Enumerations */
 enum OperationMode {
   MODE_UNKNOWN,
@@ -120,8 +119,9 @@ enum DeviceState {
   STATE_RECEIVE_SYS_CMD
 };
 
+
 // TODO: come up with a msg format to store the sys cmds that is to be read by all other nodes
-static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 /* Device's default state. */
 static enum DeviceState defaultDeviceState;
@@ -132,8 +132,9 @@ static enum DeviceState state;
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
 void setCommand(struct Command data);
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct NodeSwitch *switches);
-static void distributeSysCmd(struct NodeSwitch *switches);
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand);
+static void interpretSysCommand(int *operationMode, uint8 *deviceId);
+static void distributeSysCmd(struct Command *sysCommand);
 
 #ifdef USE_FREERTOS
 
@@ -260,7 +261,7 @@ void ds_initiator_task_function (void * pvParameter) {
   /* The type of operation for this node. */
   int operationMode = MODE_TAG; // Default
   uint8 deviceId = 0, anchorsTotalCount = 0;
-  struct NodeSwitch switches[MAX_NODE_SWITCHES] = {0};
+  struct Command sysCommand;
   state = defaultDeviceState;
 
   UNUSED_PARAMETER(pvParameter);
@@ -269,7 +270,7 @@ void ds_initiator_task_function (void * pvParameter) {
 
   while (true) {
     if (state == STATE_RECEIVE_HOST_CMD) {
-      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount, &isGateway, switches); // Set device to the next correct state
+      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount, &isGateway, &sysCommand); // Set device to the next correct state
       memset(&command, 0, sizeof command); // Clear the command
       hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
@@ -277,10 +278,11 @@ void ds_initiator_task_function (void * pvParameter) {
       vTaskDelay(RNG_DELAY_STOP_MS);
     } else if (state == STATE_RECEIVE_SYS_CMD) {
       printf("Executing sys cmd\r\n");
+      interpretSysCommand(&operationMode, &deviceId);
       state = STATE_EXEC_SYS_CMD;
     } else if (state == STATE_DISTRB_SYS_CMD) {
-      distributeSysCmd(switches);
-      memset(switches, 0, sizeof switches);
+      distributeSysCmd(&sysCommand);
+      memset(&sysCommand, 0, sizeof sysCommand);
       state = STATE_EXEC_SYS_CMD;
     } else if (state == STATE_EXEC_SYS_CMD) {
       if (operationMode == MODE_TAG) {
@@ -347,7 +349,7 @@ void setCommand(struct Command data) {
  *
  * @return none
  */
-static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct NodeSwitch *switches) {
+static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand) {
   switch(command.key) {
     case TAG_KEY:
       *operationMode = MODE_TAG;
@@ -384,7 +386,7 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
       printf("Stop ranging.\r\n");
       break;
     case SWITCH_KEY:
-      memcpy(switches, command.nodeSwitches, sizeof command.nodeSwitches);
+      *sysCommand = command;
       state = STATE_DISTRB_SYS_CMD;
       break;
     case ADDRESS_KEY:
@@ -404,28 +406,69 @@ static void interpretCommand(int *operationMode, uint8 *deviceId, uint8 *anchors
   }
 }
 
-static void writeNodeSwitches(uint8 *field, struct NodeSwitch *switches) {
-  int i = 0, j = 0;
-  uint8 currentId, newId;
-  char newRole;
+static void setRoleFromSysCmd(int *operationMode, uint8 *deviceId) {
+  int i = 0, j = SWITCH_DATA_INDEX;
+  uint8 currentId, newId, numOfSwitches;
+  char key;
 
-  do {
-    currentId = switches[i].currentId;
-    newId = switches[i].newId;
-    newRole = switches[i].newRole;
-    if (newRole == SWITCH_TAG_CHAR || newRole == SWITCH_ANCHOR_CHAR) {
-      field[j++] = currentId;
-      field[j++] = newId;
-      field[j++] = newRole;
+  numOfSwitches = sysCmdString[NODE_SWITCH_INDEX] - '0';
+  for (i = 0; i < numOfSwitches; i++) {
+    currentId = sysCmdString[j] - '0';
+    newId = sysCmdString[j + 1] - '0';
+    key = sysCmdString[j + 2];
+    if (key != ANCHOR_CHAR && key != TAG_CHAR) {
+      break;
     }
-    i++;
-  } while (newRole == SWITCH_TAG_CHAR || newRole == SWITCH_ANCHOR_CHAR);
+    if (currentId == *deviceId) {
+      *deviceId = newId;
+      if (key == ANCHOR_CHAR) {
+        *operationMode = MODE_ANCHOR;
+      } else {
+        *operationMode = MODE_TAG;
+      }
+      break;
+    }
+    j += SWITCH_SET_SIZE;
+  }
 }
 
-static void distributeSysCmd(struct NodeSwitch *switches) {
-  int ret;
+static void interpretSysCommand(int *operationMode, uint8 *deviceId) {
+  char key = sysCmdString[KEY_INDEX]; // Command key is at the first position.
 
-  writeNodeSwitches(&sysCmdMsg[SYS_CMD_IDX], switches);
+  switch(key) {
+    case START_CHAR:
+      state = STATE_EXEC_SYS_CMD;
+      printf("Begin ranging.\r\n");
+      break;
+    case STOP_CHAR:
+      state = STATE_STANDBY;
+      printf("Stop ranging.\r\n");
+      break;
+    case SWITCH_CHAR:
+      setRoleFromSysCmd(operationMode, deviceId);
+      state = STATE_EXEC_SYS_CMD;
+      printf("Switched role -> new ID: %d.\r\n", *deviceId);
+      break;
+    default:
+      state = STATE_STANDBY;
+      printf("Unknown command.\r\n");
+      break;
+  }
+}
+
+static void writeSysCmd(uint8 *field, uint8 *serialData) {
+  int i;
+  for (i = 0; i < MAX_CMD_SERIAL_LEN; i++) {
+    field[i] = serialData[i];
+  }
+}
+
+static void distributeSysCmd(struct Command *sysCommand) {
+  int ret;
+  uint8 serialData[MAX_CMD_SERIAL_LEN];
+
+  serializeCommand(*sysCommand, serialData);
+  writeSysCmd(&sysCmdMsg[SYS_CMD_IDX], serialData);
 
   /* Write data to TX buffer and prepare for transmission. */
   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
