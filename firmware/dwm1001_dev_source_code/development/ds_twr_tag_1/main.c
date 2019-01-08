@@ -80,12 +80,16 @@ static dwt_config_t config = {
 #define RNG_DELAY_CMD_SUCCESS_MS 50
 
 #define SYS_CMD_IDX 10
+#define EX_SEQ_COUNT_IDX 2
 
 #define EXCHANGE_SYS_CMD 4
 #define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
+
+#define ALL_MSG_COMMON_LEN 10
+#define RX_BUF_LEN 32
 
 //--------------dw1000---end---------------
 
@@ -284,15 +288,29 @@ void ds_initiator_task_function (void * pvParameter) {
       hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
     } else if (state == STATE_STANDBY) {
+      if (!isGateway) {
+        result = waitForSysCommand();
+        dwt_forcetrxoff();
+        if (result == EXCHANGE_SUCCESS) {
+          vTaskDelay(RNG_DELAY_SUCCESS_MS);
+        } else if (result == EXCHANGE_INTERRUPTED) {
+          state = STATE_RECEIVE_HOST_CMD;
+          vTaskDelay(RNG_DELAY_FAILURE_MS);
+        } else if (result == EXCHANGE_SYS_CMD) {
+          state = STATE_RECEIVE_SYS_CMD;
+          vTaskDelay(RNG_DELAY_FAILURE_MS);
+        } else {
+          vTaskDelay(RNG_DELAY_FAILURE_MS);
+        }
+      }
       vTaskDelay(RNG_DELAY_STOP_MS);
     } else if (state == STATE_RECEIVE_SYS_CMD) {
       printf("Executing sys cmd\r\n");
       interpretSysCommand(&operationMode, &deviceId);
-      state = STATE_EXEC_SYS_CMD;
     } else if (state == STATE_DISTRB_SYS_CMD) {
       distributeSysCmd(&sysCommand);
+      (sysCommand.key == START_KEY) ? (state = STATE_EXEC_SYS_CMD) : (state = STATE_STANDBY);
       memset(&sysCommand, 0, sizeof sysCommand);
-      state = STATE_EXEC_SYS_CMD;
     } else if (state == STATE_EXEC_SYS_CMD) {
       if (operationMode == MODE_TAG) {
         result = dsInitRun(&deviceId, &anchorsTotalCount);
@@ -317,6 +335,62 @@ void ds_initiator_task_function (void * pvParameter) {
     } else {
 
     }
+  }
+}
+
+static int waitForSysCommand(void) {
+  uint32 statusReg = 0;
+  uint8 rxBuffer[RX_BUF_LEN];
+
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
+  // Poll for command frames
+  printf("Waiting for system command...\r\n");
+  while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))
+      && !hasInterruptEvent) {};
+
+  if (hasInterruptEvent) {
+    printf("interrupt detected\r\n");
+    hasInterruptEvent = false;
+    return EXCHANGE_INTERRUPTED;
+  }
+
+  if (statusReg & SYS_STATUS_ALL_RX_TO) {
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO);
+    printf("=== ERROR ===\r\nRX timeout occurred from final message. Abandoning current exchange.\r\n*************\r\n");
+    return EXCHANGE_TIMEOUT;
+  }
+
+  if (statusReg & SYS_STATUS_RXFCG) {
+    uint32 frameLen;
+
+    /* Clear good RX frame event in the DW1000 status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
+
+    /* A frame has been received, read it into the local buffer. */
+    frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
+    if (frameLen <= RX_BUFFER_LEN) {
+      dwt_readrxdata(rxBuffer, frameLen, 0);
+    }
+
+    /* As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    rxBuffer[EX_SEQ_COUNT_IDX] = 0;
+
+    /* Check if the frame is a command message. */
+    if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
+      printf("Received command message\r\n");
+      memcpy(sysCmdString, &rxBuffer[SYS_CMD_IDX], MAX_CMD_SERIAL_LEN);
+      return EXCHANGE_SYS_CMD;
+    }
+  } else {
+    /* Clear RX error events in the DW1000 status register. */
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+
+    /* Reset RX to properly reinitialise LDE operation. */
+    dwt_rxreset();
+
+    printf("=== Error === Tag Initiation Frame Incorrect\r\n");
+    return EXCHANGE_FAILURE;
   }
 }
 
@@ -364,46 +438,48 @@ static void interpretCommand(enum OperationMode *operationMode, uint8 *deviceId,
       *operationMode = MODE_TAG;
       *deviceId = command.thisId;
       *anchorsTotalCount = command.anchorsTotalCount;
-      if (isGateway) {
-        state = STATE_STANDBY;
-      } else {
-        state = STATE_RECEIVE_SYS_CMD;
-      }
+      state = STATE_STANDBY;
       printf("Switched to Tag ID: %u\r\n", *deviceId);
       break;
     case ANCHOR_KEY:
       *operationMode = MODE_ANCHOR;
       *deviceId = command.thisId;
       *anchorsTotalCount = command.anchorsTotalCount;
-      if (isGateway) {
-        state = STATE_STANDBY;
-      } else {
-        state = STATE_RECEIVE_SYS_CMD;
-      }
+      state = STATE_STANDBY;
       printf("Switched to Anchor ID: %u\r\n", *deviceId);
       break;
     case START_KEY:
-      state = STATE_EXEC_SYS_CMD;
+      if (isGateway) {
+        *sysCommand = command;
+        state = STATE_DISTRB_SYS_CMD;
+      } else {
+        state = STATE_EXEC_SYS_CMD;
+      }
       printf("Begin ranging.\r\n");
       break;
     case STOP_KEY:
       if (isGateway) {
-        state = STATE_STANDBY;
+        *sysCommand = command;
+        state = STATE_DISTRB_SYS_CMD;
       } else {
-        state = STATE_RECEIVE_SYS_CMD;
+        state = STATE_STANDBY;
       }
       printf("Stop ranging.\r\n");
       break;
     case SWITCH_KEY:
-      *sysCommand = command;
-      state = STATE_DISTRB_SYS_CMD;
+      if (isGateway) {
+        *sysCommand = command;
+        state = STATE_DISTRB_SYS_CMD;
+      } else {
+        state = STATE_STANDBY;
+      }
       break;
     case ADDRESS_KEY:
       *deviceId = command.thisId;
       if (isGateway) {
         state = STATE_STANDBY;
       } else {
-        state = STATE_RECEIVE_SYS_CMD;
+        state = STATE_EXEC_SYS_CMD;
       }
       printf("Set device ID: %u\r\n", *deviceId);
       break;
