@@ -1,16 +1,16 @@
 #ifndef _PROBABILITY_DISTRIBUTION_H_
 #define _PROBABILITY_DISTRIBUTION_H_
 
-#include <unordered_map>
+#include <limits>
 #include <set>
 #include <tuple>
+#include <unordered_map>
+
+#include <boost/functional/hash.hpp>
+
 #include <Eigen/Dense>
 
 #define THRESHOLD_PROBABILITY 0.00000001
-
-
-
-#include <boost/functional/hash.hpp>
 
 /**
  * This class represents
@@ -39,7 +39,7 @@ class ProbabilityDistribution {
 private:
     int index;
     std::set<std::tuple<int, int, int> > positions;
-    std::unordered_map<std::tuple<int, int, int>, float> probability;
+    std::unordered_map<std::tuple<int, int, int>, double> probability;
     std::unordered_map<std::tuple<int, int, int>, int> insertion_index;
 
 public:
@@ -50,11 +50,13 @@ public:
      */ 
     ProbabilityDistribution& operator && (ProbabilityDistribution& max);
     
-    bool operator == (const ProbabilityDistribution& other);
+    bool operator == (const ProbabilityDistribution& other) const;
+
+    bool operator != (const ProbabilityDistribution& other) const;
     /**
      * Update the probability at given position 
      */ 
-    void updateProbability(Eigen::Vector3f position, float probability);
+    void updateProbability(Eigen::Vector3f position, double probability);
 
     /**
      * Clears the matrix
@@ -64,7 +66,7 @@ public:
     /**
      * get the probability at the given point
      */
-    float get(Eigen::Vector3f position);
+    double get(Eigen::Vector3f position) const;
 
     /**
      * Sample

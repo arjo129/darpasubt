@@ -1,12 +1,11 @@
 #include <subt_seed/ProbabilityDistribution.h>
 
 
-
 ProbabilityDistribution::ProbabilityDistribution(){
 
 }
 
-bool ProbabilityDistribution::operator == (const ProbabilityDistribution& other) {
+bool ProbabilityDistribution::operator == (const ProbabilityDistribution& other) const {
     
     if(other.positions.size() != positions.size())
         return false;
@@ -18,7 +17,14 @@ bool ProbabilityDistribution::operator == (const ProbabilityDistribution& other)
         
         if(*myIter != *otherIter) return false;
 
-        if(probability[*myIter] != other.probability[*otherIter]) return false;
+        //Stupid IEEE floats. Cannot compare inequality without fancy comparisont
+        //If probability at position is different then the result is different
+        double first = probability.find(*myIter)->second;
+        double second = other.probability.find(*otherIter)->second;
+
+        if(fabs(first-second) > std::numeric_limits<double>::epsilon()) {
+            return false;
+        }
 
         myIter++;
         otherIter++;
@@ -27,18 +33,21 @@ bool ProbabilityDistribution::operator == (const ProbabilityDistribution& other)
     return true;
 }
 
+bool ProbabilityDistribution::operator != (const ProbabilityDistribution& other) const {
+    return !(other == *this);
+}
 
 ProbabilityDistribution& ProbabilityDistribution::operator && (ProbabilityDistribution& other){
     
-    ProbabilityDistribution myDistr;
+    ProbabilityDistribution* myDistr = new ProbabilityDistribution();
     auto myPtr = positions.begin();
     auto otherPtr = other.positions.begin();
     
-    while(myPtr != positions.end() || otherPtr != other.positions.end()){
+    while(myPtr != positions.end() && otherPtr != other.positions.end()) {
         
         if(*myPtr == *otherPtr){
-            Eigen::Vector3f vec(std::get<0>(myPtr), std::get<1>(myPtr), std::get<2>(myPtr));
-            myDistr.updateProbability(vec, probability[*myPtr]*other.probability[*myPtr]);
+            Eigen::Vector3f vec(std::get<0>(*myPtr), std::get<1>(*myPtr), std::get<2>(*myPtr));
+            myDistr->updateProbability(vec, probability[*myPtr]*other.probability[*myPtr]);
         }
         
         if(*myPtr <= *otherPtr){
@@ -47,9 +56,11 @@ ProbabilityDistribution& ProbabilityDistribution::operator && (ProbabilityDistri
             otherPtr++;
         }
     }
+
+    return *myDistr;
 }
 
-void ProbabilityDistribution::updateProbability(Eigen::Vector3f position, float prob){
+void ProbabilityDistribution::updateProbability(Eigen::Vector3f position, double prob){
     std::tuple<int, int, int> pos = std::make_tuple(position[0], position[1], position[2]);
 
     if(prob < THRESHOLD_PROBABILITY) {
@@ -74,14 +85,14 @@ void ProbabilityDistribution::clear() {
     insertion_index.clear();
 }
 
-float ProbabilityDistribution::get(Eigen::Vector3f position) {
+double ProbabilityDistribution::get(Eigen::Vector3f position) const {
     std::tuple<int, int, int> pos = std::make_tuple(position[0], position[1], position[2]);
-
-    if(probability.find(pos) == probability.end()) {
+    auto iter = probability.find(pos);
+    if(iter == probability.end()) {
         return 0;
     }
 
-    return probability[pos];
+    return iter->second;
 }
 
 void ProbabilityDistribution::sample(int n, std::vector<Eigen::Vector3f>& samples) {

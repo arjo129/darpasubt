@@ -75,7 +75,7 @@ target_link_libraries(
 ###########
 ## Tests ##
 ###########
-catkin_add_gtest(probabilityTest test/ProbabilityDistributionTest.cpp)
+catkin_add_gtest(probabilityTest test/ProbabilityDistributionTest.cpp src/ProbabilityDistribution.cpp)
 target_link_libraries(
   probabilityTest
   ${catkin_LIBRARIES}
