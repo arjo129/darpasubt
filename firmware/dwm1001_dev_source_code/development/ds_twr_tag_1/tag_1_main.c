@@ -27,6 +27,8 @@
 #include "port_platform.h"
 #include "UART.h"
 #include "command.h"
+#include "timestamper.h"
+#include "message_processor.h"
 
 #define APP_NAME "DS TWR TAG"
 
@@ -40,13 +42,6 @@
 #define ALL_MSG_COMMON_LEN 10
 
 /* Indexes to access some of the fields in the frames. */
-#define EX_SEQ_COUNT_IDX 2
-#define ANCH_COUNT_IDX 10
-#define FINAL_MSG_TX_1_IDX 10
-#define FINAL_MSG_TX_2_IDX 14
-#define FINAL_MSG_RX_1_IDX 18
-#define ANCHOR_ID_IDX 10
-#define ANCHOR_DIST_IDX 11
 #define SYS_CMD_IDX 10
 
 /* Values to help determine if message transmitted or received. */
@@ -70,9 +65,6 @@
 
 /* Length of buffer to store received messages. */
 #define RX_BUF_LEN 32
-
-/* Length of all timestamp values. */
-#define FINAL_MSG_TS_LEN 4
 
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
 * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
@@ -133,12 +125,7 @@ static int distanceReceive = 0;
 extern bool hasInterruptEvent;
 
 /* Declaration of static functions. */
-static uint64 getTxTimestampU64(void);
-static uint64 getRxTimestampU64(void);
-static void finalMsgSetTs(uint8 *tsField, uint64 ts);
-static void finalMsgSetRxTs(uint8 *tsField);
 static uint32 setFinalTxDelay(void);
-static void writeFinalMsg(uint32 tagSendDelayTime);
 static int sendInitiationMsg(void);
 static int sendFinalMsg(void);
 static int receiveAnchorResponse(void);
@@ -192,10 +179,13 @@ int dsInitRun(uint8 *tagId, uint8 *totalAnchors) {
       return EXCHANGE_SYS_CMD;
     }
   }
+  /* Retrieve the timestamp from when the initial message transmits. */
+  tagTxTimestamp1 = getTxTimestampU64();
+  printf("Tag TX 1 = %u\r\n", (uint32)tagTxTimestamp1);
+  tagSendDelayTime = setFinalTxDelay();
 
   /* Received every anchor's response, now we notify them with a final confirmation message. */
-  tagSendDelayTime = setFinalTxDelay();
-  writeFinalMsg(tagSendDelayTime);
+  writeFinalMsg(tagSendDelayTime, tagTxTimestamp1, anchorsTotalCount, tagFinalMsg, anchorsTimestamps, &exchangeSeqCount);
   finalSend = sendFinalMsg();
   if (finalSend == FINAL_SEND_FAILURE) {
     return EXCHANGE_FAILURE;
@@ -222,74 +212,6 @@ int dsInitRun(uint8 *tagId, uint8 *totalAnchors) {
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn getTxTimestampU64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 getTxTimestampU64(void) {
-    uint8 tsTab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readtxtimestamp(tsTab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= tsTab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn getRxTimestampU64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 getRxTimestampU64(void) {
-    uint8 tsTab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readrxtimestamp(tsTab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= tsTab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn finalMsgSetRxTs()
- *
- * @brief Fill the final message witt RX timestamp values of all Anchors. In the timestamp fields of the final message,
- *        the least significant byte is at the lower address.
- *
- * @param  tsField  pointer on the first byte of the timestamp field to fill
- *         ts timestamp value
- *
- * @return none
- */
-static void finalMsgSetRxTs(uint8 *tsField) {
-  int i, j = 0;
-  uint64 ts;
-  for (i = 0; i < anchorsTotalCount; i++) {
-    ts = anchorsTimestamps[i];
-    // We want to continuosly write all RX timestamps which are 4 bytes each. So we start at multiples of 4.
-    for (j = i * FINAL_MSG_TS_LEN; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
-      tsField[j] = (uint8) ts;
-      ts >>= 8;
-    }
-  }
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
  * @fn printDistance()
  *
  * @brief Prints all the distances gathered from every Anchors in the system.
@@ -311,25 +233,6 @@ static void printDistance(void) {
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn finalMsgSetTs()
- *
- * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
- *        message, the least significant byte is at the lower address.
- *
- * @param  tsField  pointer on the first byte of the timestamp field to fill
- *         ts  timestamp value
- *
- * @return none
- */
-static void finalMsgSetTs(uint8 *tsField, uint64 ts) {
-    int i;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-        tsField[i] = (uint8) ts;
-        ts >>= 8;
-    }
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
  * @fn setFinalTxDelay()
  *
  * @brief Set the TX delay for sending the final message. The calculated value is based on the last anchor ID.
@@ -347,36 +250,6 @@ static uint32 setFinalTxDelay(void) {
   dwt_setdelayedtrxtime(tagSendDelayTime);
 
   return tagSendDelayTime;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn writeFinalMsg()
- *
- * @brief Fill the final message with all TX/RX timestamp values and frame sequence number.
- *
- * @param  tagSendDelayTime the TX delay for transmitting the final message.
- *
- * @return none
- */
-static void writeFinalMsg(uint32 tagSendDelayTime) {
-  /* Retrieve the timestamp from when the initial message transmits. */
-  tagTxTimestamp1 = getTxTimestampU64();
-  printf("Tag TX 1 = %u\r\n", (uint32)tagTxTimestamp1);
-  
-  tagSendDelayTime = setFinalTxDelay();
-
-  /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
-  printf("Tag TX 2 = %u\r\n", (uint32)tagTxTimestamp2);
-
-  /* Write all the timestamps in the final message. See NOTE 11 below. */
-  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
-  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
-  finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
-
-  /* Increment frame sequence number after transmission of the final message (modulo 256). */
-  exchangeSeqCount++;
-  tagFinalMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -595,7 +468,6 @@ static int receiveDistanceMsgs() {
 
     /* A frame has been received, read it into the local buffer. */
     frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-  
     if (frameLen <= RX_BUF_LEN) {
       dwt_readrxdata(rxBuffer, frameLen, 0);
     }

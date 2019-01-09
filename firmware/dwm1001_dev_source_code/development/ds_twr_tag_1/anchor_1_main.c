@@ -27,6 +27,8 @@
 #include "port_platform.h"
 #include "UART.h"
 #include "command.h"
+#include "message_processor.h"
+#include "timestamper.h"
 
 /* Number representing the identification of this Anchor. 
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. 
@@ -44,13 +46,6 @@
 #define ALL_MSG_COMMON_LEN 10
 
 /* Index to access some of the fields in the frames involved in the process. */
-#define EX_SEQ_COUNT_IDX 2
-#define ANCH_COUNT_IDX 10
-#define FINAL_MSG_TX_1_IDX 10
-#define FINAL_MSG_TX_2_IDX 14
-#define FINAL_MSG_RX_1_IDX 18
-#define ANCHOR_ID_IDX 10
-#define ANCHOR_DIST_IDX 11
 #define SYS_CMD_IDX 10
 
 /* Values to help determine if message transmitted or received. */
@@ -74,9 +69,6 @@
 
 /* Length of buffer to store received messages. */
 #define RX_BUF_LEN 32
-
-/* Length of all timestamp values. */
-#define FINAL_MSG_TS_LEN 4
 
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
 * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
@@ -162,11 +154,6 @@ static int operationMode;
 extern bool hasInterruptEvent;
 
 /* Declaration of static functions. */
-static uint64 getTxTimestampU64(void);
-static uint64 getRxTimestampU64(void);
-static void finalMsgGetTs(const uint8 *tsField, uint32 *ts);
-static void writeResponseMsg(void);
-static void writeDistanceMsg(void);
 static void setResponseDelays(uint64 timestampToDelayFrom);
 static int receiveInitiationMsg(void);
 static int receiveFinalMsg(void);
@@ -216,7 +203,7 @@ int dsRespRun(uint8 *anchorId, uint8 *anchorsTotalCount) {
     return EXCHANGE_SYS_CMD;
   }
 
-  writeResponseMsg();
+  writeResponseMsg(anchorMsg, anchorIdNum);
   setResponseDelays(respRxTimestamp1);
   sendResponse = sendResponseMsg();
   if (sendResponse == RESPONSE_SEND_FAILURE) {
@@ -246,7 +233,7 @@ int dsRespRun(uint8 *anchorId, uint8 *anchorsTotalCount) {
   computeDistance();
   printf("Completed Exchange #%u --- Distance: %f m\r\n", exchangeSeqCount, distanceMetre);
   
-  writeDistanceMsg();
+  writeDistanceMsg(anchorDistMsg, anchorIdNum, distanceMetre);
   setResponseDelays(respRxTimestamp2);
   sendDistance = sendDistanceMsg();
   if (sendDistance == DISTANCE_SEND_SUCCESS) {
@@ -254,98 +241,6 @@ int dsRespRun(uint8 *anchorId, uint8 *anchorsTotalCount) {
   }
 
   return EXCHANGE_SUCCESS;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn getTxTimestampU64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 getTxTimestampU64(void) {
-    uint8 tsTab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readtxtimestamp(tsTab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= tsTab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
-* @fn getRxTimestampU64()
-*
-* @brief Get the RX time-stamp in a 64-bit variable.
-*        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
-*
-* @param  none
-*
-* @return  64-bit value of the read time-stamp.
-*/
-static uint64 getRxTimestampU64(void) {
-  uint8 tsTab[5];
-  uint64 ts = 0;
-  int i;
-  dwt_readrxtimestamp(tsTab);
-  for (i = 4; i >= 0; i--) {
-    ts <<= 8;
-    ts |= tsTab[i];
-  }
-  return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn finalMsgGetTs()
- *
- * @brief Read a given timestamp value from the final message. In the timestamp fields of the final message, the least
- *        significant byte is at the lower address.
- *
- * @param  tsField  pointer on the first byte of the timestamp field to read
- *         ts  timestamp value
- *
- * @return none
- */
-static void finalMsgGetTs(const uint8 *tsField, uint32 *ts) {
-    int i;
-    *ts = 0;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-        *ts += tsField[i] << (i * 8);
-    }
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn writeResponseMsg()
- *
- * @brief Fill the response message with this Anchor's ID.
- *
- * @param  none
- *
- * @return none
- */
-static void writeResponseMsg(void) {
-  /* Send ID of this anchor back to tag. */
-  anchorMsg[ANCHOR_ID_IDX] = anchorIdNum;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn writeDistanceMsg()
- *
- * @brief Fill the distance message with this Anchor's ID and calculated distance.
- *
- * @param  none
- *
- * @return none
- */
-static void writeDistanceMsg(void) {
-  /* Write the ID and distance to transmission message. */
-  anchorDistMsg[ANCHOR_ID_IDX] = anchorIdNum;
-  memcpy(&anchorDistMsg[ANCHOR_DIST_IDX], &distanceMetre, sizeof(double));
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
