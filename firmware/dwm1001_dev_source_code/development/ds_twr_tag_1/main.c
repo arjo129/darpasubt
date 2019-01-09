@@ -144,6 +144,8 @@ void setCommand(struct Command data);
 static void interpretCommand(enum OperationMode *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand);
 static void interpretSysCommand(enum OperationMode *operationMode, uint8 *deviceId);
 static void distributeSysCmd(struct Command *sysCommand);
+static int waitForSysCommand(void);
+static void executeSysCmd(struct Command *sysCommand, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway);
 
 #ifdef USE_FREERTOS
 
@@ -309,7 +311,8 @@ void ds_initiator_task_function (void * pvParameter) {
       interpretSysCommand(&operationMode, &deviceId);
     } else if (state == STATE_DISTRB_SYS_CMD) {
       distributeSysCmd(&sysCommand);
-      (sysCommand.key == START_KEY) ? (state = STATE_EXEC_SYS_CMD) : (state = STATE_STANDBY);
+      printf("Executing sys cmd\r\n");
+      executeSysCmd(&sysCommand, &operationMode, &deviceId, &isGateway);
       memset(&sysCommand, 0, sizeof sysCommand);
     } else if (state == STATE_EXEC_SYS_CMD) {
       if (operationMode == MODE_TAG) {
@@ -421,6 +424,40 @@ void setCommand(struct Command data) {
   state = STATE_RECEIVE_HOST_CMD;
   hasInterruptEvent = true;
   printf("received interrupt\r\n");
+}
+
+static void setRole(struct Command *cmd, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway) {
+  uint8 numOfSwitches = cmd->numberOfSwitches;
+  int i;
+
+  for (i = 0; i < numOfSwitches; i++) {
+    if (cmd->nodeSwitches[i].currentId == *deviceId) {
+      *deviceId = cmd->nodeSwitches[i].newId;
+      (cmd->nodeSwitches[i].newRole == TAG_CHAR) ? (*operationMode = MODE_TAG) : (*operationMode = MODE_ANCHOR);
+      break;
+    }
+  }
+}
+
+static void executeSysCmd(struct Command *sysCommand, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway) {
+  switch(sysCommand->key) {
+    case START_KEY:
+      state = STATE_EXEC_SYS_CMD;
+      printf("Begin ranging.\r\n");
+      break;
+    case STOP_KEY:
+      state = STATE_STANDBY;
+      printf("Stop ranging.\r\n");
+      break;
+    case SWITCH_KEY:
+      setRole(sysCommand, operationMode, deviceId, isGateway);
+      state = STATE_STANDBY;
+      printf("Switched role -> new ID: %d.\r\n", *deviceId);
+      break;
+    default:
+      state = STATE_STANDBY;
+      printf("Unknown command.\r\n");
+  }
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

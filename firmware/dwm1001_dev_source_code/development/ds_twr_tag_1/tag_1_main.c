@@ -26,6 +26,7 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "UART.h"
+#include "command.h"
 
 #define APP_NAME "DS TWR TAG"
 
@@ -46,10 +47,13 @@
 #define FINAL_MSG_RX_1_IDX 18
 #define ANCHOR_ID_IDX 10
 #define ANCHOR_DIST_IDX 11
+#define SYS_CMD_IDX 10
 
 /* Values to help determine if message transmitted or received. */
 #define INITIATION_SEND_SUCCESS 1
 #define INITIATION_SEND_FAILURE 0
+#define ANCHOR_RECEIVE_SYS_CMD 4
+#define ANCHOR_RECEIVE_INTERRUPTED 3
 #define ANCHOR_RECEIVE_TIMEOUT 2
 #define ANCHOR_RECEIVE_SUCCESS 1
 #define ANCHOR_RECEIVE_FAILURE 0
@@ -58,6 +62,8 @@
 #define DISTANCE_RECEIVE_TIMEOUT 2
 #define DISTANCE_RECEIVE_SUCCESS 1
 #define DISTANCE_RECEIVE_FAILURE 0
+#define EXCHANGE_SYS_CMD 4
+#define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
@@ -84,6 +90,7 @@ static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 static int anchorsTotalCount;
 
@@ -96,6 +103,8 @@ static uint64 anchorsTimestamps[MAX_ANCHORS_COUNT];
 
 /* Temporary storage for the distances. */
 static double anchorsDistances[MAX_ANCHORS_COUNT];
+
+extern char sysCmdString[MAX_CMD_SERIAL_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32 statusReg = 0;
@@ -178,6 +187,9 @@ int dsInitRun(uint8 *tagId, uint8 *totalAnchors) {
     }
     if (anchorReceive == ANCHOR_RECEIVE_FAILURE) {
       return EXCHANGE_FAILURE;
+    }
+    if (anchorReceive == ANCHOR_RECEIVE_SYS_CMD) {
+      return EXCHANGE_SYS_CMD;
     }
   }
 
@@ -479,9 +491,17 @@ static int receiveAnchorResponse(void) {
       dwt_readrxdata(rxBuffer, frameLen, 0);
     }
 
-    /* Check that the frame is the expected response from the companion "DS TWR responder" example.
-    * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    /* As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
     rxBuffer[EX_SEQ_COUNT_IDX] = 0;
+
+    /* Check if the frame is a command message. */
+    if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
+      printf("Received command message\r\n");
+      memcpy(sysCmdString, &rxBuffer[SYS_CMD_IDX], MAX_CMD_SERIAL_LEN);
+      return ANCHOR_RECEIVE_INTERRUPTED;
+    }
+
+    /* Check that the frame is sent by an Anchor. */
     if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
       rxCount++;
       // printf("Reception # : %d\r\n",rxCount);
