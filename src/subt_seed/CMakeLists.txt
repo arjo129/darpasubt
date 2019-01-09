@@ -75,6 +75,13 @@ target_link_libraries(
 ###########
 ## Tests ##
 ###########
+catkin_add_gtest(probabilityTest test/ProbabilityDistributionTest.cpp)
+target_link_libraries(
+  probabilityTest
+  ${catkin_LIBRARIES}
+  ${PCL_COMMON_LIBRARIES}
+  ${OCTOMAP_LIBRARIES}
+)
 
 
 #############
