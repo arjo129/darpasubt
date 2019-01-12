@@ -2,11 +2,12 @@ import serial
 import keyboard
 import sys, termios
 import re
+from threading import Event
 
 # Variables to be used
-devicePort = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-needMenu = True
+devicePort = serial.Serial('/dev/ttyACM1', 115200, timeout=0.1)
 selection = 0
+exit = Event()
 
 # Devic control configuration variables
 givenDeviceId = '0'
@@ -34,15 +35,20 @@ MSG_SERIAL_SENT = "Serial transmitted: "
 # Constants
 MAX_SELECTIONS = 8
 SELECTION_OUTPUT = 1
-SELECTION_START = 2
-SELECTION_STOP = 3
-SELECTION_TAG = 4
-SELECTION_ANCHOR = 5
-SELECTION_ADDRESS = 6
-SELECTION_SWITCH = 7
-SELECTION_CONFIG = 8
-CHAR_START = 'b'
-CHAR_STOP = 's'
+SELECTION_START_DEVICE = 2
+SELECTION_START_NETWORK = 3
+SELECTION_STOP_DEVICE = 4
+SELECTION_STOP_NETWORK = 5
+SELECTION_TAG = 6
+SELECTION_ANCHOR = 7
+SELECTION_ADDRESS = 8
+SELECTION_SWITCH = 9
+SELECTION_CONFIG = 0
+SELECTION_BACK = 0
+CHAR_START_DEVICE = 'b'
+CHAR_START_NETWORK = 'n'
+CHAR_STOP_DEVICE = 's'
+CHAR_STOP_NETWORK = 'm'
 CHAR_TAG = 't'
 CHAR_ANCHOR = 'a'
 CHAR_SWITCH = 'w'
@@ -53,19 +59,12 @@ CONFIG_ID = 1
 CONFIG_ANCHORS = 2
 CONFIG_SWITCHES = 3
 
-# Data bytes to be sent over the port
-startData = b"b;"
-stopData = b"s;"
-tagData = b"t03;"
-anchorData = b"a13;"
-addressData = b"d1;"
-switchData = b"w412a23a01a30t;"
 
 def serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList):
     serialOutput = ""
 
     serialOutput += commandKey
-    if commandKey == CHAR_START or commandKey == CHAR_STOP:
+    if commandKey == CHAR_START_DEVICE or commandKey == CHAR_STOP_DEVICE:
         pass
     elif commandKey == CHAR_TAG or commandKey == CHAR_ANCHOR:
         serialOutput += newDeviceId
@@ -99,9 +98,22 @@ def clearControlVars():
 
 
 def readDistance():
-    line = devicePort.readline()
-    line = line.rstrip(b'\r\n')
-    line = line.decode()
+    line = ""
+    while True:
+        if exit.isSet():
+            return
+
+        byte = devicePort.read()
+        ch = byte.decode()
+        if (ch == '\n'):
+            line = ""
+            continue
+        else:
+            line += ch
+        if (ch == CHAR_TERM):
+            break
+
+    line = line.rstrip('\r\n')
     if line.endswith(';'):
         values = line.split(',')
 
@@ -124,8 +136,10 @@ def printMenu():
     printConfigStatus()
     print("")
     print("%d. Display PORT output" % SELECTION_OUTPUT)
-    print("%d. Send START command" % SELECTION_START)
-    print("%d. Send STOP command" % SELECTION_STOP)
+    print("%d. Send START DEVICE command" % SELECTION_START_DEVICE)
+    print("%d. Send START NETWORK command" % SELECTION_START_NETWORK)
+    print("%d. Send STOP DEVICE command" % SELECTION_STOP_DEVICE)
+    print("%d. Send STOP NETWORK command" % SELECTION_STOP_NETWORK)
     print("%d. Send TAG command" % SELECTION_TAG)
     print("%d. Send ANCHOR command" % SELECTION_ANCHOR)
     print("%d. Send ADDRESS command" % SELECTION_ADDRESS)
@@ -140,6 +154,7 @@ def printConfigMenu():
     print("%d. Device ID" % CONFIG_ID)
     print("%d. Anchors Count" % CONFIG_ANCHORS)
     print("%d. Switches" % CONFIG_SWITCHES)
+    print("%d. Back to main menu" % SELECTION_BACK)
 
 
 def showMenu():
@@ -158,11 +173,23 @@ def sendStart():
     global switchesNum
     global switchList
 
-    commandKey = CHAR_START
+    commandKey = CHAR_START_DEVICE
     devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Started device.")
-    clearControlVars()
     pass
+
+
+def sendStartNetwork():
+    global commandKey
+    global newDeviceId
+    global anchorsCount
+    global switchesNum
+    global switchList
+
+    commandKey = CHAR_START_NETWORK
+    devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
+    print("Started network.")
+
 
 def sendStop():
     global commandKey
@@ -171,11 +198,23 @@ def sendStop():
     global switchesNum
     global switchList
 
-    commandKey = CHAR_STOP
+    commandKey = CHAR_STOP_DEVICE
     devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Stopped device.")
-    clearControlVars()
     pass
+
+
+def sendStopNetwork():
+    global commandKey
+    global newDeviceId
+    global anchorsCount
+    global switchesNum
+    global switchList
+
+    commandKey = CHAR_STOP_NETWORK
+    devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
+    print("Stopped network.")
+
 
 def sendTag():
     global commandKey
@@ -189,8 +228,8 @@ def sendTag():
     anchorsCount = givenAnchorsCount
     devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Switched device to Tag.")
-    clearControlVars()
     pass
+
 
 def sendAnchor():
     global commandKey
@@ -204,7 +243,6 @@ def sendAnchor():
     anchorsCount = givenAnchorsCount
     devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Switched device to Anchor.")
-    clearControlVars()
     pass
 
 
@@ -219,7 +257,6 @@ def sendAddress():
     newDeviceId = givenDeviceId
     devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Switched device to ID: %d" % int(newDeviceId))
-    clearControlVars()
     pass
 
 
@@ -235,7 +272,6 @@ def sendSwitch():
     switchesNum = str(len(switchList))
     devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Executed switches: " + str(switchList))
-    clearControlVars()
     pass
 
 
@@ -273,56 +309,58 @@ def configure():
     elif selection == CONFIG_SWITCHES:
         raw = input(MSG_GIVE_SWITCHES)
         configSwitches(raw)
+    elif selection == SELECTION_BACK:
+        return
     else:
         print(MSG_INVALID)
 
 
-def parseSelection():
+def parseSelection(selection):
+    print(MSG_RESULT)
+
     if selection == SELECTION_OUTPUT:
-        global needMenu
-        needMenu = False
-    elif selection == SELECTION_START:
-        print(MSG_RESULT)
+        exit.clear()
+    elif selection == SELECTION_START_DEVICE:
         sendStart()
-    elif selection == SELECTION_STOP:
-        print(MSG_RESULT)
+    elif selection == SELECTION_START_NETWORK:
+        sendStartNetwork()
+    elif selection == SELECTION_STOP_DEVICE:
         sendStop()
+    elif selection == SELECTION_STOP_NETWORK:
+        sendStopNetwork()
     elif selection == SELECTION_TAG:
-        print(MSG_RESULT)
         sendTag()
     elif selection == SELECTION_ANCHOR:
-        print(MSG_RESULT)
         sendAnchor()
     elif selection == SELECTION_ADDRESS:
-        print(MSG_RESULT)
         sendAddress()
     elif selection == SELECTION_SWITCH:
-        print(MSG_RESULT)
         sendSwitch()
     elif selection == SELECTION_CONFIG:
         configure()
     else:
         print(MSG_INVALID)
 
+    clearControlVars()
+
 
 def switchOnMenu(e):
     # scan_code of '50' is 'm'
     if e.scan_code == 50:
-        global needMenu
-        needMenu = True
+        exit.set()
     pass
 
 
 # Setup the keyboard interrupt
 keyboard.hook(switchOnMenu)
+exit.set()
 
 while (True):
-    if needMenu:
+    if exit.isSet():
         selection = showMenu()
-
-        parseSelection()
+        parseSelection(selection)
     else:
         readDistance()
 
-	
+
 devicePort.close()
