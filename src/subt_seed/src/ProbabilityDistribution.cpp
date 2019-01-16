@@ -2,7 +2,7 @@
 
 
 ProbabilityDistribution::ProbabilityDistribution(){
-
+    std::srand(std::time(nullptr));
 }
 
 bool ProbabilityDistribution::operator == (const ProbabilityDistribution& other) const {
@@ -21,7 +21,6 @@ bool ProbabilityDistribution::operator == (const ProbabilityDistribution& other)
         //If probability at position is different then the result is different
         double first = probability.find(*myIter)->second;
         double second = other.probability.find(*otherIter)->second;
-
         if(fabs(first-second) > std::numeric_limits<double>::epsilon()) {
             return false;
         }
@@ -79,6 +78,10 @@ void ProbabilityDistribution::updateProbability(Eigen::Vector3f position, double
     probability[pos] = prob;
 }
 
+void ProbabilityDistribution::accumulate(Eigen::Vector3f position, double prob) {
+    updateProbability(position ,get(position) + prob);
+}
+
 void ProbabilityDistribution::clear() {
     positions.clear();
     probability.clear();
@@ -87,6 +90,7 @@ void ProbabilityDistribution::clear() {
 
 double ProbabilityDistribution::get(Eigen::Vector3f position) const {
     std::tuple<int, int, int> pos = std::make_tuple(position[0], position[1], position[2]);
+   
     auto iter = probability.find(pos);
     if(iter == probability.end()) {
         return 0;
@@ -97,6 +101,21 @@ double ProbabilityDistribution::get(Eigen::Vector3f position) const {
 
 void ProbabilityDistribution::sample(int n, std::vector<Eigen::Vector3f>& samples) {
 
+    std::map<double, std::tuple<int,int,int> > probab_map;
+
+    double accumulated_prob = 0;
+    for(auto prob: probability) {
+        accumulated_prob += prob.second;
+        probab_map.insert(std::pair<double, std::tuple<int, int, int> >(accumulated_prob, prob.first));
+    }
+
+    for(int i  = 0 ; i < n ; i++) {
+        double num = (double)std::rand()/RAND_MAX;
+        auto location = probab_map.upper_bound(num);
+        std::tuple<int,int,int> result = location->second;
+        Eigen::Vector3f res(std::get<0>(result), std::get<1>(result), std::get<2>(result));
+        samples.push_back(res);
+    }
 }
 
 void ProbabilityDistribution::normalize() {
@@ -109,4 +128,23 @@ void ProbabilityDistribution::normalize() {
     for(auto a: probability) {
         probability[a.first] /= sum;
     }
+}
+
+ProbabilityDistribution& ProbabilityDistribution::gaussianBlur(int radius){
+
+    for(auto position: positions) {
+        Eigen::Vector3f pos(std::get<0>(position), std::get<1>(position), std::get<2>(position));
+        double val = get(pos);
+        for(int i = -radius; i <= radius; i++){
+            for(int j = -radius; j <= radius; j++){
+                for(int k = -radius; k <= radius; k++){
+                    Eigen::Vector3f offset(i,j,k);
+                    double distSq = i*i+k*k+j*j;
+                    accumulate(pos + offset, val*exp(-(distSq)/(2*radius)));
+                }
+            }
+        }
+    }
+
+    normalize();
 }

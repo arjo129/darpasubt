@@ -1,6 +1,8 @@
 #ifndef _PROBABILITY_DISTRIBUTION_H_
 #define _PROBABILITY_DISTRIBUTION_H_
 
+#include <ctime>
+#include <exception>
 #include <limits>
 #include <set>
 #include <tuple>
@@ -13,7 +15,7 @@
 #define THRESHOLD_PROBABILITY 0.00000001
 
 /**
- * This class represents
+ * This class represents a simple hash for tuples of ints.
  */ 
 namespace std
 {
@@ -27,8 +29,7 @@ struct hash<tuple<T...>>
     }
 };
 
-}
-
+};
 
 /**
  * This class represents a probability distribution in 3D. It is essentially
@@ -42,9 +43,9 @@ private:
     std::unordered_map<std::tuple<int, int, int>, double> probability;
     std::unordered_map<std::tuple<int, int, int>, int> insertion_index;
 
+
 public:
     ProbabilityDistribution();
-    
     /**
      * This function performs an and operation over two probability distributions
      */ 
@@ -69,7 +70,13 @@ public:
     double get(Eigen::Vector3f position) const;
 
     /**
-     * Sample
+     * @brief accumulates the
+     * @param position
+     * @param prob
+     */
+    void accumulate(Eigen::Vector3f position, double prob);
+    /**
+     * Sample [Unimplemented TODO: Implement]
      */ 
     void sample(int n, std::vector<Eigen::Vector3f>& samples);
 
@@ -77,5 +84,10 @@ public:
      * Normalize the distribution such that the sum of probabilities = 1
      */ 
     void normalize();
+
+    /**
+     * Performs a gaussian blur for the radius
+     */
+    ProbabilityDistribution& gaussianBlur(int radius); 
 };
 #endif
