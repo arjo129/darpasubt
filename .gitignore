@@ -6,3 +6,4 @@ src/.vscode
 build/
 devel/
 install/
+*/.hg/*
