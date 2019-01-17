@@ -261,6 +261,7 @@ static void setResponseDelays(uint64 timestampToDelayFrom) {
   delay_64 = timestampToDelayFrom + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME);
   delay_64 = delay_64 + ((anchorIdNum - 1) * (ANCH_RX_AFT_TX_DLY * UUS_TO_DWT_TIME));
   respSendDelayTime = (delay_64) >> 8;
+  printf("Setting response delay with ID: %d\r\n", anchorIdNum);
   dwt_setdelayedtrxtime(respSendDelayTime);
 
   /* Set the delay to turn on receiver after transmission of respone message. */
@@ -377,7 +378,7 @@ static int receiveInitiationMsg(void) {
     /* Check if the frame is a command message. */
     if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
       printf("Received command message\r\n");
-      memcpy(sysCmdString, &rxBuffer[SYS_CMD_IDX], MAX_CMD_SERIAL_LEN);
+      setCommand(constructCommand(&rxBuffer[SYS_CMD_IDX]));
       return INITIATION_RECEIVE_SYS_CMD;
     }
 

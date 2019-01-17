@@ -13,7 +13,9 @@
 #define TAG_CHAR 't'
 #define ANCHOR_CHAR 'a'
 #define STOP_CHAR 's'
+#define STOP_NETWORK_CHAR 'm'
 #define START_CHAR 'b'
+#define START_NETWORK_CHAR 'n'
 #define SWITCH_CHAR 'w'
 #define ADDRESS_CHAR 'd'
 
@@ -33,7 +35,9 @@ enum CommandKey {
   TAG_KEY,
   ANCHOR_KEY,
   START_KEY,
+  START_NETWORK_KEY,
   STOP_KEY,
+  STOP_NETWORK_KEY,
   SWITCH_KEY,
   ADDRESS_KEY
 };

@@ -40,8 +40,20 @@ struct Command constructCommand(char *inputString) {
       result.anchorsTotalCount = 0; // Irrelevant so we clear
       memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
       break;
+    case STOP_NETWORK_CHAR:
+      result.key = STOP_NETWORK_KEY;
+      result.thisId = 0; // Irrelevant so we clear
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
+      break;
     case START_CHAR:
       result.key = START_KEY;
+      result.thisId = 0; // Irrelevant so we clear
+      result.anchorsTotalCount = 0; // Irrelevant so we clear
+      memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
+      break;
+    case START_NETWORK_CHAR:
+      result.key = START_NETWORK_KEY;
       result.thisId = 0; // Irrelevant so we clear
       result.anchorsTotalCount = 0; // Irrelevant so we clear
       memset(&result.nodeSwitches, 0, sizeof result.nodeSwitches); // Irrelevant so we clear
@@ -85,8 +97,14 @@ void serializeCommand(struct Command command, uint8 *serialData) {
     case STOP_KEY:
       serialData[KEY_INDEX] = STOP_CHAR;
       break;
+    case STOP_NETWORK_KEY:
+      serialData[KEY_INDEX] = STOP_NETWORK_CHAR;
+      break;
     case START_KEY:
       serialData[KEY_INDEX] = START_CHAR;
+      break;
+    case START_NETWORK_KEY:
+      serialData[KEY_INDEX] = START_NETWORK_CHAR;
       break;
     case SWITCH_KEY:
       serialData[KEY_INDEX] = SWITCH_CHAR;

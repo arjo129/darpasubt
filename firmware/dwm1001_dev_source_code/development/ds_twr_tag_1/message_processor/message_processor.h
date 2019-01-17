@@ -8,6 +8,7 @@
 #define ANCHOR_ID_IDX 10
 #define ANCH_COUNT_IDX 10
 #define ANCHOR_DIST_IDX 11
+#define SYS_CMD_IDX 10
 
 /* Length of all timestamp values. */
 #define FINAL_MSG_TS_LEN 4

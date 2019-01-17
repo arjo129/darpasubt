@@ -38,11 +38,11 @@
 #include "command.h"
 
 #define DEFAULT_TAG_ID 0
-#define DEFAULT_ANCHOR_ID 3
+#define DEFAULT_ANCHOR_ID 1
 #define DEFAULT_DEVICE_STATE STATE_STANDBY
 #define DEFAULT_OPERATION_MODE MODE_TAG
-#define DEFAULT_ANCHORS_COUNT 3
-#define GATEWAY_DEVICE true
+#define DEFAULT_ANCHORS_COUNT 2
+#define GATEWAY_DEVICE false
 
 //-----------------dw1000----------------------------
 
@@ -71,13 +71,15 @@ static dwt_config_t config = {
 #define RX_ANT_DLY 16456
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_SUCCESS_MS 100
+#define RNG_DELAY_SUCCESS_MS 200
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
 #define RNG_DELAY_FAILURE_MS 1000
 /* Stop operation delay. */
-#define RNG_DELAY_STOP_MS 100
+#define RNG_DELAY_STOP_MS 500
 /* Receive command success. */
 #define RNG_DELAY_CMD_SUCCESS_MS 50
+/* Timeout delay. */
+#define RNG_DELAY_TIMEOUT_MS 2000
 
 #define SYS_CMD_IDX 10
 #define EX_SEQ_COUNT_IDX 2
@@ -141,11 +143,39 @@ static enum DeviceState state;
 /* Function prototypes */
 void ds_initiator_task_function (void * pvParameter);
 void setCommand(struct Command data);
-static void interpretCommand(enum OperationMode *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand);
-static void interpretSysCommand(enum OperationMode *operationMode, uint8 *deviceId);
+static void interpretCommand(enum OperationMode *operationMode, enum DeviceState *state, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand);
+static void interpretSysCommand(struct Command *command, enum DeviceState *state, enum OperationMode *operationMode, uint8 *deviceId);
 static void distributeSysCmd(struct Command *sysCommand);
 static int waitForSysCommand(void);
 static void executeSysCmd(struct Command *sysCommand, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway);
+
+/* Function prototypes related to command and interpretation. */
+static void setTagDevice(
+    struct Command *command,
+    enum OperationMode *operationMode,
+    uint8 *deviceId,
+    uint8 *anchorsTotalCount,
+    enum DeviceState *state);
+static void setAnchorDevice(
+    struct Command *command,
+    enum OperationMode *operationMode,
+    uint8 *deviceId,
+    uint8 *anchorsTotalCount,
+    enum DeviceState *state);
+static void setNetworkSwitches(
+    struct Command *command,
+    enum DeviceState *state,
+    enum OperationMode *operationMode,
+    uint8 *deviceId);
+static void setSwitchesFromCmd(
+    struct Command *command,
+    enum OperationMode *operationMode,
+    uint8 *deviceId);
+static void setStartDevice(enum DeviceState *state);
+static void setStartNetwork(enum DeviceState *state);
+static void setStopDevice(enum DeviceState *state);
+static void setStopNetwork(enum DeviceState *state);
+static void setAddressDevice(struct Command *command, enum DeviceState *state, uint8 *deviceId);
 
 #ifdef USE_FREERTOS
 
@@ -272,7 +302,6 @@ void ds_initiator_task_function (void * pvParameter) {
   /* The type of operation for this node. */
   enum OperationMode operationMode;
   uint8 deviceId, anchorsTotalCount;
-  struct Command sysCommand;
 
   operationMode = DEFAULT_OPERATION_MODE;
   state = DEFAULT_DEVICE_STATE;
@@ -285,11 +314,11 @@ void ds_initiator_task_function (void * pvParameter) {
 
   while (true) {
     if (state == STATE_RECEIVE_HOST_CMD) {
-      interpretCommand(&operationMode, &deviceId, &anchorsTotalCount, &isGateway, &sysCommand); // Set device to the next correct state
-      memset(&command, 0, sizeof command); // Clear the command
+      interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
       hasInterruptEvent = false; // Clear interrupt flag
       vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
     } else if (state == STATE_STANDBY) {
+      memset(&command, 0, sizeof command);
       if (!isGateway) {
         result = waitForSysCommand();
         dwt_forcetrxoff();
@@ -308,13 +337,17 @@ void ds_initiator_task_function (void * pvParameter) {
       vTaskDelay(RNG_DELAY_STOP_MS);
     } else if (state == STATE_RECEIVE_SYS_CMD) {
       printf("Executing sys cmd\r\n");
-      interpretSysCommand(&operationMode, &deviceId);
+      interpretSysCommand(&command, &state, &operationMode, &deviceId);
+      hasInterruptEvent = false; // Clear interrupt flag
+      if (operationMode == MODE_TAG) {
+        vTaskDelay(RNG_DELAY_TIMEOUT_MS);
+      }
     } else if (state == STATE_DISTRB_SYS_CMD) {
-      distributeSysCmd(&sysCommand);
+      distributeSysCmd(&command);
       printf("Executing sys cmd\r\n");
-      executeSysCmd(&sysCommand, &operationMode, &deviceId, &isGateway);
-      memset(&sysCommand, 0, sizeof sysCommand);
+      interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
     } else if (state == STATE_EXEC_SYS_CMD) {
+      memset(&command, 0, sizeof command);
       if (operationMode == MODE_TAG) {
         result = dsInitRun(&deviceId, &anchorsTotalCount);
       }
@@ -332,6 +365,8 @@ void ds_initiator_task_function (void * pvParameter) {
       } else if (result == EXCHANGE_SYS_CMD) {
         state = STATE_RECEIVE_SYS_CMD;
         vTaskDelay(RNG_DELAY_FAILURE_MS);
+      } else if (result == EXCHANGE_TIMEOUT && operationMode == MODE_TAG) {
+        vTaskDelay(RNG_DELAY_TIMEOUT_MS);
       } else {
         vTaskDelay(RNG_DELAY_FAILURE_MS);
       }
@@ -382,7 +417,12 @@ static int waitForSysCommand(void) {
     /* Check if the frame is a command message. */
     if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
       printf("Received command message\r\n");
-      memcpy(sysCmdString, &rxBuffer[SYS_CMD_IDX], MAX_CMD_SERIAL_LEN);
+      int i;
+      for (i = 0; i < RX_BUF_LEN; i++) {
+        printf("%c", rxBuffer[i]);
+      }
+      printf("\r\n");
+      command = constructCommand(&rxBuffer[SYS_CMD_IDX]);
       return EXCHANGE_SYS_CMD;
     }
   } else {
@@ -410,7 +450,8 @@ void printCommand(void) {
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * @fn setCommand()
+ * @fn setCommand()static void writeSysCmd(uint8 *field, uint8 *serialData) {
+  int i;
  *
  * @brief Set the command structure so the device can execute it when the current exchange ends.
  *
@@ -469,60 +510,43 @@ static void executeSysCmd(struct Command *sysCommand, enum OperationMode *operat
  *
  * @return none
  */
-static void interpretCommand(enum OperationMode *operationMode, uint8 *deviceId, uint8 *anchorsTotalCount, bool *isGateway, struct Command *sysCommand) {
-  switch(command.key) {
+static void interpretCommand(
+    enum OperationMode *operationMode,
+    enum DeviceState *state,
+    uint8 *deviceId,
+    uint8 *anchorsTotalCount,
+    bool *isGateway,
+    struct Command *command) {
+  switch(command->key) {
     case TAG_KEY:
-      *operationMode = MODE_TAG;
-      *deviceId = command.thisId;
-      *anchorsTotalCount = command.anchorsTotalCount;
-      state = STATE_STANDBY;
-      printf("Switched to Tag ID: %u\r\n", *deviceId);
+      setTagDevice(command, operationMode, deviceId, anchorsTotalCount, state);
       break;
     case ANCHOR_KEY:
-      *operationMode = MODE_ANCHOR;
-      *deviceId = command.thisId;
-      *anchorsTotalCount = command.anchorsTotalCount;
-      state = STATE_STANDBY;
-      printf("Switched to Anchor ID: %u\r\n", *deviceId);
+      setAnchorDevice(command, operationMode, deviceId, anchorsTotalCount, state);
       break;
     case START_KEY:
-      if (isGateway) {
-        *sysCommand = command;
-        state = STATE_DISTRB_SYS_CMD;
-      } else {
-        state = STATE_EXEC_SYS_CMD;
-      }
-      printf("Begin ranging.\r\n");
+      setStartDevice(state);
       break;
     case STOP_KEY:
-      if (isGateway) {
-        *sysCommand = command;
-        state = STATE_DISTRB_SYS_CMD;
-      } else {
-        state = STATE_STANDBY;
-      }
-      printf("Stop ranging.\r\n");
+      setStopDevice(state);
+      break;
+    case ADDRESS_KEY:
+      setAddressDevice(command, deviceId, state);
+      break;
+    // The following cases will change the device state to distribute command to network.
+    case START_NETWORK_KEY:
+      setStartNetwork(state);
+      break;
+    case STOP_NETWORK_KEY:
+      setStopNetwork(state);
       break;
     case SWITCH_KEY:
       if (isGateway) {
-        *sysCommand = command;
-        state = STATE_DISTRB_SYS_CMD;
-      } else {
-        state = STATE_STANDBY;
+        setNetworkSwitches(command, state, operationMode, deviceId);
       }
-      break;
-    case ADDRESS_KEY:
-      *deviceId = command.thisId;
-      if (isGateway) {
-        state = STATE_STANDBY;
-      } else {
-        state = STATE_EXEC_SYS_CMD;
-      }
-      printf("Set device ID: %u\r\n", *deviceId);
       break;
     default:
       // Do nothing
-      state = STATE_STANDBY;
       printf("Unknown command.\r\n");
       break;
   }
@@ -554,27 +578,22 @@ static void setRoleFromSysCmd(int *operationMode, uint8 *deviceId) {
   }
 }
 
-static void interpretSysCommand(enum OperationMode *operationMode, uint8 *deviceId) {
-  char key = sysCmdString[KEY_INDEX]; // Command key is at the first position.
-
-  switch(key) {
-    case START_CHAR:
-      state = STATE_EXEC_SYS_CMD;
-      printf("Begin ranging.\r\n");
+static void interpretSysCommand(struct Command *command, enum DeviceState *state, enum OperationMode *operationMode, uint8 *deviceId) {
+  switch(command->key) {
+    case START_NETWORK_KEY:
+      *state = STATE_EXEC_SYS_CMD;
       break;
-    case STOP_CHAR:
-      state = STATE_STANDBY;
-      printf("Stop ranging.\r\n");
+    case STOP_NETWORK_KEY:
+      *state = STATE_STANDBY;
       break;
-    case SWITCH_CHAR:
-      setRoleFromSysCmd(operationMode, deviceId);
-      state = STATE_EXEC_SYS_CMD;
-      printf("Switched role -> new ID: %d.\r\n", *deviceId);
+    case SWITCH_KEY:
+      printf("Switching roles\r\n");
+      printCommand();
+      setSwitchesFromCmd(command, operationMode, deviceId);
+      *state = STATE_STANDBY;
       break;
     default:
-      state = STATE_STANDBY;
-      printf("Unknown command.\r\n");
-      break;
+      printf("Unknown system command\r\n");
   }
 }
 
@@ -590,6 +609,12 @@ static void distributeSysCmd(struct Command *sysCommand) {
   uint8 serialData[MAX_CMD_SERIAL_LEN];
 
   serializeCommand(*sysCommand, serialData);
+  printf("sending ");
+  int i;
+  for (i = 0; i < MAX_CMD_SERIAL_LEN; i++) {
+    printf(" %c", serialData[i]);
+  }
+  printf("\r\n");
   writeSysCmd(&sysCmdMsg[SYS_CMD_IDX], serialData);
 
   /* Write data to TX buffer and prepare for transmission. */
@@ -603,9 +628,122 @@ static void distributeSysCmd(struct Command *sysCommand) {
     /* Ensure transmission occurs. */
     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {};
     dwt_forcetrxoff();
-    printf("Distribute command success");
+    printf("Distribute command success\r\n");
   } else {
-    printf("Distribute command failure");
+    printf("Distribute command failure\r\n");
+  }
+}
+
+static void setTagDevice(
+    struct Command *command,
+    enum OperationMode *operationMode,
+    uint8 *deviceId,
+    uint8 *anchorsTotalCount,
+    enum DeviceState *state) {
+  *operationMode = MODE_TAG;
+  *deviceId = command->thisId;
+  *anchorsTotalCount = command->anchorsTotalCount;
+  *state = STATE_STANDBY;
+  printf("Switched to Tag ID: %u\r\n", *deviceId);
+}
+
+static void setAnchorDevice(
+    struct Command *command,
+    enum OperationMode *operationMode,
+    uint8 *deviceId,
+    uint8 *anchorsTotalCount,
+    enum DeviceState *state) {
+  *operationMode = MODE_ANCHOR;
+  *deviceId = command->thisId;
+  *anchorsTotalCount = command->anchorsTotalCount;
+  *state = STATE_STANDBY;
+  printf("Switched to Anchor ID: %u\r\n", *deviceId);
+}
+
+static void setStartDevice(enum DeviceState *state) {
+  *state = STATE_EXEC_SYS_CMD;
+  printf("Begin ranging for this device.\r\n");
+}
+
+static void setStartNetwork(enum DeviceState *state) {
+  if (*state == STATE_RECEIVE_HOST_CMD) {
+    *state = STATE_DISTRB_SYS_CMD;
+    printf("Begin network ranging.\r\n");
+    return;
+  }
+  if (*state == STATE_DISTRB_SYS_CMD) {
+    *state = STATE_EXEC_SYS_CMD;
+    printf("Begin ranging for this device.\r\n");
+    return;
+  }
+}
+
+static void setStopDevice(enum DeviceState *state) {
+  *state = STATE_STANDBY;
+  printf("Stop ranging for this device.\r\n");
+}
+
+static void setStopNetwork(enum DeviceState *state) {
+  if (*state == STATE_RECEIVE_HOST_CMD) {
+    *state = STATE_DISTRB_SYS_CMD;
+    printf("Stop network ranging.\r\n");
+    return;
+  }
+  if (*state == STATE_DISTRB_SYS_CMD) {
+    *state = STATE_STANDBY;
+    printf("Stop ranging for this device.\r\n");
+    return;
+  }
+}
+
+static void setNetworkSwitches(
+    struct Command *command,
+    enum DeviceState *state,
+    enum OperationMode *operationMode,
+    uint8 *deviceId) {
+  if (*state == STATE_RECEIVE_HOST_CMD) {
+    *state = STATE_DISTRB_SYS_CMD;
+    return;
+  }
+  if (*state == STATE_DISTRB_SYS_CMD) {
+    setSwitchesFromCmd(command, operationMode, deviceId);
+    *state = STATE_STANDBY;
+    return;
+  }
+  printf("Switching network nodes.\r\n");
+}
+
+static void setAddressDevice(struct Command *command, enum DeviceState *state, uint8 *deviceId) {
+  *deviceId = command->thisId;
+  *state = STATE_STANDBY;
+  printf("Set new address ID: %u\r\n", *deviceId);
+}
+
+static void setSwitchesFromCmd(
+    struct Command *command,
+    enum OperationMode *operationMode,
+    uint8 *deviceId) {
+  int numberOfSwitches = command->numberOfSwitches;
+  int i;
+
+  for (i = 0; i < numberOfSwitches; i++) {
+    struct NodeSwitch currSwitch = command->nodeSwitches[i];
+    if (currSwitch.currentId == *deviceId) {
+      printf("id matches: %d\r\n", *deviceId);
+      if (currSwitch.newRole == TAG_CHAR) {
+        *operationMode = MODE_TAG;
+        printf("new mode: tag\r\n");
+      } else if (currSwitch.newRole == ANCHOR_CHAR) {
+        *operationMode = MODE_ANCHOR;
+        printf("new mode: anchor\r\n");
+      } else {
+        printf("continue\r\n");
+        continue;
+      }
+      *deviceId = currSwitch.newId;
+      printf("new id: %d\r\n", *deviceId);
+      break;
+    }
   }
 }
 
