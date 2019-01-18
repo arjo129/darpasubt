@@ -40,7 +40,7 @@
 #define DEFAULT_TAG_ID 0
 #define DEFAULT_ANCHOR_ID 1
 #define DEFAULT_DEVICE_STATE STATE_STANDBY
-#define DEFAULT_OPERATION_MODE MODE_TAG
+#define DEFAULT_OPERATION_MODE MODE_ANCHOR
 #define DEFAULT_ANCHORS_COUNT 2
 #define GATEWAY_DEVICE false
 
@@ -147,7 +147,6 @@ static void interpretCommand(enum OperationMode *operationMode, enum DeviceState
 static void interpretSysCommand(struct Command *command, enum DeviceState *state, enum OperationMode *operationMode, uint8 *deviceId);
 static void distributeSysCmd(struct Command *sysCommand);
 static int waitForSysCommand(void);
-static void executeSysCmd(struct Command *sysCommand, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway);
 
 /* Function prototypes related to command and interpretation. */
 static void setTagDevice(
@@ -467,40 +466,6 @@ void setCommand(struct Command data) {
   printf("received interrupt\r\n");
 }
 
-static void setRole(struct Command *cmd, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway) {
-  uint8 numOfSwitches = cmd->numberOfSwitches;
-  int i;
-
-  for (i = 0; i < numOfSwitches; i++) {
-    if (cmd->nodeSwitches[i].currentId == *deviceId) {
-      *deviceId = cmd->nodeSwitches[i].newId;
-      (cmd->nodeSwitches[i].newRole == TAG_CHAR) ? (*operationMode = MODE_TAG) : (*operationMode = MODE_ANCHOR);
-      break;
-    }
-  }
-}
-
-static void executeSysCmd(struct Command *sysCommand, enum OperationMode *operationMode, uint8 *deviceId, bool *isGateway) {
-  switch(sysCommand->key) {
-    case START_KEY:
-      state = STATE_EXEC_SYS_CMD;
-      printf("Begin ranging.\r\n");
-      break;
-    case STOP_KEY:
-      state = STATE_STANDBY;
-      printf("Stop ranging.\r\n");
-      break;
-    case SWITCH_KEY:
-      setRole(sysCommand, operationMode, deviceId, isGateway);
-      state = STATE_STANDBY;
-      printf("Switched role -> new ID: %d.\r\n", *deviceId);
-      break;
-    default:
-      state = STATE_STANDBY;
-      printf("Unknown command.\r\n");
-  }
-}
-
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn interpretCommand()
  *
@@ -549,32 +514,6 @@ static void interpretCommand(
       // Do nothing
       printf("Unknown command.\r\n");
       break;
-  }
-}
-
-static void setRoleFromSysCmd(int *operationMode, uint8 *deviceId) {
-  int i = 0, j = SWITCH_DATA_INDEX;
-  uint8 currentId, newId, numOfSwitches;
-  char key;
-
-  numOfSwitches = sysCmdString[NODE_SWITCH_INDEX] - '0';
-  for (i = 0; i < numOfSwitches; i++) {
-    currentId = sysCmdString[j] - '0';
-    newId = sysCmdString[j + 1] - '0';
-    key = sysCmdString[j + 2];
-    if (key != ANCHOR_CHAR && key != TAG_CHAR) {
-      break;
-    }
-    if (currentId == *deviceId) {
-      *deviceId = newId;
-      if (key == ANCHOR_CHAR) {
-        *operationMode = MODE_ANCHOR;
-      } else {
-        *operationMode = MODE_TAG;
-      }
-      break;
-    }
-    j += SWITCH_SET_SIZE;
   }
 }
 
@@ -671,6 +610,11 @@ static void setStartNetwork(enum DeviceState *state) {
     printf("Begin network ranging.\r\n");
     return;
   }
+  if (*state == STATE_RECEIVE_SYS_CMD) {
+    *state = STATE_EXEC_SYS_CMD;
+    printf("Begin network ranging with system command.\r\n");
+    return;
+  }
   if (*state == STATE_DISTRB_SYS_CMD) {
     *state = STATE_EXEC_SYS_CMD;
     printf("Begin ranging for this device.\r\n");
@@ -687,6 +631,11 @@ static void setStopNetwork(enum DeviceState *state) {
   if (*state == STATE_RECEIVE_HOST_CMD) {
     *state = STATE_DISTRB_SYS_CMD;
     printf("Stop network ranging.\r\n");
+    return;
+  }
+  if (*state == STATE_RECEIVE_SYS_CMD) {
+    *state = STATE_STANDBY;
+    printf("Stop network ranging with system command.\r\n");
     return;
   }
   if (*state == STATE_DISTRB_SYS_CMD) {
