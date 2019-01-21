@@ -42,7 +42,7 @@
 #define DEFAULT_DEVICE_STATE STATE_STANDBY
 #define DEFAULT_OPERATION_MODE MODE_ANCHOR
 #define DEFAULT_ANCHORS_COUNT 2
-#define GATEWAY_DEVICE false
+#define GATEWAY_DEVICE true
 
 //-----------------dw1000----------------------------
 
@@ -72,7 +72,7 @@ static dwt_config_t config = {
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_ANCHOR_SUCCESS_MS 200
-#define RNG_DELAY_TAG_SUCCESS_MS 200 // Must be higher than the anchor success delay
+#define RNG_DELAY_TAG_SUCCESS_MS 300 // Must be higher than the anchor success delay
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
 #define RNG_DELAY_FAILURE_MS 1000
 /* Stop operation delay. */
@@ -150,6 +150,7 @@ static void interpretCommand(enum OperationMode *operationMode, enum DeviceState
 static void interpretSysCommand(struct Command *command, enum DeviceState *state, enum OperationMode *operationMode, uint8 *deviceId);
 static void distributeSysCmd(struct Command *sysCommand);
 static int waitForSysCommand(void);
+static void resetTransceiverValues(void);
 
 /* Function prototypes related to command and interpretation. */
 static void setTagDevice(
@@ -352,6 +353,7 @@ void ds_initiator_task_function (void * pvParameter) {
     } else if (state == STATE_EXEC_SYS_CMD) {
       memset(&command, 0, sizeof command);
       if (operationMode == MODE_TAG) {
+        resetTransceiverValues();
         result = dsInitRun(&deviceId, &anchorsTotalCount);
       }
 
@@ -702,6 +704,11 @@ static void setSwitchesFromCmd(
   }
 }
 
+static void resetTransceiverValues(void) {
+  dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+  dwt_setrxtimeout(0);
+  dwt_forcetrxoff();
+}
 /*****************************************************************************************************************************************************
  * NOTES:
  *
