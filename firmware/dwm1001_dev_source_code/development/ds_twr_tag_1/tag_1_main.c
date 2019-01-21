@@ -57,6 +57,7 @@
 #define DISTANCE_RECEIVE_TIMEOUT 2
 #define DISTANCE_RECEIVE_SUCCESS 1
 #define DISTANCE_RECEIVE_FAILURE 0
+#define EXCHANGE_TAG_SUCCESS 5
 #define EXCHANGE_SYS_CMD 4
 #define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
@@ -208,7 +209,7 @@ int dsInitRun(uint8 *tagId, uint8 *totalAnchors) {
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_SUCCESS_MS);
 
-  return EXCHANGE_SUCCESS;
+  return EXCHANGE_TAG_SUCCESS;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

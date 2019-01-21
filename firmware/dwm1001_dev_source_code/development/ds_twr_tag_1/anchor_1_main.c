@@ -61,6 +61,7 @@
 #define FINAL_RECEIVE_FAILURE 0
 #define DISTANCE_SEND_SUCCESS 1
 #define DISTANCE_SEND_FAILURE 0
+#define EXCHANGE_ANCHOR_SUCCESS 6
 #define EXCHANGE_SYS_CMD 4
 #define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
@@ -240,7 +241,7 @@ int dsRespRun(uint8 *anchorId, uint8 *anchorsTotalCount) {
     printf("Sent back distance.\r\n\r\n");
   }
 
-  return EXCHANGE_SUCCESS;
+  return EXCHANGE_ANCHOR_SUCCESS;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

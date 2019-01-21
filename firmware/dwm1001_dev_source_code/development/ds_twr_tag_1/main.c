@@ -71,7 +71,8 @@ static dwt_config_t config = {
 #define RX_ANT_DLY 16456
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_SUCCESS_MS 200
+#define RNG_DELAY_ANCHOR_SUCCESS_MS 200
+#define RNG_DELAY_TAG_SUCCESS_MS 200 // Must be higher than the anchor success delay
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
 #define RNG_DELAY_FAILURE_MS 1000
 /* Stop operation delay. */
@@ -84,6 +85,8 @@ static dwt_config_t config = {
 #define SYS_CMD_IDX 10
 #define EX_SEQ_COUNT_IDX 2
 
+#define EXCHANGE_ANCHOR_SUCCESS 6
+#define EXCHANGE_TAG_SUCCESS 5
 #define EXCHANGE_SYS_CMD 4
 #define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
@@ -319,10 +322,11 @@ void ds_initiator_task_function (void * pvParameter) {
     } else if (state == STATE_STANDBY) {
       memset(&command, 0, sizeof command);
       if (!isGateway) {
+        dwt_setrxtimeout(0); // Make sure we wait for system command indefinitely.
         result = waitForSysCommand();
         dwt_forcetrxoff();
-        if (result == EXCHANGE_SUCCESS) {
-          vTaskDelay(RNG_DELAY_SUCCESS_MS);
+        if (result == EXCHANGE_ANCHOR_SUCCESS || result == EXCHANGE_TAG_SUCCESS) {
+          vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
         } else if (result == EXCHANGE_INTERRUPTED) {
           state = STATE_RECEIVE_HOST_CMD;
           vTaskDelay(RNG_DELAY_FAILURE_MS);
@@ -356,8 +360,8 @@ void ds_initiator_task_function (void * pvParameter) {
       }
 
       /* Delay a task for a given number of ticks */
-      if (result == EXCHANGE_SUCCESS) {
-        vTaskDelay(RNG_DELAY_SUCCESS_MS);
+      if (result == EXCHANGE_ANCHOR_SUCCESS) {
+        vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
       } else if (result == EXCHANGE_INTERRUPTED) {
         state = STATE_RECEIVE_HOST_CMD;
         vTaskDelay(RNG_DELAY_FAILURE_MS);
@@ -366,6 +370,8 @@ void ds_initiator_task_function (void * pvParameter) {
         vTaskDelay(RNG_DELAY_FAILURE_MS);
       } else if (result == EXCHANGE_TIMEOUT && operationMode == MODE_TAG) {
         vTaskDelay(RNG_DELAY_TIMEOUT_MS);
+      } else if (result == EXCHANGE_TAG_SUCCESS) {
+        vTaskDelay(RNG_DELAY_TAG_SUCCESS_MS);
       } else {
         vTaskDelay(RNG_DELAY_FAILURE_MS);
       }
