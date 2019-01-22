@@ -97,8 +97,6 @@ static uint64 anchorsTimestamps[MAX_ANCHORS_COUNT];
 /* Temporary storage for the distances. */
 static double anchorsDistances[MAX_ANCHORS_COUNT];
 
-extern char sysCmdString[MAX_CMD_SERIAL_LEN];
-
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32 statusReg = 0;
 
@@ -371,8 +369,8 @@ static int receiveAnchorResponse(void) {
     /* Check if the frame is a command message. */
     if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
       printf("Received command message\r\n");
-      memcpy(sysCmdString, &rxBuffer[SYS_CMD_IDX], MAX_CMD_SERIAL_LEN);
-      return ANCHOR_RECEIVE_INTERRUPTED;
+      setCommand(constructCommand(&rxBuffer[SYS_CMD_IDX]));
+      return ANCHOR_RECEIVE_SYS_CMD;
     }
 
     /* Check that the frame is sent by an Anchor. */
