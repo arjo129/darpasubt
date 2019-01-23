@@ -353,6 +353,7 @@ void ds_initiator_task_function (void * pvParameter) {
     } else if (state == STATE_EXEC_SYS_CMD) {
       memset(&command, 0, sizeof command);
       if (operationMode == MODE_TAG) {
+        vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
         resetTransceiverValues();
         result = dsInitRun(&deviceId, &anchorsTotalCount);
       }
@@ -360,6 +361,8 @@ void ds_initiator_task_function (void * pvParameter) {
       if (operationMode == MODE_ANCHOR) {
         result = dsRespRun(&deviceId, &anchorsTotalCount);
       }
+
+      state = STATE_STANDBY;
 
       /* Delay a task for a given number of ticks */
       if (result == EXCHANGE_ANCHOR_SUCCESS) {

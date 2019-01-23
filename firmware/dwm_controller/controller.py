@@ -2,6 +2,7 @@ import serial
 import keyboard
 import sys, termios
 import re
+import time
 from threading import Event
 
 # Variables to be used
@@ -187,8 +188,13 @@ def sendStartNetwork():
     global switchList
 
     commandKey = CHAR_START_NETWORK
-    devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
     print("Started network.")
+    exit.clear()
+    while (True):
+        if exit.isSet():
+            return
+        devicePort.write(bytearray(serialDataBuilder(commandKey, newDeviceId, anchorsCount, switchesNum, switchList), 'utf-8'))
+        time.sleep(3)
 
 
 def sendStop():
