@@ -27,12 +27,13 @@
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl_ros/transforms.h>
-#include <nav_msgs/Odometry.h>
+
+#include <octomap_msgs/Octomap.h>
 
 #include <string>
 
 #include <subt_gazebo/CommsClient.hh>
-#include <subt_seed/mapper.h>
+#include <subt_seed/odometrybasedlocalization.h>
 
 #include <tf/transform_broadcaster.h>
 
@@ -60,21 +61,17 @@ class Controller
                                    const std::string &_data);
 
   /// \brief ROS node handler.
-  private: ros::NodeHandle n;
-  tf::TransformListener listener;
-  LocalMap* localMap;
-  //LocalMap3d* localMap3d;
-  std::string name;
-  octomap::point3d* sensor_origin;
+  private:
+    OdometryBasedLocalization* odom;
+    boost::shared_ptr<ros::NodeHandle> nh;
+    tf::TransformListener listener;
+    std::string name;
+
 
   private: void handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_msg);
-  void handleOdom(const nav_msgs::Odometry& odom_msg);
 
   /// \brief publisher to send cmd_vel
   private: ros::Publisher velPub, mapPub, map3dPub;
-
-  private: ros::Subscriber sub;
-  ros::Subscriber odomSub;
 
   /// \brief Communication client.
   private: std::unique_ptr<subt::CommsClient> client;
@@ -87,17 +84,10 @@ Controller::Controller(const std::string &_name)
   // Create subt communication client
   this->client.reset(new subt::CommsClient(_name));
   this->client->Bind(&Controller::CommClientCallback, this);
-
+  nh = boost::shared_ptr<ros::NodeHandle>(new ros::NodeHandle());
+  odom = new OdometryBasedLocalization(nh, name);
   // Create a cmd_vel publisher to control a vehicle.
-  this->velPub = this->n.advertise<geometry_msgs::Twist>(_name + "/cmd_vel", 1);
-  this->mapPub = this->n.advertise<nav_msgs::OccupancyGrid>(_name+"/local_map",1);
-  this->map3dPub = this->n.advertise<octomap_msgs::Octomap>(_name+"/local_map_3d",1);
-  this->sub = this->n.subscribe(_name + "/points", 1, &Controller::handlePointCloud, this);
-  this->localMap = new LocalMap(_name+"/base_link");
-  //this->localMap3d = new LocalMap3d(_name+"/base_link");
-  this->odomSub = this->n.subscribe(_name + "/x1_velocity_controller/odom", 1, &Controller::handleOdom, this);
-
-  ROS_INFO("Initiallizing call backs");
+  this->velPub = nh->advertise<geometry_msgs::Twist>(_name + "/cmd_vel", 1);
 }
 
 /////////////////////////////////////////////////
@@ -108,36 +98,6 @@ void Controller::CommClientCallback(const std::string &/*_srcAddress*/,
 {
   // Add code to handle communication callbacks.
   ROS_INFO("CommClientCallback");
-}
-
-void Controller::handlePointCloud(const sensor_msgs::PointCloud2ConstPtr& cloud_msg) {
-  pcl::PCLPointCloud2 pcl_pc2;
-  octomap_msgs::Octomap octomap_msg;
-  pcl_conversions::toPCL(*cloud_msg, pcl_pc2);
-  pcl::PointCloud<pcl::PointXYZI>::Ptr temp_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-  pcl::fromPCLPointCloud2(pcl_pc2, *temp_cloud);
-  localMap->update(*temp_cloud);
-  //localMap3d->insert(cloud_msg, *(this->sensor_origin));
-  //localMap3d->update();
-  //octomap_msgs::fullMapToMsg(*localMap3d->tree, octomap_msg);
-  //this->map3dPub.publish(octomap_msg);
-  nav_msgs::OccupancyGrid grid;
-  localMap->toOccupancyGrid(grid);
-  this->mapPub.publish(grid);
-}
-
-void Controller::handleOdom(const nav_msgs::Odometry& odom_msg) {
-  this->sensor_origin = new octomap::point3d(
-    odom_msg.pose.pose.position.x,
-    odom_msg.pose.pose.position.y,
-    odom_msg.pose.pose.position.z);
-
-  static tf::TransformBroadcaster br;
-  tf::Transform transform;
-  transform.setOrigin( tf::Vector3(odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y, 0.0) );
-  tf::Quaternion q(odom_msg.pose.pose.orientation.x, odom_msg.pose.pose.orientation.y, odom_msg.pose.pose.orientation.z, odom_msg.pose.pose.orientation.w);
-  transform.setRotation(q);
-  br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "map", name+"/base_link"));
 }
 
 /////////////////////////////////////////////////
