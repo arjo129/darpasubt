@@ -81,6 +81,8 @@ static dwt_config_t config = {
 #define RNG_DELAY_CMD_SUCCESS_MS 50
 /* Timeout delay. */
 #define RNG_DELAY_TIMEOUT_MS 2000
+/* Delay before begin ranging for Tag, to ensure all other anchors are ready to receive. */
+#define RNG_DELAY_TAG_BEGIN 2000
 
 #define SYS_CMD_IDX 10
 #define EX_SEQ_COUNT_IDX 2
@@ -353,7 +355,7 @@ void ds_initiator_task_function (void * pvParameter) {
     } else if (state == STATE_EXEC_SYS_CMD) {
       memset(&command, 0, sizeof command);
       if (operationMode == MODE_TAG) {
-        vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
+        vTaskDelay(RNG_DELAY_TAG_BEGIN);
         resetTransceiverValues();
         result = dsInitRun(&deviceId, &anchorsTotalCount);
       }
