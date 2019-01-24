@@ -106,6 +106,7 @@ void Controller::Update()
   // Add code that should be processed every iteration.
 
   // The following code will continuous drive the robot forward.
+    odom->broadcast();
   geometry_msgs::Twist msg;
   msg.linear.x = 1.0;
   this->velPub.publish(msg);
