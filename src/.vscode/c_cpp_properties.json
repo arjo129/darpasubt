@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "browse": {
+                "databaseFilename": "",
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "includePath": [
+                "/home/arjo/Desktop/subt_sim_ws/devel/include",
+                "/home/arjo/Desktop/subt_sim_ws/install/include",
+                "/opt/ros/melodic/include",
+                "/home/arjo/Desktop/subt_sim_ws/src/subt/subt_gazebo/include",
+                "/usr/include",
+                "subt_seed/include"
+            ],
+            "name": "Linux",
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
