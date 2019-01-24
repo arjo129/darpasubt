@@ -58,8 +58,8 @@ static dwt_config_t config = {
 #define POLL_TX_TO_RESP_RX_DLY_UUS 100 
 
 /*Should be accurately calculated during calibration*/
-#define TX_ANT_DLY 16300
-#define RX_ANT_DLY 16456	
+#define TX_ANT_DLY 16456
+#define RX_ANT_DLY 16456
 
 //--------------dw1000---end---------------
 
@@ -133,7 +133,7 @@ int main(void)
   
   /*Initialization UART*/
   boUART_Init ();
-  printf("Singled Sided Two Way Ranging Initiator Example \r\n");
+  printf("TAG --- Double Sided Two Way Ranging\r\n");
   
   /* Reset DW1000 */
   reset_DW1000(); 
@@ -164,7 +164,7 @@ int main(void)
   /* Set expected response's delay and timeout. 
   * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
   dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-  dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms  
+  dwt_setrxtimeout(65000); // Maximum value timeout with DW1000 is 65ms.
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
