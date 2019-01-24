@@ -6,19 +6,55 @@
 * @file command.h
 */
 
-#define DELIMITER ';'
+#include "deca_types.h"
+
+#define MSG_END_CHAR ';'
+
+#define TAG_CHAR 't'
+#define ANCHOR_CHAR 'a'
+#define STOP_CHAR 's'
+#define STOP_NETWORK_CHAR 'm'
+#define START_CHAR 'b'
+#define START_NETWORK_CHAR 'n'
+#define SWITCH_CHAR 'w'
+#define ADDRESS_CHAR 'd'
+
+#define KEY_INDEX 0
+#define ID_INDEX 1
+#define ANCHORS_COUNT_INDEX 2
+#define NODE_SWITCH_INDEX 1
+#define ADDRESS_INDEX 1
+#define SWITCH_DATA_INDEX 2
+
+#define MAX_NODE_SWITCHES 6
+#define MAX_CMD_SERIAL_LEN 20
+#define SWITCH_SET_SIZE 3
 
 enum CommandKey {
-    TAG_KEY,
-    ANCHOR_KEY,
-    START_KEY,
-    STOP_KEY,
-    UNKNOWN_KEY
+  UNKNOWN_KEY,
+  TAG_KEY,
+  ANCHOR_KEY,
+  START_KEY,
+  START_NETWORK_KEY,
+  STOP_KEY,
+  STOP_NETWORK_KEY,
+  SWITCH_KEY,
+  ADDRESS_KEY
+};
+
+struct NodeSwitch {
+  uint8 currentId;
+  uint8 newId;
+  char newRole;
 };
 
 struct Command {
-    enum CommandKey key;
-    char *param;
+  enum CommandKey key;
+  uint8 thisId;
+  uint8 anchorsTotalCount;
+  uint8 numberOfSwitches;
+  struct NodeSwitch nodeSwitches[MAX_NODE_SWITCHES];
 };
 
 struct Command constructCommand(char *inputString);
+void serializeCommand(struct Command command, uint8 *serialData);

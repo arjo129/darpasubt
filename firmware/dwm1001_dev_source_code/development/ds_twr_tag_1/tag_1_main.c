@@ -27,6 +27,8 @@
 #include "port_platform.h"
 #include "UART.h"
 #include "command.h"
+#include "timestamper.h"
+#include "message_processor.h"
 
 #define APP_NAME "DS TWR TAG"
 
@@ -34,30 +36,19 @@
 * Minimum of 1 and maximum of 256, ie. a 1-byte value. */
 ////////////////////*** IMPORTANT ***/////////////////////
 ///// ENSURE THIS IS CORRECTLY SET BEFORE OPERATION! /////
-#define ANCHORS_TOTAL_COUNT 3
-
-/* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_SUCCESS_MS 100
-/* Failure delay of 150ms is the lowest value that allows successful self recovery. */
-#define RNG_DELAY_FAILURE_MS 1000
-/* Stop operation delay. */
-#define RNG_DELAY_STOP_MS 100
+#define MAX_ANCHORS_COUNT 3
 
 /* Length of the common part of the message (up to and including the function code, see NOTE 1 below). */
 #define ALL_MSG_COMMON_LEN 10
 
 /* Indexes to access some of the fields in the frames. */
-#define EX_SEQ_COUNT_IDX 2
-#define ANCH_COUNT_IDX 10
-#define FINAL_MSG_TX_1_IDX 10
-#define FINAL_MSG_TX_2_IDX 14
-#define FINAL_MSG_RX_1_IDX 18
-#define ANCHOR_ID_IDX 10
-#define ANCHOR_DIST_IDX 11
+#define SYS_CMD_IDX 10
 
 /* Values to help determine if message transmitted or received. */
 #define INITIATION_SEND_SUCCESS 1
 #define INITIATION_SEND_FAILURE 0
+#define ANCHOR_RECEIVE_SYS_CMD 4
+#define ANCHOR_RECEIVE_INTERRUPTED 3
 #define ANCHOR_RECEIVE_TIMEOUT 2
 #define ANCHOR_RECEIVE_SUCCESS 1
 #define ANCHOR_RECEIVE_FAILURE 0
@@ -66,15 +57,15 @@
 #define DISTANCE_RECEIVE_TIMEOUT 2
 #define DISTANCE_RECEIVE_SUCCESS 1
 #define DISTANCE_RECEIVE_FAILURE 0
+#define EXCHANGE_TAG_SUCCESS 5
+#define EXCHANGE_SYS_CMD 4
+#define EXCHANGE_INTERRUPTED 3
 #define EXCHANGE_TIMEOUT 2
 #define EXCHANGE_SUCCESS 1
 #define EXCHANGE_FAILURE 0
 
 /* Length of buffer to store received messages. */
 #define RX_BUF_LEN 32
-
-/* Length of all timestamp values. */
-#define FINAL_MSG_TS_LEN 4
 
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
 * 1 uus = 512 / 499.2 �s and 1 �s = 499.2 * 128 dtu. */
@@ -92,16 +83,19 @@ static uint8 tagFirstMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE
 static uint8 anchorMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0};
 static uint8 tagFinalMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0x23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 anchorDistMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static uint8 sysCmdMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static int anchorsTotalCount;
 
 /* Buffer to store received response message.
 * Its size is adjusted to longest frame that this application is supposed to handle. */
 static uint8 rxBuffer[RX_BUF_LEN];
 
 /* Temporary storage for the timestamps to be sent to anchors. */
-static uint64 anchorsTimestamps[ANCHORS_TOTAL_COUNT];
+static uint64 anchorsTimestamps[MAX_ANCHORS_COUNT];
 
 /* Temporary storage for the distances. */
-static double anchorsDistances[ANCHORS_TOTAL_COUNT];
+static double anchorsDistances[MAX_ANCHORS_COUNT];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
 static uint32 statusReg = 0;
@@ -127,36 +121,15 @@ static int anchorReceive = 0;
 static int finalSend = 0;
 static int distanceReceive = 0;
 
-/* Buffer to receive commands from UART RX buffer. */
-static struct Command command;
-
-/* Flag to notify that there is data in UART RX. */
-static bool hasCommand = false;
+extern bool hasInterruptEvent;
 
 /* Declaration of static functions. */
-static uint64 getTxTimestampU64(void);
-static uint64 getRxTimestampU64(void);
-static void finalMsgSetTs(uint8 *tsField, uint64 ts);
-static void finalMsgSetRxTs(uint8 *tsField);
 static uint32 setFinalTxDelay(void);
-static void writeFinalMsg(uint32 tagSendDelayTime);
 static int sendInitiationMsg(void);
 static int sendFinalMsg(void);
 static int receiveAnchorResponse(void);
 static int receiveDistanceMsgs(void);
 static void printDistance(void);
-void setCommand(struct Command data);
-static void interpretCommand(int *operationMode);
-
-/* Enumerations */
-enum OperationMode {
-  MODE_START = 1,
-  MODE_STOP = 2,
-  MODE_UNKNOWN = 4,
-  MODE_TAG = 8,
-  MODE_ANCHOR = 16,
-  MODE_GATEWAY = 32
-};
 
 /* TODO:
  * 2. Possibly use soft reset to restart clocks to reduce clock drift maybe?
@@ -172,9 +145,13 @@ enum OperationMode {
 *
 * @return none
 */
-int dsInitRun(void) {
+int dsInitRun(uint8 *tagId, uint8 *totalAnchors) {
   /* Loop forever initiating ranging exchanges. */
   uint32 tagSendDelayTime;
+  anchorsTotalCount = *totalAnchors;
+
+  /* Resets the RX timeout for Tag mode. */
+  dwt_setrxtimeout(65000);
 
   /* Clears the anchor timestamps temporary storage. */
   memset(anchorsTimestamps, 0, sizeof anchorsTimestamps);
@@ -189,7 +166,7 @@ int dsInitRun(void) {
 
   /* Poll for reception of frames from all anchors, loop until response from all anchors have been received. */
   anchorsCount = 0;
-  while (anchorsCount < ANCHORS_TOTAL_COUNT) {
+  while (anchorsCount < anchorsTotalCount) {
     anchorReceive = receiveAnchorResponse();
     if (anchorReceive == ANCHOR_RECEIVE_TIMEOUT) {
       return EXCHANGE_TIMEOUT;
@@ -197,11 +174,17 @@ int dsInitRun(void) {
     if (anchorReceive == ANCHOR_RECEIVE_FAILURE) {
       return EXCHANGE_FAILURE;
     }
+    if (anchorReceive == ANCHOR_RECEIVE_SYS_CMD) {
+      return EXCHANGE_SYS_CMD;
+    }
   }
+  /* Retrieve the timestamp from when the initial message transmits. */
+  tagTxTimestamp1 = getTxTimestampU64();
+  printf("Tag TX 1 = %u\r\n", (uint32)tagTxTimestamp1);
+  tagSendDelayTime = setFinalTxDelay();
 
   /* Received every anchor's response, now we notify them with a final confirmation message. */
-  tagSendDelayTime = setFinalTxDelay();
-  writeFinalMsg(tagSendDelayTime);
+  writeFinalMsg(tagSendDelayTime, tagTxTimestamp1, anchorsTotalCount, tagFinalMsg, anchorsTimestamps, &exchangeSeqCount);
   finalSend = sendFinalMsg();
   if (finalSend == FINAL_SEND_FAILURE) {
     return EXCHANGE_FAILURE;
@@ -209,7 +192,7 @@ int dsInitRun(void) {
   
   /* For for reception of the distances. */
   anchorsCount = 0;
-  while (anchorsCount < ANCHORS_TOTAL_COUNT) {
+  while (anchorsCount < anchorsTotalCount) {
     distanceReceive = receiveDistanceMsgs();
     if (distanceReceive == DISTANCE_RECEIVE_TIMEOUT) {
       return EXCHANGE_TIMEOUT;
@@ -224,75 +207,7 @@ int dsInitRun(void) {
   /* Execute a delay between ranging exchanges. */
   // deca_sleep(RNG_DELAY_SUCCESS_MS);
 
-  return INITIATION_SEND_SUCCESS;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn getTxTimestampU64()
- *
- * @brief Get the TX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 getTxTimestampU64(void) {
-    uint8 tsTab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readtxtimestamp(tsTab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= tsTab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn getRxTimestampU64()
- *
- * @brief Get the RX time-stamp in a 64-bit variable.
- *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
- *
- * @param  none
- *
- * @return  64-bit value of the read time-stamp.
- */
-static uint64 getRxTimestampU64(void) {
-    uint8 tsTab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readrxtimestamp(tsTab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= tsTab[i];
-    }
-    return ts;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn finalMsgSetRxTs()
- *
- * @brief Fill the final message witt RX timestamp values of all Anchors. In the timestamp fields of the final message,
- *        the least significant byte is at the lower address.
- *
- * @param  tsField  pointer on the first byte of the timestamp field to fill
- *         ts timestamp value
- *
- * @return none
- */
-static void finalMsgSetRxTs(uint8 *tsField) {
-  int i, j = 0;
-  uint64 ts;
-  for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
-    ts = anchorsTimestamps[i];
-    // We want to continuosly write all RX timestamps which are 4 bytes each. So we start at multiples of 4.
-    for (j = i * FINAL_MSG_TS_LEN; j <  (i + 1) * FINAL_MSG_TS_LEN; j++) {
-      tsField[j] = (uint8) ts;
-      ts >>= 8;
-    }
-  }
+  return EXCHANGE_TAG_SUCCESS;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -307,32 +222,13 @@ static void finalMsgSetRxTs(uint8 *tsField) {
 static void printDistance(void) {
   int i = 0;
   double dist;
-  for (int i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+  for (int i = 0; i < anchorsTotalCount; i++) {
     printf("%lf", anchorsDistances[i]);
-    if (i < ANCHORS_TOTAL_COUNT - 1) {
+    if (i < anchorsTotalCount - 1) {
       printf(",");
     }
   }
   printf(";\r\n");
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn finalMsgSetTs()
- *
- * @brief Fill a given timestamp field in the final message with the given value. In the timestamp fields of the final
- *        message, the least significant byte is at the lower address.
- *
- * @param  tsField  pointer on the first byte of the timestamp field to fill
- *         ts  timestamp value
- *
- * @return none
- */
-static void finalMsgSetTs(uint8 *tsField, uint64 ts) {
-    int i;
-    for (i = 0; i < FINAL_MSG_TS_LEN; i++) {
-        tsField[i] = (uint8) ts;
-        ts >>= 8;
-    }
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -349,40 +245,10 @@ static uint32 setFinalTxDelay(void) {
 
   /* Compute final message transmission time. See NOTE 10 below. */
   // Uses the RX timestamp from the last received anchor response to calculate the delay needed to transmit final message.
-  tagSendDelayTime = (anchorsTimestamps[ANCHORS_TOTAL_COUNT - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+  tagSendDelayTime = (anchorsTimestamps[anchorsTotalCount - 1] + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
   dwt_setdelayedtrxtime(tagSendDelayTime);
 
   return tagSendDelayTime;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn writeFinalMsg()
- *
- * @brief Fill the final message with all TX/RX timestamp values and frame sequence number.
- *
- * @param  tagSendDelayTime the TX delay for transmitting the final message.
- *
- * @return none
- */
-static void writeFinalMsg(uint32 tagSendDelayTime) {
-  /* Retrieve the timestamp from when the initial message transmits. */
-  tagTxTimestamp1 = getTxTimestampU64();
-  printf("Tag TX 1 = %u\r\n", (uint32)tagTxTimestamp1);
-  
-  tagSendDelayTime = setFinalTxDelay();
-
-  /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-  tagTxTimestamp2 = (((uint64)(tagSendDelayTime & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
-  printf("Tag TX 2 = %u\r\n", (uint32)tagTxTimestamp2);
-
-  /* Write all the timestamps in the final message. See NOTE 11 below. */
-  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_1_IDX], tagTxTimestamp1);
-  finalMsgSetTs(&tagFinalMsg[FINAL_MSG_TX_2_IDX], tagTxTimestamp2);
-  finalMsgSetRxTs(&tagFinalMsg[FINAL_MSG_RX_1_IDX]);
-
-  /* Increment frame sequence number after transmission of the final message (modulo 256). */
-  exchangeSeqCount++;
-  tagFinalMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -399,7 +265,7 @@ static int sendInitiationMsg(void) {
 
   /* Write frame data to DW1000 and prepare transmission. See NOTE 8 below. */
   tagFirstMsg[EX_SEQ_COUNT_IDX] = exchangeSeqCount;
-  tagFirstMsg[ANCH_COUNT_IDX] = (uint8) ANCHORS_TOTAL_COUNT;
+  tagFirstMsg[ANCH_COUNT_IDX] = anchorsTotalCount;
   dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
   dwt_writetxdata(sizeof(tagFirstMsg), tagFirstMsg, 0); /* Zero offset in TX buffer. */
   dwt_writetxfctrl(sizeof(tagFirstMsg), 0, 1); /* Zero offset in TX buffer, ranging. */
@@ -475,7 +341,7 @@ static int receiveAnchorResponse(void) {
     printf("=== ERROR ===\r\nRX timeout occured from listening responses. Abandoning current exchange.\r\n");
     printf("Missing Anchors:");
     int i;
-    for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+    for (i = 0; i < anchorsTotalCount; i++) {
       if (anchorsTimestamps[i] == 0) {
         printf("% d |", i + 1);
       }
@@ -497,9 +363,17 @@ static int receiveAnchorResponse(void) {
       dwt_readrxdata(rxBuffer, frameLen, 0);
     }
 
-    /* Check that the frame is the expected response from the companion "DS TWR responder" example.
-    * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
+    /* As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
     rxBuffer[EX_SEQ_COUNT_IDX] = 0;
+
+    /* Check if the frame is a command message. */
+    if (memcmp(rxBuffer, sysCmdMsg, ALL_MSG_COMMON_LEN) == 0) {
+      printf("Received command message\r\n");
+      setCommand(constructCommand(&rxBuffer[SYS_CMD_IDX]));
+      return ANCHOR_RECEIVE_SYS_CMD;
+    }
+
+    /* Check that the frame is sent by an Anchor. */
     if (memcmp(rxBuffer, anchorMsg, ALL_MSG_COMMON_LEN) == 0) {
       rxCount++;
       // printf("Reception # : %d\r\n",rxCount);
@@ -514,7 +388,7 @@ static int receiveAnchorResponse(void) {
 
       /* Temporarily store the timestamps specific to the retrieved anchor number. */
       // Safety check
-      if (anchorID > ANCHORS_TOTAL_COUNT) {
+      if (anchorID > anchorsTotalCount) {
         printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsTimestamps[anchorID - 1] = tagRxTimestamp1;
@@ -525,7 +399,7 @@ static int receiveAnchorResponse(void) {
       /* We need to ensure we enable RX only when we expect another response from the anchors.
         * This is crucial since enabling RX without receiving will cause any transmissions (final
         * message transmission later) to be delayed for unusually long. */
-      if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+      if (anchorsCount < anchorsTotalCount) {
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
 
@@ -575,7 +449,7 @@ static int receiveDistanceMsgs() {
     printf("=== ERROR ===\r\nRX timeout occured from listening distances. Abandoning current exchange.\r\n");
     printf("Missing Anchors:");
     int i;
-    for (i = 0; i < ANCHORS_TOTAL_COUNT; i++) {
+    for (i = 0; i < anchorsTotalCount; i++) {
       if (anchorsDistances[i] == 0) {
         printf("% d |", i + 1);
       }
@@ -593,7 +467,6 @@ static int receiveDistanceMsgs() {
 
     /* A frame has been received, read it into the local buffer. */
     frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-  
     if (frameLen <= RX_BUF_LEN) {
       dwt_readrxdata(rxBuffer, frameLen, 0);
     }
@@ -615,7 +488,7 @@ static int receiveDistanceMsgs() {
 
       /* Temporarily store the timestamps specific to the retrieved anchor number. */
       // Safety check
-      if (anchorID > ANCHORS_TOTAL_COUNT) {
+      if (anchorID > anchorsTotalCount) {
         printf("=== Error === Anchor number out of bounds. Anchor ID: %u\r\n", anchorID);
       } else {
         anchorsDistances[anchorID - 1] = anchorDistance;
@@ -626,7 +499,7 @@ static int receiveDistanceMsgs() {
       /* We need to ensure we enable RX only when we expect another response from the anchors.
         * This is crucial since enabling RX without receiving will cause any transmissions (final
         * message transmission later) to be delayed for unusually long. */
-      if (anchorsCount < ANCHORS_TOTAL_COUNT) {
+      if (anchorsCount < anchorsTotalCount) {
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
       }
 
@@ -652,97 +525,6 @@ static int receiveDistanceMsgs() {
 
   /* Default return value. */
   return DISTANCE_RECEIVE_FAILURE;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn setCommand()
- *
- * @brief Set the command structure so the device can execute it when the current exchange ends.
- *
- * @param  command the Command struct to set with
- *
- * @return none
- */
-void setCommand(struct Command data) {
-  command = data;
-  hasCommand = true;
-}
-
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn interpretCommand()
- *
- * @brief Deconstruct the received command struct and set the operation mode accordingly.
- *
- * @param  operationMode pointer to the operation mode value to change.
- *
- * @return none
- */
-static void interpretCommand(int *operationMode) {
-  switch(command.key) {
-    case TAG_KEY:
-      *operationMode |= MODE_TAG;
-      *operationMode &= ~MODE_ANCHOR;
-      printf("Switched to Tag: 1\r\n");
-      break;
-    case ANCHOR_KEY:
-      *operationMode |= MODE_ANCHOR;
-      *operationMode &= ~MODE_TAG;
-      printf("Switched to Anchor: 1\r\n");
-      break;
-    case START_KEY:
-      *operationMode |= MODE_START;
-      *operationMode &= ~MODE_STOP;
-      printf("Begin ranging.\r\n");
-      break;
-    case STOP_KEY:
-      *operationMode |= MODE_STOP;
-      *operationMode &= ~MODE_START;
-      printf("Stop ranging.\r\n");
-      break;
-    default:
-      // Do nothing
-      // *operationMode = 0;
-      // *operationMode |= MODE_UNKNOWN;
-      printf("Unknown command.\r\n");
-  }
-}
-
-/**@brief DS TWR Tag task entry function.
-*
-* @param[in] pvParameter   Pointer that will be used as the parameter for the task.
-*/
-void ds_initiator_task_function (void * pvParameter) {
-  int result;
-  /* The type of operation for this node. */
-  int operationMode = MODE_TAG | MODE_START; // Default
-
-  UNUSED_PARAMETER(pvParameter);
-
-  dwt_setleds(DWT_LEDS_ENABLE);
-  while (true) {
-    if (hasCommand) {
-      interpretCommand(&operationMode);
-      memset(&command, 0, sizeof command); // Clear the command
-      hasCommand = false;
-    }
-
-    if ((operationMode & MODE_TAG) && (operationMode & MODE_START)) {
-      result = dsInitRun();
-    } else if ((operationMode & MODE_ANCHOR) && (operationMode & MODE_START)) {
-      // Implement anchor code
-    } else {
-      vTaskDelay(RNG_DELAY_STOP_MS);
-      continue;
-    }
-
-      /* Delay a task for a given number of ticks */
-    if (result == EXCHANGE_SUCCESS) {
-      vTaskDelay(RNG_DELAY_SUCCESS_MS);
-    } else {
-      vTaskDelay(RNG_DELAY_FAILURE_MS);
-    }
-    /* Tasks must be implemented to never return... */
-  }
 }
 
 /*****************************************************************************************************************************************************

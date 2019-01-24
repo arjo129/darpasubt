@@ -35,10 +35,13 @@ const app_uart_comm_params_t comm_params =
   NRF_UART_BAUDRATE_115200
 };
 
+static char dataString[UART_RX_BUF_SIZE] = {0}; // +1 for null termination
+
+static int inputDataIndex = 0;
+
 // local functions
 static void vHandleUartInternalErrors (uint32_t u32Error);
 static void vUartErrorHandle					(app_uart_evt_t * p_event);
-static void getRxData(char *data);
 
 /**
  * @brief Public interface, initialise the FIFO UART.
@@ -80,30 +83,23 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
     {
         vHandleUartInternalErrors(p_event->evt_type);
     } else if (p_event -> evt_type == APP_UART_DATA_READY) {
-      char dataString[UART_RX_BUF_SIZE + 1] = {0}; // +1 for null termination
       struct Command command;
+      char byte;
 
-      getRxData(dataString);
-      command = constructCommand(dataString);
-      setCommand(command);
+      boUART_getc(&byte);
+
+      if (byte == MSG_END_CHAR) {
+        command = constructCommand(dataString);
+        setCommand(command);
+        memset(dataString, 0, sizeof dataString);
+        inputDataIndex = 0;
+      } else {
+        dataString[inputDataIndex++] = byte;
+      }
     }
 }
 
 static void vHandleUartInternalErrors (uint32_t u32Error)
 {
 	// notify app of error - LED ?
-}
-
-static void getRxData(char *data) {
-  char byte;
-  int i = 0;
-  bool hasChar = false;
-
-  // Get each byte until RX buffer is empty
-  while (boUART_getc(&byte) == true) {
-    data[i] = byte;
-    i++;
-  }
-
-  data[i] = '\0';
 }

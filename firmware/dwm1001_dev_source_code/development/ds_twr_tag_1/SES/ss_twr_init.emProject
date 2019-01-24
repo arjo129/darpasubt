@@ -26,7 +26,7 @@
       Name="nrf52832_xxaa"
       c_only_additional_options=""
       c_preprocessor_definitions="BOARD_DW1001_DEV;BSP_SIMPLE;;CONFIG_GPIO_AS_PINRESET;FLOAT_ABI_HARD;NRF52;NRF52832_XXAA;NRF52_PAN_74;SWI_DISABLE0"
-      c_user_include_directories="$(PackagesDir)/nRF/CMSIS/Device/Include;$(PackagesDir)/CMSIS_5/CMSIS/Core/Include;../../../nRF5_SDK_14.2.0/components/device;../UART;../command;../config;../../../nRF5_SDK_14.2.0/components;../../../nRF5_SDK_14.2.0/components/boards;../../../nRF5_SDK_14.2.0/components/drivers_nrf/clock;../../../nRF5_SDK_14.2.0/components/drivers_nrf/common;../../../nRF5_SDK_14.2.0/components/drivers_nrf/delay;../../../nRF5_SDK_14.2.0/components/drivers_nrf/gpiote;../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal;../../../nRF5_SDK_14.2.0/components/drivers_nrf/nrf_soc_nosd;../../../nRF5_SDK_14.2.0/components/drivers_nrf/spi_master;../../../nRF5_SDK_14.2.0/components/drivers_nrf/uart;../../../nRF5_SDK_14.2.0/components/libraries/atomic;../../../nRF5_SDK_14.2.0/components/libraries/balloc;../../../nRF5_SDK_14.2.0/components/libraries/bsp;../../../nRF5_SDK_14.2.0/components/libraries/button;../../../nRF5_SDK_14.2.0/components/libraries/fifo;../../../nRF5_SDK_14.2.0/components/libraries/experimental_log;../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/src;../../../nRF5_SDK_14.2.0/components/libraries/experimental_memobj;../../../nRF5_SDK_14.2.0/components/libraries/experimental_section_vars;../../../nRF5_SDK_14.2.0/components/libraries/scheduler;../../../nRF5_SDK_14.2.0/components/libraries/strerror;../../../nRF5_SDK_14.2.0/components/libraries/timer;../../../nRF5_SDK_14.2.0/components/libraries/util;../../../nRF5_SDK_14.2.0/components/libraries/uart;../../../nRF5_SDK_14.2.0/components/toolchain;../../../deca_driver;../../../deca_driver/port;../../../nRF5_SDK_14.2.0/external/fprintf;../../../nRF5_SDK_14.2.0/external/segger_rtt;../../../nRF5_SDK_14.2.0/external/freertos/;../../../nRF5_SDK_14.2.0/external/freertos/source;../../../nRF5_SDK_14.2.0/external/freertos/config;../../../nRF5_SDK_14.2.0/external/freertos/source/include;../../../nRF5_SDK_14.2.0/external/freertos/portable/ARM/nrf52;../../../nRF5_SDK_14.2.0/external/freertos/portable/CMSIS/nrf52;../../../nRF5_SDK_14.2.0/external/freertos/source/portable;../../../boards;../../.."
+      c_user_include_directories="$(PackagesDir)/nRF/CMSIS/Device/Include;$(PackagesDir)/CMSIS_5/CMSIS/Core/Include;../../../nRF5_SDK_14.2.0/components/device;../UART;../command;../timestamper;../message_processor;../message_transceiver;../config;../../../nRF5_SDK_14.2.0/components;../../../nRF5_SDK_14.2.0/components/boards;../../../nRF5_SDK_14.2.0/components/drivers_nrf/clock;../../../nRF5_SDK_14.2.0/components/drivers_nrf/common;../../../nRF5_SDK_14.2.0/components/drivers_nrf/delay;../../../nRF5_SDK_14.2.0/components/drivers_nrf/gpiote;../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal;../../../nRF5_SDK_14.2.0/components/drivers_nrf/nrf_soc_nosd;../../../nRF5_SDK_14.2.0/components/drivers_nrf/spi_master;../../../nRF5_SDK_14.2.0/components/drivers_nrf/uart;../../../nRF5_SDK_14.2.0/components/libraries/atomic;../../../nRF5_SDK_14.2.0/components/libraries/balloc;../../../nRF5_SDK_14.2.0/components/libraries/bsp;../../../nRF5_SDK_14.2.0/components/libraries/button;../../../nRF5_SDK_14.2.0/components/libraries/fifo;../../../nRF5_SDK_14.2.0/components/libraries/experimental_log;../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/src;../../../nRF5_SDK_14.2.0/components/libraries/experimental_memobj;../../../nRF5_SDK_14.2.0/components/libraries/experimental_section_vars;../../../nRF5_SDK_14.2.0/components/libraries/scheduler;../../../nRF5_SDK_14.2.0/components/libraries/strerror;../../../nRF5_SDK_14.2.0/components/libraries/timer;../../../nRF5_SDK_14.2.0/components/libraries/util;../../../nRF5_SDK_14.2.0/components/libraries/uart;../../../nRF5_SDK_14.2.0/components/toolchain;../../../deca_driver;../../../deca_driver/port;../../../nRF5_SDK_14.2.0/external/fprintf;../../../nRF5_SDK_14.2.0/external/segger_rtt;../../../nRF5_SDK_14.2.0/external/freertos/;../../../nRF5_SDK_14.2.0/external/freertos/source;../../../nRF5_SDK_14.2.0/external/freertos/config;../../../nRF5_SDK_14.2.0/external/freertos/source/include;../../../nRF5_SDK_14.2.0/external/freertos/portable/ARM/nrf52;../../../nRF5_SDK_14.2.0/external/freertos/portable/CMSIS/nrf52;../../../nRF5_SDK_14.2.0/external/freertos/source/portable;../../../boards;../../.."
       linker_additional_options=""
       linker_section_placement_file="$(ProjectDir)/RTE/flash_placement.xml" />
     <configuration
@@ -36,6 +36,7 @@
       <file file_name="../main.c" />
       <file file_name="../config/sdk_config.h" />
       <file file_name="../tag_1_main.c" />
+      <file file_name="../anchor_1_main.c" />
     </folder>
     <folder Name="Board Definition">
       <file file_name="../../../nRF5_SDK_14.2.0/components/boards/boards.c" />
@@ -110,6 +111,18 @@
     <folder Name="Command">
       <file file_name="../command/command.c" />
       <file file_name="../command/command.h" />
+    </folder>
+    <folder Name="timestamper">
+      <file file_name="../timestamper/timestamper.c" />
+      <file file_name="../timestamper/timestamper.h" />
+    </folder>
+    <folder Name="message_processor">
+      <file file_name="../message_processor/message_processor.h" />
+      <file file_name="../message_processor/message_processor.c" />
+    </folder>
+    <folder Name="message_transceiver">
+      <file file_name="../message_transceiver/message_transceiver.c" />
+      <file file_name="../message_transceiver/message_transceiver.h" />
     </folder>
   </project>
   <configuration Name="Internal" hidden="Yes" />
