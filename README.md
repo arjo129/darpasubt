@@ -6,7 +6,7 @@ This repository contains everything for the challenge (heck google does it too -
 The organization of this repo is as follows:
 
 ````
-/ui - ??? [Marcus]
+/ui - contains the GUI for path tracking of entities. [WIP] Maintained by @marcus-pzj
 /firmware - contains the source of our UWB firmware. Maintained by @lekook
 /src - contains ROS packages. Maintained by @arjo129
 ````
