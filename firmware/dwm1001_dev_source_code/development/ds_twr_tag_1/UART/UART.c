@@ -19,12 +19,9 @@
 #include "UART.h"
 #include "bsp.h"
 #include "boards.h"
+#include "command.h"
 
 #define NO_PARITY	false
-
-// UART circular buffers - Tx and Rx size
-#define UART_TX_BUF_SIZE 512
-#define UART_RX_BUF_SIZE 32
 
 // UART initialisation structure
 const app_uart_comm_params_t comm_params =
@@ -37,6 +34,10 @@ const app_uart_comm_params_t comm_params =
   NO_PARITY,
   NRF_UART_BAUDRATE_115200
 };
+
+static char dataString[UART_RX_BUF_SIZE] = {0}; // +1 for null termination
+
+static int inputDataIndex = 0;
 
 // local functions
 static void vHandleUartInternalErrors (uint32_t u32Error);
@@ -81,6 +82,20 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
     else if (p_event->evt_type == APP_UART_FIFO_ERROR)
     {
         vHandleUartInternalErrors(p_event->evt_type);
+    } else if (p_event -> evt_type == APP_UART_DATA_READY) {
+      struct Command command;
+      char byte;
+
+      boUART_getc(&byte);
+
+      if (byte == MSG_END_CHAR) {
+        command = constructCommand(dataString);
+        setCommand(command);
+        memset(dataString, 0, sizeof dataString);
+        inputDataIndex = 0;
+      } else {
+        dataString[inputDataIndex++] = byte;
+      }
     }
 }
 
@@ -88,4 +103,3 @@ static void vHandleUartInternalErrors (uint32_t u32Error)
 {
 	// notify app of error - LED ?
 }
-
