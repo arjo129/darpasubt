@@ -19,5 +19,5 @@ The `src` folder contains a number of packages. These packages include:
  - `uwb_package` - Contains ROS side UWB driver. Maintained by @lws803
  - `optical_flow` - [??] Optical flow stuff from @pdotdeep
  - `subt_seed` - for localization related stuff (TODO: Rename to localization_daemon). Maintained by @arjo129.
- - `path_planner` - [??] for @LeeYiyuan
+ - `ynav` - Navigation package. Maintained by @LeeYiyuan.
 
