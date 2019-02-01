@@ -19,7 +19,7 @@
  */
 class OdometryBasedLocalization
 {
-public:
+private:
     ros::Subscriber odometrySub, imuSub;
     boost::shared_ptr<ros::NodeHandle> node;
     nav_msgs::Odometry lastOdom;
@@ -29,9 +29,24 @@ public:
     Eigen::Vector3d position, prevOdom;
     bool first = true;
 
-    OdometryBasedLocalization(boost::shared_ptr<ros::NodeHandle> nh, std::string botName);
+    /**
+     * @brief onImuRecieveData - Callback for imu data
+     * @param imu
+     */
     void onImuRecieveData(sensor_msgs::Imu imu);
+    /**
+     * @brief onOdometryRecieveData - callback for odometry data.
+     * Relies on IMU data to recalculate position.
+     * @param odom
+     */
     void onOdometryRecieveData(nav_msgs::Odometry odom);
+
+public:
+    OdometryBasedLocalization(boost::shared_ptr<ros::NodeHandle> nh, std::string botName);
+
+    /**
+     * @brief broadcast TF Data
+     */
     void broadcast();
 };
 

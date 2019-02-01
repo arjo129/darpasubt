@@ -88,6 +88,11 @@ public:
     /**
      * Performs a gaussian blur for the radius
      */
-    ProbabilityDistribution& gaussianBlur(int radius); 
+    void gaussianBlur(int radius);
+
+    /***
+     * Translate the distribution
+     */
+    ProbabilityDistribution& translate(int x, int y, int z);
 };
 #endif

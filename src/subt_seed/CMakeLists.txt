@@ -57,8 +57,7 @@ link_directories(
 add_executable(
   subt_seed_node
   src/subt_seed_node.cc
-  src/localmap.cpp
-  src/localmap3d.cpp
+  src/odometrybasedlocalization.cpp
 )
 
 add_dependencies(

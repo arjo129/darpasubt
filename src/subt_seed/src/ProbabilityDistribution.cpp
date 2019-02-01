@@ -1,4 +1,4 @@
-#include <subt_seed/ProbabilityDistribution.h>
+﻿#include <subt_seed/ProbabilityDistribution.h>
 
 
 ProbabilityDistribution::ProbabilityDistribution(){
@@ -130,7 +130,7 @@ void ProbabilityDistribution::normalize() {
     }
 }
 
-ProbabilityDistribution& ProbabilityDistribution::gaussianBlur(int radius){
+void ProbabilityDistribution::gaussianBlur(int radius){
 
     for(auto position: positions) {
         Eigen::Vector3f pos(std::get<0>(position), std::get<1>(position), std::get<2>(position));
@@ -147,4 +147,15 @@ ProbabilityDistribution& ProbabilityDistribution::gaussianBlur(int radius){
     }
 
     normalize();
+}
+
+ProbabilityDistribution& ProbabilityDistribution::translate(int x, int y, int z) {
+    ProbabilityDistribution* myDistr = new ProbabilityDistribution();
+    for(auto prob: probability) {
+       auto ind = prob.first;
+       Eigen::Vector3f position(std::get<0>(ind), std::get<1>(ind), std::get<2>(ind));
+       Eigen::Vector3f translation(x,y,z);
+       myDistr->updateProbability(position+translation, prob.second);
+    }
+    return *myDistr;
 }
