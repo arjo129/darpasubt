@@ -47,9 +47,9 @@ cache:
 language: generic
 matrix:
   include:
-  - name: "Bionic melodic"
-    dist: bionic
-    env: ROS_DISTRO=melodic
+  - name: "Xenial kinetic"
+    dist: xenial
+    env: ROS_DISTRO=kinetic
 
 
 # Configuration variables. All variables are global now, but this can be used to
@@ -69,11 +69,11 @@ env:
 
 # Install system dependencies, namely a very barebones ROS setup.
 before_install:
-  - sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
+  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' 
   - sudo apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116
-  - sudo apt-get update -qq
-  - sudo apt-get install -y ros-melodic-desktop-full dpkg
-  - sudo apt-get install -y ros-melodic-octomap ros-melodic-octomap-ros ros-melodic-octomap-msgs  
+  - sudo apt-get update
+  - sudo apt-get install -y ros-kinetic-desktop-full dpkg
+  - sudo apt-get install -y ros-kinetic-octomap ros-kinetic-octomap-ros ros-kinetic-octomap-msgs  
   - source /opt/ros/$ROS_DISTRO/setup.bash
   # Prepare rosdep to install dependencies.
 
