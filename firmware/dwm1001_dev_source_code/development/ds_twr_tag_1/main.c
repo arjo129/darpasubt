@@ -322,7 +322,6 @@ void ds_initiator_task_function (void * pvParameter) {
       interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
       hasInterruptEvent = false; // Clear interrupt flag
     } else if (state == STATE_STANDBY) {
-      memset(&command, 0, sizeof command);
       if (!isGateway) {
         dwt_setrxtimeout(0);
         result = waitForSysCommand();
@@ -347,7 +346,6 @@ void ds_initiator_task_function (void * pvParameter) {
       printf("Executing sys cmd\r\n");
       interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
     } else if (state == STATE_EXEC_SYS_CMD) {
-      memset(&command, 0, sizeof command);
       if (operationMode == MODE_TAG) {
         vTaskDelay(RNG_DELAY_TAG_BEGIN);
         resetTransceiverValues();
@@ -443,7 +441,6 @@ static int waitForSysCommand(void) {
     printf("=== Error === Tag Initiation Frame Incorrect\r\n");
     return EXCHANGE_FAILURE;
   }
-  printf("test\r\n");
 }
 
 void printCommand(void) {
