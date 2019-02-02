@@ -41,8 +41,8 @@
 #define DEFAULT_ANCHOR_ID 1
 #define DEFAULT_DEVICE_STATE STATE_STANDBY
 #define DEFAULT_OPERATION_MODE MODE_ANCHOR
-#define DEFAULT_ANCHORS_COUNT 2
-#define GATEWAY_DEVICE true
+#define DEFAULT_ANCHORS_COUNT 3
+#define GATEWAY_DEVICE false
 
 //-----------------dw1000----------------------------
 
@@ -71,8 +71,8 @@ static dwt_config_t config = {
 #define RX_ANT_DLY 16456
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_ANCHOR_SUCCESS_MS 200
-#define RNG_DELAY_TAG_SUCCESS_MS 300 // Must be higher than the anchor success delay
+#define RNG_DELAY_ANCHOR_SUCCESS_MS 100
+#define RNG_DELAY_TAG_SUCCESS_MS 100 // Must be higher than the anchor success delay
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
 #define RNG_DELAY_FAILURE_MS 1000
 /* Stop operation delay. */
@@ -82,7 +82,7 @@ static dwt_config_t config = {
 /* Timeout delay. */
 #define RNG_DELAY_TIMEOUT_MS 2000
 /* Delay before begin ranging for Tag, to ensure all other anchors are ready to receive. */
-#define RNG_DELAY_TAG_BEGIN 200
+#define RNG_DELAY_TAG_BEGIN 100
 
 #define SYS_CMD_IDX 10
 #define EX_SEQ_COUNT_IDX 2
@@ -321,7 +321,6 @@ void ds_initiator_task_function (void * pvParameter) {
     if (state == STATE_RECEIVE_HOST_CMD) {
       interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
       hasInterruptEvent = false; // Clear interrupt flag
-      vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
     } else if (state == STATE_STANDBY) {
       memset(&command, 0, sizeof command);
       if (!isGateway) {
@@ -335,7 +334,6 @@ void ds_initiator_task_function (void * pvParameter) {
           vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
         } else if (result == EXCHANGE_SYS_CMD) {
           state = STATE_RECEIVE_SYS_CMD;
-          vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
         } else {
           vTaskDelay(RNG_DELAY_FAILURE_MS);
         }
@@ -344,9 +342,6 @@ void ds_initiator_task_function (void * pvParameter) {
       printf("Executing sys cmd\r\n");
       interpretSysCommand(&command, &state, &operationMode, &deviceId);
       hasInterruptEvent = false; // Clear interrupt flag
-      if (operationMode == MODE_TAG) {
-        vTaskDelay(RNG_DELAY_TIMEOUT_MS);
-      }
     } else if (state == STATE_DISTRB_SYS_CMD) {
       distributeSysCmd(&command);
       printf("Executing sys cmd\r\n");
@@ -370,10 +365,10 @@ void ds_initiator_task_function (void * pvParameter) {
         vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
       } else if (result == EXCHANGE_INTERRUPTED) {
         state = STATE_RECEIVE_HOST_CMD;
-        vTaskDelay(RNG_DELAY_FAILURE_MS);
+        vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
       } else if (result == EXCHANGE_SYS_CMD) {
         state = STATE_RECEIVE_SYS_CMD;
-        vTaskDelay(RNG_DELAY_FAILURE_MS);
+        vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
       } else if (result == EXCHANGE_TIMEOUT && operationMode == MODE_TAG) {
         vTaskDelay(RNG_DELAY_TIMEOUT_MS);
       } else if (result == EXCHANGE_TAG_SUCCESS) {
