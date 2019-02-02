@@ -82,7 +82,7 @@ static dwt_config_t config = {
 /* Timeout delay. */
 #define RNG_DELAY_TIMEOUT_MS 2000
 /* Delay before begin ranging for Tag, to ensure all other anchors are ready to receive. */
-#define RNG_DELAY_TAG_BEGIN 2000
+#define RNG_DELAY_TAG_BEGIN 200
 
 #define SYS_CMD_IDX 10
 #define EX_SEQ_COUNT_IDX 2
@@ -332,15 +332,14 @@ void ds_initiator_task_function (void * pvParameter) {
           vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
         } else if (result == EXCHANGE_INTERRUPTED) {
           state = STATE_RECEIVE_HOST_CMD;
-          vTaskDelay(RNG_DELAY_FAILURE_MS);
+          vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
         } else if (result == EXCHANGE_SYS_CMD) {
           state = STATE_RECEIVE_SYS_CMD;
-          vTaskDelay(RNG_DELAY_FAILURE_MS);
+          vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
         } else {
           vTaskDelay(RNG_DELAY_FAILURE_MS);
         }
       }
-      vTaskDelay(RNG_DELAY_STOP_MS);
     } else if (state == STATE_RECEIVE_SYS_CMD) {
       printf("Executing sys cmd\r\n");
       interpretSysCommand(&command, &state, &operationMode, &deviceId);
