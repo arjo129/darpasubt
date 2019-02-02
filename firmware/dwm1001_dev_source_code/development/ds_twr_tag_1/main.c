@@ -342,6 +342,7 @@ void ds_initiator_task_function (void * pvParameter) {
       interpretSysCommand(&command, &state, &operationMode, &deviceId);
       hasInterruptEvent = false; // Clear interrupt flag
     } else if (state == STATE_DISTRB_SYS_CMD) {
+      resetTransceiverValues();
       distributeSysCmd(&command);
       printf("Executing sys cmd\r\n");
       interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
