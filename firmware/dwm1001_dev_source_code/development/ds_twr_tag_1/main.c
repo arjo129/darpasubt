@@ -74,13 +74,13 @@ static dwt_config_t config = {
 #define RNG_DELAY_ANCHOR_SUCCESS_MS 0
 #define RNG_DELAY_TAG_SUCCESS_MS 100 // Must be higher than the anchor success delay
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
-#define RNG_DELAY_FAILURE_MS 1000
+#define RNG_DELAY_FAILURE_MS 0
 /* Stop operation delay. */
 #define RNG_DELAY_STOP_MS 500
 /* Receive command success. */
 #define RNG_DELAY_CMD_SUCCESS_MS 50
 /* Timeout delay. */
-#define RNG_DELAY_TIMEOUT_MS 2000
+#define RNG_DELAY_TIMEOUT_MS 0
 /* Delay before begin ranging for Tag, to ensure all other anchors are ready to receive. */
 #define RNG_DELAY_TAG_BEGIN 100
 
