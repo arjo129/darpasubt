@@ -71,7 +71,7 @@ static dwt_config_t config = {
 #define RX_ANT_DLY 16456
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_ANCHOR_SUCCESS_MS 100
+#define RNG_DELAY_ANCHOR_SUCCESS_MS 0
 #define RNG_DELAY_TAG_SUCCESS_MS 100 // Must be higher than the anchor success delay
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
 #define RNG_DELAY_FAILURE_MS 1000
@@ -324,7 +324,7 @@ void ds_initiator_task_function (void * pvParameter) {
     } else if (state == STATE_STANDBY) {
       memset(&command, 0, sizeof command);
       if (!isGateway) {
-        dwt_setrxtimeout(0); // Make sure we wait for system command indefinitely.
+        dwt_setrxtimeout(0);
         result = waitForSysCommand();
         dwt_forcetrxoff();
         if (result == EXCHANGE_ANCHOR_SUCCESS || result == EXCHANGE_TAG_SUCCESS) {
@@ -386,13 +386,15 @@ static int waitForSysCommand(void) {
   uint32 statusReg = 0;
   uint8 rxBuffer[RX_BUF_LEN];
 
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  /* If TX to RX turn around is not set, turn on the receiver. */
+  if (SYS_CTRL_WAIT4RESP & dwt_read8bitoffsetreg(SYS_CTRL_WAIT4RESP, 0)) {
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  }
 
   // Poll for command frames
   printf("Waiting for system command...\r\n");
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))
       && !hasInterruptEvent) {};
-
   if (hasInterruptEvent) {
     printf("interrupt detected\r\n");
     hasInterruptEvent = false;
@@ -441,6 +443,7 @@ static int waitForSysCommand(void) {
     printf("=== Error === Tag Initiation Frame Incorrect\r\n");
     return EXCHANGE_FAILURE;
   }
+  printf("test\r\n");
 }
 
 void printCommand(void) {
