@@ -41,8 +41,8 @@
 #define DEFAULT_ANCHOR_ID 1
 #define DEFAULT_DEVICE_STATE STATE_STANDBY
 #define DEFAULT_OPERATION_MODE MODE_ANCHOR
-#define DEFAULT_ANCHORS_COUNT 2
-#define GATEWAY_DEVICE true
+#define DEFAULT_ANCHORS_COUNT 3
+#define GATEWAY_DEVICE false
 
 //-----------------dw1000----------------------------
 
@@ -71,18 +71,18 @@ static dwt_config_t config = {
 #define RX_ANT_DLY 16456
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_ANCHOR_SUCCESS_MS 200
-#define RNG_DELAY_TAG_SUCCESS_MS 300 // Must be higher than the anchor success delay
+#define RNG_DELAY_ANCHOR_SUCCESS_MS 0
+#define RNG_DELAY_TAG_SUCCESS_MS 100 // Must be higher than the anchor success delay
 /* Failure delay of 150ms is the lowest value that allows successful self recovery. */
-#define RNG_DELAY_FAILURE_MS 1000
+#define RNG_DELAY_FAILURE_MS 0
 /* Stop operation delay. */
 #define RNG_DELAY_STOP_MS 500
 /* Receive command success. */
 #define RNG_DELAY_CMD_SUCCESS_MS 50
 /* Timeout delay. */
-#define RNG_DELAY_TIMEOUT_MS 2000
+#define RNG_DELAY_TIMEOUT_MS 0
 /* Delay before begin ranging for Tag, to ensure all other anchors are ready to receive. */
-#define RNG_DELAY_TAG_BEGIN 2000
+#define RNG_DELAY_TAG_BEGIN 100
 
 #define SYS_CMD_IDX 10
 #define EX_SEQ_COUNT_IDX 2
@@ -321,39 +321,32 @@ void ds_initiator_task_function (void * pvParameter) {
     if (state == STATE_RECEIVE_HOST_CMD) {
       interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
       hasInterruptEvent = false; // Clear interrupt flag
-      vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
     } else if (state == STATE_STANDBY) {
-      memset(&command, 0, sizeof command);
       if (!isGateway) {
-        dwt_setrxtimeout(0); // Make sure we wait for system command indefinitely.
+        dwt_setrxtimeout(0);
         result = waitForSysCommand();
         dwt_forcetrxoff();
         if (result == EXCHANGE_ANCHOR_SUCCESS || result == EXCHANGE_TAG_SUCCESS) {
           vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
         } else if (result == EXCHANGE_INTERRUPTED) {
           state = STATE_RECEIVE_HOST_CMD;
-          vTaskDelay(RNG_DELAY_FAILURE_MS);
+          vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
         } else if (result == EXCHANGE_SYS_CMD) {
           state = STATE_RECEIVE_SYS_CMD;
-          vTaskDelay(RNG_DELAY_FAILURE_MS);
         } else {
           vTaskDelay(RNG_DELAY_FAILURE_MS);
         }
       }
-      vTaskDelay(RNG_DELAY_STOP_MS);
     } else if (state == STATE_RECEIVE_SYS_CMD) {
       printf("Executing sys cmd\r\n");
       interpretSysCommand(&command, &state, &operationMode, &deviceId);
       hasInterruptEvent = false; // Clear interrupt flag
-      if (operationMode == MODE_TAG) {
-        vTaskDelay(RNG_DELAY_TIMEOUT_MS);
-      }
     } else if (state == STATE_DISTRB_SYS_CMD) {
+      resetTransceiverValues();
       distributeSysCmd(&command);
       printf("Executing sys cmd\r\n");
       interpretCommand(&operationMode, &state, &deviceId, &anchorsTotalCount, &isGateway, &command); // Set device to the next correct state
     } else if (state == STATE_EXEC_SYS_CMD) {
-      memset(&command, 0, sizeof command);
       if (operationMode == MODE_TAG) {
         vTaskDelay(RNG_DELAY_TAG_BEGIN);
         resetTransceiverValues();
@@ -371,10 +364,10 @@ void ds_initiator_task_function (void * pvParameter) {
         vTaskDelay(RNG_DELAY_ANCHOR_SUCCESS_MS);
       } else if (result == EXCHANGE_INTERRUPTED) {
         state = STATE_RECEIVE_HOST_CMD;
-        vTaskDelay(RNG_DELAY_FAILURE_MS);
+        vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
       } else if (result == EXCHANGE_SYS_CMD) {
         state = STATE_RECEIVE_SYS_CMD;
-        vTaskDelay(RNG_DELAY_FAILURE_MS);
+        vTaskDelay(RNG_DELAY_CMD_SUCCESS_MS);
       } else if (result == EXCHANGE_TIMEOUT && operationMode == MODE_TAG) {
         vTaskDelay(RNG_DELAY_TIMEOUT_MS);
       } else if (result == EXCHANGE_TAG_SUCCESS) {
@@ -392,13 +385,15 @@ static int waitForSysCommand(void) {
   uint32 statusReg = 0;
   uint8 rxBuffer[RX_BUF_LEN];
 
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  /* If TX to RX turn around is not set, turn on the receiver. */
+  if (SYS_CTRL_WAIT4RESP & dwt_read8bitoffsetreg(SYS_CTRL_WAIT4RESP, 0)) {
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  }
 
   // Poll for command frames
   printf("Waiting for system command...\r\n");
   while (!((statusReg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))
       && !hasInterruptEvent) {};
-
   if (hasInterruptEvent) {
     printf("interrupt detected\r\n");
     hasInterruptEvent = false;
