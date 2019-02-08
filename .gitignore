@@ -13,3 +13,4 @@ install/
 .*.swp
 *~
 *.pyc
+.catkin_workspace
