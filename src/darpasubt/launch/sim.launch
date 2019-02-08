@@ -1,0 +1,8 @@
+<launch>
+  <include file="$(find subt_gazebo)/launch/competition.launch"/>
+  <include file="$(find x1_gazebo)/launch/spawn_x1.launch">
+    <arg name="robot_namespace" value="X1_1"/>
+    <arg name="x" value="1"/>
+    <arg name="y" value="1"/>
+  </include>
+</launch>
