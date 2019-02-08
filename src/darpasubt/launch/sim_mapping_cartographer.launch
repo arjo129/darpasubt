@@ -1,9 +1,10 @@
 <launch>
+  <node name="ground_plane_filter" pkg="darpasubt" type="ground_plane_filter" output="screen"/>
+
   <node name="cartographer_occupancy_grid_node" pkg="cartographer_ros" type="cartographer_occupancy_grid_node" args="-resolution 0.01" />
   
   <node name="cartographer_node" pkg="cartographer_ros" type="cartographer_node" args="-configuration_directory $(find darpasubt)/cartographer -configuration_basename sim.lua" output="screen">
     <remap from="/imu" to="/X1_1/imu/data"/>
-    <!--<remap from="/odom" to="/X1_1/odom"/>-->
     <remap from="/points2" to="/X1_1/points"/>
   </node>
 </launch>

@@ -1,0 +1,13 @@
+<launch>
+  <node name="ground_plane_filter" pkg="darpasubt" type="ground_plane_filter" output="screen"/>
+
+  <!--
+  <node name="octomap_server_node" pkg="octomap_server" type="octomap_server_node" output="screen">
+    <param name="frame_id" value="/map"/>
+    <param name="resolution" value="0.05"/>
+    <param name="base_frame_id" value="X1_1/base_footprint"/>
+    <param name="filter_ground" value="true"/>
+    <remap from="/cloud_in" to="/X1_1/points"/>
+  </node>
+  -->
+</launch>
