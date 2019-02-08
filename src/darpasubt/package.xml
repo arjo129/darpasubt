@@ -16,4 +16,5 @@
   <depend>tf2_sensor_msgs</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>key_teleop</depend>
+  <depend>robot_localization</depend>
 </package>
