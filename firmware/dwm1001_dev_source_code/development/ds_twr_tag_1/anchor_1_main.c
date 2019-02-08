@@ -317,7 +317,7 @@ static int sendDistanceMsg(void) {
   /* Write and send the response message. See NOTE 10 below. */
   dwt_writetxdata(sizeof(anchorDistMsg), anchorDistMsg, 0);
   dwt_writetxfctrl(sizeof(anchorDistMsg), 0, 1);
-  ret = dwt_starttx(DWT_START_TX_DELAYED);
+  ret = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 
   /* If dwt_starttx() returns an error, abandon this ranging exchange and proceed to the next one. See NOTE 11 below. */
   if (ret == DWT_SUCCESS) {
