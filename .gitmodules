@@ -1,0 +1,6 @@
+[submodule "src/octomap_mapping"]
+	path = src/octomap_mapping
+	url = https://github.com/OctoMap/octomap_mapping
+[submodule "src/octomap_rviz_plugins"]
+	path = src/octomap_rviz_plugins
+	url = https://github.com/OctoMap/octomap_rviz_plugins

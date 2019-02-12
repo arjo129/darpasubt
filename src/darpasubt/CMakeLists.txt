@@ -34,6 +34,9 @@ catkin_package(CATKIN_DEPENDS
 
 include_directories(${catkin_INCLUDE_DIRS})
 
+add_executable(joystick_teleop src/joystick_teleop.cpp)
+target_link_libraries(joystick_teleop ${catkin_LIBRARIES})
+
 add_executable(ground_plane_filter src/ground_plane_filter.cpp)
 target_link_libraries(ground_plane_filter ${catkin_LIBRARIES})
 
