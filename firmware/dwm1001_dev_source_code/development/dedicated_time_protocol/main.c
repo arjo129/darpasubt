@@ -63,6 +63,8 @@ static dwt_config_t config = {
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
+#define N 4 /**< Number of nodes */
+#define TX_GAP 400 /**< Time interval between transmits, in microseconds */
 
 #ifdef USE_FREERTOS
 
