@@ -242,6 +242,7 @@ void enterNetwork(int id) {
 
 void nodeListen() {
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  nodeRxStore();
 }
 
 void nodeLoop(int id) {
@@ -260,6 +261,26 @@ void nodeListen() {
   /* Activate reception immediately. */
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
+}
+
+/**
+ * @brief Stores received data in the correct buffer.
+ *
+ * Uses two global variables:
+ * timeBuf
+ * distBuf
+ */
+void nodeRxStore() {
+  double rxBuf[3];
+  rxMsg(rxBuf, &msgType); // receives id, time/dist, timestamp
+  double id = rxBuf[0];
+  double dataType = rxBuf[1];
+  double data = rxBuf[2];
+  if (dataType == 0) { // 0 == time
+    timeBuf[id] = data;
+  } else { // 1 == distance
+    distBuf[id] = data;
+  }
 }
 
 /* Interrupt setup functions below. */
