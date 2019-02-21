@@ -231,18 +231,35 @@ void runTask (void * pvParameter) {
 
     // I think we can put enterNetwork() outside this while loop scope. That or we can put as separate FreeRTOS task.
     // Protocol implementation example:
-    // enterNetwork() {
-    //   listen();
-    //   nodeSleep();
-    //   range() {
-    //     while(true) {
-    //       wakeUp();
-    //       protocol();
-    //       nodeSleep();
-    //     }
-    //   }
-    // }
   }
+}
+
+void enterNetwork(int id) {
+  nodeListen();
+  nodeSleep();
+  nodeLoop();
+}
+
+void nodeListen() {
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+}
+
+void nodeLoop(int id) {
+  while(true) {
+    nodeWakeUp();
+    nodeProtocol();
+    nodeSleep(id);
+  }
+}
+
+void nodeListen() {
+
+  /* Clear reception timeout to start next ranging process. */
+  dwt_setrxtimeout(0);
+
+  /* Activate reception immediately. */
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
 }
 
 /* Interrupt setup functions below. */
