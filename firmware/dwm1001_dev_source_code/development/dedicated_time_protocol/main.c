@@ -66,6 +66,18 @@ static dwt_config_t config = {
 #define N 4 /**< Number of nodes */
 #define TX_GAP 400 /**< Time interval between transmits, in microseconds */
 
+/** Buffer for timestamps */
+double timeBuf[N];
+for (int i = 0; i < N; i++) {
+  timeBuf[i] = -1;
+}
+
+/** Buffer for distances */
+double distBuf[N];
+for (int i = 0; i < N; i++) {
+  distBuf[i] = -1;
+}
+
 #ifdef USE_FREERTOS
 
 TaskHandle_t run_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
