@@ -59,7 +59,6 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
 
   // Make sure to enable receiver again
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  /* TESTING BREAKPOINT LOCATION #1 */
 }
 
 /**

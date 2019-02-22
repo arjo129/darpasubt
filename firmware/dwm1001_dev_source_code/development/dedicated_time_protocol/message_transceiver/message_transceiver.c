@@ -36,7 +36,7 @@ TxStatus txMsg(uint8 *msg, int msgLen, uint8 mode) {
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn rxMsg()
  *
- * @brief poll for reception of a frame.
+ * @brief read frame data from device
  *
  * @param buffer - pointer to buffer that stores the received frame.
  *        msgType - pointer to be used to indicate the type of message in the received frame.
