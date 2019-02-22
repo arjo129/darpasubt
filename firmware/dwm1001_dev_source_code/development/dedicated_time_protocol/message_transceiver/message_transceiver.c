@@ -5,12 +5,6 @@
 
 /* Local function prototypes. */
 
-/*Interrupt flag*/
-extern volatile int tx_int_flag; // Transmit success interrupt flag
-extern volatile int rx_int_flag; // Receive success interrupt flag
-extern volatile int to_int_flag; // Timeout interrupt flag
-extern volatile int er_int_flag; // Error interrupt flag 
-
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn txMsg()
  *
@@ -50,35 +44,19 @@ TxStatus txMsg(uint8 *msg, int msgLen, uint8 mode) {
  * @return the status of reception.
  */
 RxStatus rxMsg(uint8 *buffer, MsgType *msgType) {
+  uint32 frameLen;
+
   *msgType = MSG_TYPE_UNKNOWN; // Default return value
-
-  /* Poll for reception of a frame success/error/timeout or software interrupt. */
-  while (!(rx_int_flag || to_int_flag|| er_int_flag)) {};
-  if (to_int_flag) {
-    to_int_flag = 0;
-    return RX_TIMEOUT;
-  }
-
-  if (er_int_flag) {
-    er_int_flag = 0;
+  
+  /* A frame has been received, read it into the local buffer. */
+  frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
+  if (frameLen <= RX_BUFFER_LEN) {
+    dwt_readrxdata(buffer, frameLen, 0);
+  } else {
     return RX_ERROR;
   }
 
-  if (rx_int_flag) {
-    uint32 frameLen;
-
-    rx_int_flag = 0;
-
-    /* A frame has been received, read it into the local buffer. */
-    frameLen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-    if (frameLen <= RX_BUFFER_LEN) {
-      dwt_readrxdata(buffer, frameLen, 0);
-    } else {
-      return RX_ERROR;
-    }
-
-    return RX_SUCCESS;
-  }
+  return RX_SUCCESS;
 }
 
 /************************************************

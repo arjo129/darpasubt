@@ -37,6 +37,7 @@
 #include "nrf_drv_gpiote.h"
 #include "UART.h"
 #include "message_transceiver.h"
+#include "int_handler.h"
 
 //-----------------dw1000----------------------------
 
@@ -73,17 +74,10 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 #endif
 
 /* Local function prototypes */
-void rx_ok_cb(const dwt_cb_data_t *cb_data);
-void rx_to_cb(const dwt_cb_data_t *cb_data);
-void rx_err_cb(const dwt_cb_data_t *cb_data);
-void tx_conf_cb(const dwt_cb_data_t *cb_data);
+
 
 // Global variables
-/*Interrupt flag*/
-volatile int tx_int_flag = 0 ; // Transmit success interrupt flag
-volatile int rx_int_flag = 0 ; // Receive success interrupt flag
-volatile int to_int_flag = 0 ; // Timeout interrupt flag
-volatile int er_int_flag = 0 ; // Error interrupt flag 
+
 
 #ifdef USE_FREERTOS
 
@@ -202,18 +196,13 @@ void runTask (void * pvParameter) {
   uint8 buffer[32] = { 0 }; // enough size to hold all data from a received frame
   MsgType msgType; // Enum to indicate what this message is holding
 
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  
   while(true) {
     // Basic transmit
-    txMsg(msg, 19, DWT_START_TX_IMMEDIATE); // msg[] length is 19 bytes
-    vTaskDelay(1000); // Pause the task for 1000ms
+    // txMsg(msg, 19, DWT_START_TX_IMMEDIATE); // msg[] length is 19 bytes
+    // vTaskDelay(1000); // Pause the task for 1000ms
 
-    // Basic receive
-    // dwt_rxenable(DWT_START_RX_IMMEDIATE);
-    // rxMsg(buffer, &msgType);
-    // for (int i = 0 ; i < 7; i++) {
-    //   printf("%c", buffer[i + 10]);
-    // }
-    // printf("\r\n");
 
     // I think we can put enterNetwork() outside this while loop scope. That or we can put as separate FreeRTOS task.
     // Protocol implementation example:
@@ -229,105 +218,6 @@ void runTask (void * pvParameter) {
     //   }
     // }
   }
-}
-
-/* Interrupt setup functions below. */
-
-/**
- * @brief Interrupt handler calls the DW1000 ISR API. Call back corresponding to each event defined in ss_init_main
- * 
- * @param pin 
- * @param action 
- */
-void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
-{
-  dwt_isr(); // DW1000 interrupt service routine 
-}
-
-/**
- * @brief Configure an IO pin as a positive edge triggered interrupt source.
- * 
- */
-void vInterruptInit (void)
-{
-  ret_code_t err_code;
-
-  if (nrf_drv_gpiote_is_init())
-    printf("nrf_drv_gpiote_init already installed\n");
-  else
-    nrf_drv_gpiote_init();
-
-  // input pin, +ve edge interrupt, no pull-up
-  nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-  in_config.pull = NRF_GPIO_PIN_NOPULL;
-
-  // Link this pin interrupt source to its interrupt handler
-  err_code = nrf_drv_gpiote_in_init(DW1000_IRQ, &in_config, vInterruptHandler);
-  APP_ERROR_CHECK(err_code);
-
-  nrf_drv_gpiote_in_event_enable(DW1000_IRQ, true);
-}
-
-/**
- * @brief Callback to process RX good frame events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-void rx_ok_cb(const dwt_cb_data_t *cb_data)
-{
-  rx_int_flag = 1 ;
-  printf("frame received\r\n");
-  /* TESTING BREAKPOINT LOCATION #1 */
-}
-
-/**
-* @brief Callback to process RX timeout events
-*
-* @param  cb_data  callback data
-*
-* @return  none
-*/
-void rx_to_cb(const dwt_cb_data_t *cb_data)
-{
-  to_int_flag = 1 ;
-  /* TESTING BREAKPOINT LOCATION #2 */
-  printf("TimeOut\r\n");
-}
-
-/**
- * @brief Callback to process RX error events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-void rx_err_cb(const dwt_cb_data_t *cb_data)
-{
-  er_int_flag = 1 ;
-  /* TESTING BREAKPOINT LOCATION #3 */
-  printf("Transmission Error : may receive package from different UWB device\r\n");
-}
-
-/**
- * @brief Callback to process TX confirmation events
- *
- * @param  cb_data  callback data
- *
- * @return  none
- */
-void tx_conf_cb(const dwt_cb_data_t *cb_data)
-{
-  /* This callback has been defined so that a breakpoint can be put here to check it is correctly called but there is actually nothing specific to
-  * do on transmission confirmation in this example. Typically, we could activate reception for the response here but this is automatically handled
-  * by DW1000 using DWT_RESPONSE_EXPECTED parameter when calling dwt_starttx().
-  * An actual application that would not need this callback could simply not define it and set the corresponding field to NULL when calling
-  * dwt_setcallbacks(). The ISR will not call it which will allow to save some interrupt processing time. */
-
-  tx_int_flag = 1 ;
-  printf("frame transmitted\r\n");
-  /* TESTING BREAKPOINT LOCATION #4 */
 }
 
 /* Protocol functions */
