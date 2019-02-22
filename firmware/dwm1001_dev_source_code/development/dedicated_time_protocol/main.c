@@ -64,6 +64,20 @@ static dwt_config_t config = {
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
+#define N 4 /**< Number of nodes */
+#define TX_GAP 400 /**< Time interval between transmits, in microseconds */
+
+/** Buffer for timestamps */
+double timeBuf[N];
+for (int i = 0; i < N; i++) {
+  timeBuf[i] = -1;
+}
+
+/** Buffer for distances */
+double distBuf[N];
+for (int i = 0; i < N; i++) {
+  distBuf[i] = -1;
+}
 
 #ifdef USE_FREERTOS
 
@@ -206,17 +220,55 @@ void runTask (void * pvParameter) {
 
     // I think we can put enterNetwork() outside this while loop scope. That or we can put as separate FreeRTOS task.
     // Protocol implementation example:
-    // enterNetwork() {
-    //   listen();
-    //   nodeSleep();
-    //   range() {
-    //     while(true) {
-    //       wakeUp();
-    //       protocol();
-    //       nodeSleep();
-    //     }
-    //   }
-    // }
+  }
+}
+
+void enterNetwork(int id) {
+  nodeListen();
+  nodeSleep();
+  nodeLoop();
+}
+
+void nodeListen() {
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  nodeRxStore();
+}
+
+void nodeLoop(int id) {
+  while(true) {
+    nodeWakeUp();
+    nodeProtocol();
+    nodeSleep(id);
+  }
+}
+
+void nodeListen() {
+
+  /* Clear reception timeout to start next ranging process. */
+  dwt_setrxtimeout(0);
+
+  /* Activate reception immediately. */
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
+}
+
+/**
+ * @brief Stores received data in the correct buffer.
+ *
+ * Uses two global variables:
+ * timeBuf
+ * distBuf
+ */
+void nodeRxStore() {
+  double rxBuf[3];
+  rxMsg(rxBuf, &msgType); // receives id, time/dist, timestamp
+  double id = rxBuf[0];
+  double dataType = rxBuf[1];
+  double data = rxBuf[2];
+  if (dataType == 0) { // 0 == time
+    timeBuf[id] = data;
+  } else { // 1 == distance
+    distBuf[id] = data;
   }
 }
 
