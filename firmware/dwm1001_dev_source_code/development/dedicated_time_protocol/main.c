@@ -55,7 +55,7 @@ static dwt_config_t config = {
 };
 
 /* Macros definitions */
-/* Antenna delays */
+// Antenna delays
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 
@@ -105,9 +105,9 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
     while (true)
     {
       LEDS_INVERT(BSP_LED_0_MASK);
-      /* Delay a task for a given number of ticks */
+      // Delay a task for a given number of ticks
       vTaskDelay(TASK_DELAY);
-      /* Tasks must be implemented to never return... */
+      // Tasks must be implemented to never return...
     }
   }
 
@@ -128,38 +128,38 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 int main(void)
 {
-  /* Setup some LEDs for debug Green and Blue on DWM1001-DEV */
+  // Setup some LEDs for debug Green and Blue on DWM1001-DEV
   LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
   LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK );
 
   #ifdef USE_FREERTOS
-    /* Create task for LED0 blinking with priority set to 2 */
+    // Create task for LED0 blinking with priority set to 2
     UNUSED_VARIABLE(xTaskCreate(led_toggle_task_function, "LED0", configMINIMAL_STACK_SIZE + 200, NULL, 2, &led_toggle_task_handle));
 
-    /* Start timer for LED1 blinking */
+    // Start timer for LED1 blinking
     led_toggle_timer_handle = xTimerCreate( "LED1", TIMER_PERIOD, pdTRUE, NULL, led_toggle_timer_callback);
     UNUSED_VARIABLE(xTimerStart(led_toggle_timer_handle, 0));
 
-    /* Create task for SS TWR Initiator set to 2 */
+    // Create task for SS TWR Initiator set to 2
     UNUSED_VARIABLE(xTaskCreate(runTask, "entry task", configMINIMAL_STACK_SIZE + 200, NULL, 2, &run_task_handle));
   #endif // #ifdef USE_FREERTOS
   
   //-------------dw1000  ini------------------------------------	
 
-  /* Setup NRF52832 interrupt on GPIO 25 : connected to DW1000 IRQ*/
+  // Setup NRF52832 interrupt on GPIO 25 : connected to DW1000 IRQ
   vInterruptInit();
   
-  /*Initialization UART*/
+  // Initialization UART
   boUART_Init();
   printf("Initialising node\r\n");
   
-  /* Reset DW1000 */
+  // Reset DW1000
   reset_DW1000(); 
 
-  /* Set SPI clock to 2MHz */
+  // Set SPI clock to 2MHz
   port_set_dw1000_slowrate();			
   
-  /* Init the DW1000 */
+  // Init the DW1000
   if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
   {
     //Init of DW1000 Failed
@@ -169,17 +169,17 @@ int main(void)
   // Set SPI to 8MHz clock
   port_set_dw1000_fastrate();
 
-  /* Configure DW1000. */
+  // Configure DW1000.
   dwt_configure(&config);
 
-  /* Initialization of the DW1000 interrupt*/
-  /* Callback are defined in ss_init_main.c */
+  // Initialization of the DW1000 transceiver interrupts
+  // Callback are defined in int_handler module
   dwt_setcallbacks(&tx_conf_cb, &rx_ok_cb, &rx_to_cb, &rx_err_cb);
 
-  /* Enable wanted interrupts (TX confirmation, RX good frames, RX timeouts and RX errors). */
+  // Enable wanted interrupts (TX confirmation, RX good frames, RX timeouts and RX errors).
   dwt_setinterrupt(DWT_INT_TFRS | DWT_INT_RFCG | DWT_INT_RFTO | DWT_INT_RXPTO | DWT_INT_RPHE | DWT_INT_RFCE | DWT_INT_RFSL | DWT_INT_SFDT, 1);
 
-  /* Apply default antenna delay value. See NOTE 2 below. */
+  // Apply default antenna delay value
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
 
@@ -187,7 +187,7 @@ int main(void)
   // IF WE GET HERE THEN THE LEDS WILL BLINK
 
   #ifdef USE_FREERTOS		
-    /* Start FreeRTOS scheduler. */
+    // Start FreeRTOS scheduler.
     vTaskStartScheduler();	
 
     while(1) 
