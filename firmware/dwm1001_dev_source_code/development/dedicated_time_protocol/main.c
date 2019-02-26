@@ -79,6 +79,9 @@ for (int i = 0; i < N; i++) {
   distBuf[i] = -1;
 }
 
+/** ID of node that requested from this node. */
+double rxId;
+
 #ifdef USE_FREERTOS
 
 TaskHandle_t run_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
@@ -254,6 +257,7 @@ void nodeListen() {
 
 /**
  * @brief Stores received data in the correct buffer.
+ * If received request, store received id, for subsequent transmission.
  *
  * Uses two global variables:
  * timeBuf
@@ -261,14 +265,19 @@ void nodeListen() {
  */
 void nodeRxStore() {
   double rxBuf[3];
-  rxMsg(rxBuf, &msgType); // receives id, time/dist, timestamp
+  rxMsg(rxBuf, &msgType); // receives: id, time/dist, timestamp, isRequest
   double id = rxBuf[0];
   double dataType = rxBuf[1];
   double data = rxBuf[2];
+  double isRequest = rxBuf[3];
+
   if (dataType == 0) { // 0 == time
     timeBuf[id] = data;
   } else { // 1 == distance
     distBuf[id] = data;
+  }
+  if (isRequest) {
+    rxId = id;
   }
 }
 
