@@ -229,7 +229,7 @@ void runTask (void * pvParameter) {
 void enterNetwork(int id) {
   nodeListen();
   nodeSleep();
-  nodeLoop();
+  nodeLoop(id);
 }
 
 void nodeListen() {
@@ -240,7 +240,7 @@ void nodeListen() {
 void nodeLoop(int id) {
   while(true) {
     nodeWakeUp();
-    nodeProtocol();
+    nodeProtocol(id);
     nodeSleep(id);
   }
 }
