@@ -281,6 +281,33 @@ void nodeRxStore() {
   }
 }
 
+/**
+ * @brief Protocol implementation
+ *
+ * @param[id] ID of node executing this protocol
+ * If ID is 1, then broadcast immediately
+ * Else, receive previous ID's transmission, then broadcast
+ */
+void nodeProtocol(int id) {
+  uint8 rxBuf[32];
+
+  // No time/dist, no timestamp, isRequest
+  uint8 requestMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, id, 0, 0, 1};
+
+  // Implementation
+  for (int i = 1; i < id; i++) {
+    nodeRxStore();
+  }
+  txMsg(requestMsg, 14, DWT_START_TX_IMMEDIATE);
+  for (int i = 1; i < N; i++) {
+    nodeRxStore();
+  }
+  txMsg(requestMsg, 14, DWT_START_TX_IMMEDIATE);
+  for (int i = id; i < N; i++) {
+    nodeRxStore();
+  }
+}
+
 /* Protocol functions */
 
 /**
