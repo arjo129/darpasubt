@@ -105,5 +105,6 @@ static void lfclkRequest(void)
 static uint32_t usToTicks(uint32_t time)
 {
   uint32_t rtcFreq = APP_TIMER_CLOCK_FREQ / (APP_TIMER_CONFIG_RTC_FREQUENCY + 1); // Get configured frequency.
-  return (time * rtcFreq) / (1000000); // Convert from microseconds to seconds.
+  uint64_t ticksInUs = (uint64_t)time * (uint64_t)rtcFreq;
+  return ticksInUs / 1000000; // Convert to ticks in one second.
 }
