@@ -92,9 +92,7 @@
       <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/source/tasks.c" />
       <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/source/timers.c" />
       <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/source/portable/MemMang/heap_1.c" />
-      <file file_name="../../../nRF5_SDK_14.2.0/components/libraries/timer/app_timer_freertos.c" />
       <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/portable/CMSIS/nrf52/port_cmsis.c" />
-      <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/portable/CMSIS/nrf52/port_cmsis_systick.c" />
       <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/portable/CMSIS/nrf52/portmacro_cmsis.h" />
       <file file_name="../../../nRF5_SDK_14.2.0/external/freertos/portable/GCC/nrf52/port.c" />
     </folder>

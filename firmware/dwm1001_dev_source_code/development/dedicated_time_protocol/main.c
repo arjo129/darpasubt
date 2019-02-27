@@ -123,10 +123,6 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
     UNUSED_PARAMETER(pvParameter);
     LEDS_INVERT(BSP_LED_1_MASK);
   }
-#else
-
-  extern int ss_init_run(void);
-
 #endif   // #ifdef USE_FREERTOS
 
 int main(void)
@@ -195,6 +191,8 @@ int main(void)
 
     while(1) 
     {};
+  #else
+    runTask(void);
   #endif
 }
 
