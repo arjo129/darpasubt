@@ -65,6 +65,7 @@
       <file file_name="../../../nRF5_SDK_14.2.0/components/libraries/fifo/app_fifo.c" />
       <file file_name="../../../nRF5_SDK_14.2.0/components/libraries/uart/app_uart_fifo.c" />
       <file file_name="../../../nRF5_SDK_14.2.0/components/libraries/uart/retarget.c" />
+      <file file_name="../../../nRF5_SDK_14.2.0/components/libraries/timer/app_timer.c" />
     </folder>
     <folder Name="nRF_Log">
       <file file_name="../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/src/nrf_log_backend_rtt.c" />

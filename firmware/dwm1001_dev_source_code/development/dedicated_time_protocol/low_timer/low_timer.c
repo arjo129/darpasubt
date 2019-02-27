@@ -13,6 +13,7 @@
 
 /* Local function prototypes */
 static void lfclkRequest(void);
+static uint32_t usToTicks(uint32_t time);
 
 /**
  * @brief Initialises the low frequency timer (LFCLK).
@@ -40,14 +41,33 @@ void lowTimerRepeatCreate(const app_timer_id_t *timerId, app_timer_timeout_handl
 }
 
 /**
- * @brief Starts the repeated timer instance.
+ * @brief Creates a single shot timer instance of the low frequency timer.
+ * 
+ * @details Only one instance is allowed when using FreeRTOS.
+ *
+ * @param timerId Pointer to timer identifier.
+ * @param handler Function to be executed when timer runs out.
+ */
+void lowTimerSingleCreate(const app_timer_id_t *timerId, app_timer_timeout_handler_t handler)
+{
+  ret_code_t errCode;
+  errCode = app_timer_create(timerId, APP_TIMER_MODE_SINGLE_SHOT, handler);
+  APP_ERROR_CHECK(errCode);
+}
+
+/**
+ * @brief Starts the specified timer instance.
+ * 
+ * @details The minimum programmable time is dependent on the minimum programmable ticks (5 ticks).
+ *          In general, minTime(seconds) = 5 / rtcFrequency
+ *          At 32768Hz, the minimum time is approximately ~152.6us.
  * 
  * @param timerId Identifier of timer to start.
- * @param timeout Number of milliseconds to time-out event (minimum 5ms).
+ * @param timeout Number of microseconds to time-out event.
  */
-void lowTimerRepeatStart(app_timer_id_t timerId, uint32_t timeout)
+void lowTimerStart(app_timer_id_t timerId, uint32_t timeout)
 {
-  ret_code_t errCode = app_timer_start(timerId, timeout, NULL);
+  ret_code_t errCode = app_timer_start(timerId, usToTicks(timeout), NULL);
   APP_ERROR_CHECK(errCode);
 }
 
@@ -75,4 +95,15 @@ static void lfclkRequest(void)
   ret_code_t errCode = nrf_drv_clock_init();
   APP_ERROR_CHECK(errCode);
   nrf_drv_clock_lfclk_request(NULL);
+}
+
+/**
+ * @brief Converts microseconds to ticks for app timer use.
+ * 
+ * @param time the time in microseconds.
+ */
+static uint32_t usToTicks(uint32_t time)
+{
+  uint32_t rtcFreq = APP_TIMER_CLOCK_FREQ / (APP_TIMER_CONFIG_RTC_FREQUENCY + 1); // Get configured frequency.
+  return (time * rtcFreq) / (1000000); // Convert from microseconds to seconds.
 }
