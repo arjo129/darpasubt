@@ -91,7 +91,7 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 #endif
 
 /* Local function prototypes */
-
+void runTask (void * pvParameter);
 
 // Global variables
 
@@ -165,9 +165,6 @@ int main(void)
     while (1) {};
   }
 
-  // Set SPI to 8MHz clock
-  port_set_dw1000_fastrate();
-
   // Configure DW1000.
   dwt_configure(&config);
 
@@ -192,7 +189,8 @@ int main(void)
     while(1) 
     {};
   #else
-    runTask(void);
+    int pvParameter = 0;
+    runTask(&pvParameter);
   #endif
 }
 

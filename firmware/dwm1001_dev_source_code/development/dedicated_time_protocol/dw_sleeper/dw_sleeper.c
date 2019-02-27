@@ -1,7 +1,7 @@
 //! Module that controls the sleeping function of DW1000 device.
 #include "deca_device_api.h"
 
-#define DUMMY_SIZE 100 // Byte length set for SPI 2MHz
+#define DUMMY_SIZE 130 // Byte length set for SPI 2MHz
 
 /**
  * @brief Puts the device to SLEEP state.
