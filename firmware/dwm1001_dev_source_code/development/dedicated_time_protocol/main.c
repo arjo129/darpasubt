@@ -38,6 +38,7 @@
 #include "UART.h"
 #include "message_transceiver.h"
 #include "int_handler.h"
+#include "low_timer.h"
 
 //-----------------dw1000----------------------------
 
@@ -54,17 +55,22 @@ static dwt_config_t config = {
     (129 + 8 - 8)     /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
 };
 
+//--------------dw1000---end---------------
+
 /* Macros definitions */
 // Antenna delays
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
-
-//--------------dw1000---end---------------
-
+// Frames related
+#define MSG_LEN 24
+// Ranging related
+#define RANGE_FREQ 1
+#define TX_INTERVAL 40000 // In microseconds
+#define SECS_TO_MS 1000 // Convert seconds to milliseconds
+#define N 4 /**< Number of nodes */
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
-#define N 4 /**< Number of nodes */
 #define TX_GAP 400 /**< Time interval between transmits, in microseconds */
 
 /** Buffer for timestamps */
@@ -92,9 +98,18 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
+static void initTimerHandler(void *pContext);
+static void sleepTimerHandler(void *pContext);
+static void initCycleTimings(void);
 
-// Global variables
-
+/* Global variables */
+// Frames related
+// msg[] is the entire frame to transmitted out. there is a frame format (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
+uint8 msg[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8 buf[MSG_LEN] = { 0 }; // enough size to hold all data from a received frame
+uint32 cyclePeriod;
+uint32 activePeriod;
+uint32 sleepPeriod;
 
 #ifdef USE_FREERTOS
 
@@ -179,6 +194,16 @@ int main(void)
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
 
+  // Create the required timers
+  lowTimerInit();
+  APP_TIMER_DEF(initTimer);
+  APP_TIMER_DEF(sleepTimer);
+  lowTimerSingleCreate(&initTimer, initTimerHandler);
+  lowTimerSingleCreate(&sleepTimer, sleepTimerHandler);
+
+  // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
+  initCycleTimings();
+
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
 
@@ -203,22 +228,8 @@ void runTask (void * pvParameter) {
   UNUSED_PARAMETER(pvParameter);
   dwt_setleds(DWT_LEDS_ENABLE);
 
-  // Example variables for basic tx/rx
-  // msg[] is the entire frame to transmitted out. there is a frame format (first 10 bits and last 2 bits) to follow, check the dw1000 manual.
-  uint8 msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 'M', 'E', 'S', 'S', 'A', 'G', 'E', 0, 0};
-  uint8 buffer[32] = { 0 }; // enough size to hold all data from a received frame
-  MsgType msgType; // Enum to indicate what this message is holding
-
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  
   while(true) {
-    // Basic transmit
-    // txMsg(msg, 19, DWT_START_TX_IMMEDIATE); // msg[] length is 19 bytes
-    // vTaskDelay(1000); // Pause the task for 1000ms
 
-
-    // I think we can put enterNetwork() outside this while loop scope. That or we can put as separate FreeRTOS task.
-    // Protocol implementation example:
   }
 }
 
@@ -317,4 +328,27 @@ void nodeProtocol(int id) {
 void wakeUp(void) {
   // TODO: See 0x2C in dw1000 manual for sleep and wakeup configuration procedures
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
+}
+
+static void initTimerHandler(void *pContext)
+{
+
+}
+
+static void sleepTimerHandler(void *pContext)
+{
+
+}
+
+/**
+ * @brief Initialises the cycle timings.
+ * 
+ * #details These timings are the cycle, active and sleep periods.
+ * 
+ */
+static void initCycleTimings(void)
+{
+  cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
+  activePeriod = ((2 * N - 1) * (TX_INTERVAL)); // Number of intervals in N nodes.
+  sleepPeriod = cyclePeriod - activePeriod;
 }
