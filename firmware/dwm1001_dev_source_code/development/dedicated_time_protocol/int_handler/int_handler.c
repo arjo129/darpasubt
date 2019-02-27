@@ -7,7 +7,8 @@
 
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
-
+extern int counter; // debugging purpose
+extern bool txSuccess;
 /* Public functions */
 /**
  * @brief Configure an IO pin as a positive edge triggered interrupt source.
@@ -46,15 +47,11 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
   MsgType msgType;
   uint8 buffer[32] = {0};
 
-  printf("frame received\r\n");
 
   // Eg: Read received frame data and print
   rxStatus = rxMsg(buffer, &msgType);
   if (rxStatus == RX_SUCCESS) {
-    for (int i = 0 ; i < 7; i++) {
-      printf("%c", buffer[i + 10]);
-    }
-    printf("\r\n");
+    counter++; // debugging purpose
   }
 
   // Make sure to enable receiver again
@@ -84,7 +81,8 @@ void rx_to_cb(const dwt_cb_data_t *cb_data)
 void rx_err_cb(const dwt_cb_data_t *cb_data)
 {
   /* TESTING BREAKPOINT LOCATION #3 */
-  printf("Transmission Error : may receive package from different UWB device\r\n");
+  // printf("Transmission Error : may receive package from different UWB device\r\n");
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
 /**
@@ -102,7 +100,8 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   * An actual application that would not need this callback could simply not define it and set the corresponding field to NULL when calling
   * dwt_setcallbacks(). The ISR will not call it which will allow to save some interrupt processing time. */
 
-  printf("frame transmitted\r\n");
+  // printf("frame transmitted\r\n");
+  txSuccess = true;
   /* TESTING BREAKPOINT LOCATION #4 */
 }
 

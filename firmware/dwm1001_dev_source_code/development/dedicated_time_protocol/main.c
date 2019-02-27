@@ -62,12 +62,14 @@ static dwt_config_t config = {
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 // Frames related
-#define MSG_LEN 24
+#define MSG_LEN 24 // Length (bytes) of the standard message
 // Ranging related
-#define RANGE_FREQ 1
-#define TX_INTERVAL 40000 // In microseconds
-#define SECS_TO_MS 1000 // Convert seconds to milliseconds
+#define NODE_ID 1 // Node ID
+#define RANGE_FREQ 1 // Frequency of the cycles
+#define TX_INTERVAL 70000 // In microseconds
 #define N 4 /**< Number of nodes */
+#define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
+
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
@@ -101,6 +103,9 @@ void runTask (void * pvParameter);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void initCycleTimings(void);
+static void initListen(void);
+static void setTxDelay(int nodeId);
+static void setFnDelay(int nodeId);
 
 /* Global variables */
 // Frames related
@@ -110,6 +115,14 @@ uint8 buf[MSG_LEN] = { 0 }; // enough size to hold all data from a received fram
 uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod;
+// States related
+bool isInitiating = false;
+bool isSleeping = false;
+bool txSuccess = false;
+// Timers related
+APP_TIMER_DEF(initTimer);
+APP_TIMER_DEF(sleepTimer);
+int counter = 0; // debugging purpose
 
 #ifdef USE_FREERTOS
 
@@ -196,8 +209,6 @@ int main(void)
 
   // Create the required timers
   lowTimerInit();
-  APP_TIMER_DEF(initTimer);
-  APP_TIMER_DEF(sleepTimer);
   lowTimerSingleCreate(&initTimer, initTimerHandler);
   lowTimerSingleCreate(&sleepTimer, sleepTimerHandler);
 
@@ -224,12 +235,58 @@ int main(void)
  * 
  * @param[in] pvParameter Pointer that will be used as the parameter for the task.
  */
-void runTask (void * pvParameter) {
+void runTask (void * pvParameter)
+{
   UNUSED_PARAMETER(pvParameter);
   dwt_setleds(DWT_LEDS_ENABLE);
 
-  while(true) {
+  // Listen for activity in the network
+  initListen();
+  while (isInitiating) {};
+  printf("%d\r\n", counter); // debugging purpose
 
+  while(true)
+  {
+    while (isSleeping) {};
+    printf("1\r\n"); // debugging purpose
+
+    txSuccess = false;
+    setTxDelay(NODE_ID);
+    if (NODE_ID != 1)
+    {
+      txMsg(msg, MSG_LEN, DWT_START_TX_DELAYED);
+    }
+    else
+    {
+      txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+    }
+
+    while (!txSuccess) {};
+    // ISSUE: If we comment the line below out, the cycle is able to complete.
+    // Otherwise, its stuck at the next poll for txSuccess. And second message
+    // fails to TX.
+    // Why? Is it somehow causing the tx delay time set to be unsuccessful?
+    // In SEGGER debugger, things run smoothly when stepping through but not
+    // when running this code in real time. ???
+    txSuccess = false;
+
+    setFnDelay(NODE_ID);
+    if (txMsg(msg, MSG_LEN, DWT_START_TX_DELAYED) == TX_SUCCESS)
+    {
+      printf("s\r\n"); // debugging purpose
+    }
+
+    while (!txSuccess) {};
+
+    // Use initiate timer to simulate receiving of other nodes
+    isInitiating = true;
+    lowTimerStart(initTimer, (N - NODE_ID) * TX_INTERVAL);
+    while (isInitiating) {};
+
+    // Sleep from now on
+    isSleeping = true;
+    dwSleep(false);
+    lowTimerStart(sleepTimer, sleepPeriod);
   }
 }
 
@@ -318,37 +375,85 @@ void nodeProtocol(int id) {
 /* Protocol functions */
 
 /**
- * @brief Wake up the node from sleep
+ * @brief Handler function for when the initiating timer timeouts.
  * 
- * @param none
- * 
- * @return none
- * 
+ * @param pContext General parameter that can be passed into the handler.
  */
-void wakeUp(void) {
-  // TODO: See 0x2C in dw1000 manual for sleep and wakeup configuration procedures
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-}
-
 static void initTimerHandler(void *pContext)
 {
-
+  // Stop receiving frames
+  dwt_forcetrxoff();
+  isInitiating = false;
 }
 
+/**
+ * @brief Handler function for when the sleeping timer timeouts.
+ * 
+ * @param pContext General parameter that can be passed into the handler.
+ */
 static void sleepTimerHandler(void *pContext)
 {
-
+  isSleeping = false;
+  dwWake();
 }
 
 /**
  * @brief Initialises the cycle timings.
  * 
- * #details These timings are the cycle, active and sleep periods.
- * 
+ * @details These timings are the cycle, active and sleep periods.
  */
 static void initCycleTimings(void)
 {
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
   activePeriod = ((2 * N - 1) * (TX_INTERVAL)); // Number of intervals in N nodes.
   sleepPeriod = cyclePeriod - activePeriod;
+}
+
+/**
+ * @brief Listens for activity in the network at initial phase.
+ * 
+ */
+static void initListen(void)
+{
+  isInitiating = true;
+
+  // Start listening for one cycle
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  lowTimerStart(initTimer, cyclePeriod);
+
+  // TODO: Determine how long to sleep after this listening. So the node wakes up at the correct time where protocol cycle
+  // in the network begins.
+}
+
+/**
+ * @brief Sets the TX delay for the first of the two messages.
+ * 
+ * @param nodeId ID of this node.
+ */
+static void setTxDelay(int nodeId)
+{
+  if (nodeId == 1)
+  {
+    return;
+  }
+  else
+  {
+    uint64 sysTime = (dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET)) << 8;
+    uint64 intv = ((TX_INTERVAL * (nodeId - 1)) * UUS_TO_DWT_TIME);
+    uint32 startTime = (sysTime + intv) >> 8;
+    dwt_setdelayedtrxtime(startTime);
+  } 
+}
+
+/**
+ * @brief Sets the TX delay for the second of the two messages.
+ * 
+ * @param nodeId ID of this node.
+ */
+static void setFnDelay(int nodeId)
+{
+  uint64 sysTime = (dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET)) << 8;
+  uint64 intv = ((TX_INTERVAL * N) * UUS_TO_DWT_TIME);
+  uint32 startTime = (sysTime + intv) >> 8;
+  dwt_setdelayedtrxtime(startTime);
 }
