@@ -89,7 +89,7 @@ for (int i = 0; i < N; i++) {
 }
 
 /** ID of node that requested from this node. */
-double rxId;
+uint8 rxId;
 
 #ifdef USE_FREERTOS
 
@@ -327,25 +327,25 @@ void nodeListen() {
  * Uses two global variables:
  * timeBuf
  * distanceBuf
+ *
+ * data: either time or distance.
+ *  time: uint32, 3 timestamps.
+ *  distance, double, 1 distance.
  */
 void nodeRxStore() {
-  double rxBuf[3];
+  uint8 rxBuf[1+3*4]; // uint8 id, uint32 data0,1,2
   MsgType msgType;
 
   rxMsg(rxBuf, &msgType);
-  double id = rxBuf[0];
-  double data1 = rxBuf[1]; // time1 / distance
-  double data2 = rxBuf[2]; // time2 / distance
-  double data3 = rxBuf[3]; // time3 / distance
+  uint8 id = rxBuf[0];
+  uint8 data = rxBuf + 1; // (dist0/time0), (dist1/time1), time2
 
   case (msgType) {
     switch MSG_TYPE_TIME:
-      timeBuf[3*id] = data1;
-      timeBuf[3*id+1] = data2;
-      timeBuf[3*id+2] = data3;
+      memcpy(timeBuf[id], data, 3*sizeof(uint32));
       break;
     switch MSG_TYPE_DISTANCE:
-      distanceBuf[id] = data1;
+      memcpy(distanceBuf[id], data, sizeof(double));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = id;
