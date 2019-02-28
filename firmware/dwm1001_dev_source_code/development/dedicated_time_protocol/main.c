@@ -133,6 +133,9 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
  *    |0|0|1|1|...|N-1|N-1|
+ *    where NODE_ID is i
+ *      i elems: actual transmitted time, estimated transmission time
+ *      other elems: received time, received time
  */
 typedef struct {
   uint8 header[10];
