@@ -76,21 +76,6 @@ static dwt_config_t config = {
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
 #define TX_GAP 400 /**< Time interval between transmits, in microseconds */
 
-/** Buffer for timestamps */
-double timeBuf[3*N];
-for (int i = 0; i < 3*N; i++) {
-  timeBuf[i] = -1;
-}
-
-/** Buffer for distances */
-double distanceBuf[N];
-for (int i = 0; i < N; i++) {
-  distanceBuf[i] = -1;
-}
-
-/** ID of node that requested from this node. */
-uint8 rxId;
-
 #ifdef USE_FREERTOS
 
 TaskHandle_t run_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
@@ -123,6 +108,21 @@ bool txSuccess = false;
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
 int counter = 0; // debugging purpose
+
+/** Buffer for timestamps */
+double timeBuf[3*N];
+for (int i = 0; i < 3*N; i++) {
+  timeBuf[i] = -1;
+}
+
+/** Buffer for distances */
+double distanceBuf[N];
+for (int i = 0; i < N; i++) {
+  distanceBuf[i] = -1;
+}
+
+/** ID of node that requested from this node */
+uint8 rxId;
 
 #ifdef USE_FREERTOS
 
