@@ -115,12 +115,6 @@ for (int i = 0; i < 2*N; i++) {
   timeBuf[i] = -1;
 }
 
-/** Buffer for distances */
-double distanceBuf[N];
-for (int i = 0; i < N; i++) {
-  distanceBuf[i] = -1;
-}
-
 /** Message template */
 typedef struct {
   uint8 header[10];
@@ -336,11 +330,9 @@ void nodeListen() {
  *
  * Uses two global variables:
  * timeBuf
- * distanceBuf
  *
- * data: either time or distance.
+ * data: time.
  *  time: uint32, 3 timestamps.
- *  distance, double, 1 distance.
  */
 void nodeRxStore() {
   uint8 rxBuf[MSG_LEN];
@@ -348,14 +340,11 @@ void nodeRxStore() {
 
   rxMsg(rxBuf, &msgType);
   uint8 id = rxBuf[0];
-  uint8 data = rxBuf + 1; // (dist0/time0), (dist1/time1), time2
+  uint8 data = rxBuf + 1;
 
   case (msgType) {
     switch MSG_TYPE_TIME:
       memcpy(timeBuf + 2*id, data, 3*sizeof(uint32));
-      break;
-    switch MSG_TYPE_DISTANCE:
-      memcpy(distanceBuf + id, data, sizeof(double));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = id;
@@ -389,9 +378,10 @@ void nodeTxId() {
  * Uses one global variable:
  * timeBuf
  *
- * data: either time or distance.
- *  time: uint32, 3 timestamps.
- *  distance, double, 1 distance.
+ * data: time.
+ *  time: uint32, 2*(N-1)+1 timestamps.
+ *    2*(N-1) receiving timestamps from other nodes.
+ *    1 timestamp of current node.
  */
 void nodeTxTime() {
   uint8 data[12];

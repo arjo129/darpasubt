@@ -12,7 +12,6 @@ typedef enum {
 
 typedef enum {
   MSG_TYPE_REQUEST,
-  MSG_TYPE_DISTANCE,
   MSG_TYPE_TIME,
   MSG_TYPE_UNKNOWN
 } MsgType;
