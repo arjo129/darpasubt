@@ -8,7 +8,7 @@
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 extern int counter; // debugging purpose
-extern bool txSuccess;
+
 /* Public functions */
 /**
  * @brief Configure an IO pin as a positive edge triggered interrupt source.
@@ -101,7 +101,6 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   * dwt_setcallbacks(). The ISR will not call it which will allow to save some interrupt processing time. */
 
   // printf("frame transmitted\r\n");
-  txSuccess = true;
   /* TESTING BREAKPOINT LOCATION #4 */
 }
 
