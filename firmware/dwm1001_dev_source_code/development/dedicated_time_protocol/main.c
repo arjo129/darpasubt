@@ -115,11 +115,14 @@ for (int i = 0; i < 2*N; i++) {
   timeBuf[i] = -1;
 }
 
-/** Message template */
+/** Message template
+ * data: time.
+ *  time: uint32, 2*(N-1)+1 timestamps.
+ */
 typedef struct {
   uint8 header[10];
   uint8 id;
-  uint8 data[12];
+  uint8 data[2*(N-1)+1];
   uint8 crc[2];
 } msg_template
 
@@ -332,7 +335,7 @@ void nodeListen() {
  * timeBuf
  *
  * data: time.
- *  time: uint32, 3 timestamps.
+ *  time: uint32, 2*(N-1)+1 timestamps.
  */
 void nodeRxStore() {
   uint8 rxBuf[MSG_LEN];
@@ -350,7 +353,6 @@ void nodeRxStore() {
       rxId = id;
       break;
   }
-
 }
 
 /**
@@ -371,17 +373,16 @@ void nodeTxId() {
 }
 
 /**
- * @brief Transmits three timestamps.
- *  time0: from own id.
- *  time1: time received from rxId.
+ * @brief Transmits many timestamps.
+ *  time_i: time0 received from rxId_i.
+ *  time_i+1: time1 received from rxId_i.
+ *  time_N: from own id.
  *
  * Uses one global variable:
  * timeBuf
  *
  * data: time.
  *  time: uint32, 2*(N-1)+1 timestamps.
- *    2*(N-1) receiving timestamps from other nodes.
- *    1 timestamp of current node.
  */
 void nodeTxTime() {
   uint8 data[12];
