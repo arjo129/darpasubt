@@ -82,9 +82,9 @@ for (int i = 0; i < N; i++) {
 }
 
 /** Buffer for distances */
-double distBuf[N];
+double distanceBuf[N];
 for (int i = 0; i < N; i++) {
-  distBuf[i] = -1;
+  distanceBuf[i] = -1;
 }
 
 /** ID of node that requested from this node. */
