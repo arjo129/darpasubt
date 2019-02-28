@@ -110,9 +110,8 @@ static void setFnDelay(int nodeId);
 
 /* Global variables */
 // Frames related
-// msg[] is the entire frame to transmitted out. there is a frame format (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
-uint8 msg[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint8 buf[MSG_LEN] = { 0 }; // enough size to hold all data from a received frame
+// msg_template is the entire frame to transmitted out. there is a frame format 
+// (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
 uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod;
