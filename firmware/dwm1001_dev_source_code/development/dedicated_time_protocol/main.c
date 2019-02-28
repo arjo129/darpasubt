@@ -39,6 +39,7 @@
 #include "message_transceiver.h"
 #include "int_handler.h"
 #include "low_timer.h"
+#include "timestamper.h"
 
 //-----------------dw1000----------------------------
 
