@@ -328,7 +328,7 @@ void nodeListen() {
 void nodeRxStore(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + 2*msg.id, msg.data, 3*sizeof(uint32));
+      memcpy(timeBuf + 2*msg.id, msg.data, 2*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = msg.id;
