@@ -132,6 +132,7 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
+ *    |0|0|1|1|...|N-1|N-1|
  */
 typedef struct {
   uint8 header[10];
