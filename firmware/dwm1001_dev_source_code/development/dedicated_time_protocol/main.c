@@ -343,7 +343,7 @@ void nodeListen() {
  *  distance, double, 1 distance.
  */
 void nodeRxStore() {
-  uint8 rxBuf[1+3*4]; // uint8 id, uint32 data0,1,2
+  uint8 rxBuf[MSG_LEN];
   MsgType msgType;
 
   rxMsg(rxBuf, &msgType);
@@ -365,6 +365,47 @@ void nodeRxStore() {
 }
 
 /**
+ * @brief Transmits id of node.
+ *
+ * Uses one global variable:
+ * timeBuf
+ *
+ * Stores actual transmitted time into data timeBuf.
+ */
+void nodeTxId() {
+  msg_template msg = { header, NODE_ID };
+  txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+
+  uint32 time;
+  dwt_readtxtimestamp(&time);
+  memcpy(timeBuf + 3*id, time, sizeof(uint32));
+}
+
+/**
+ * @brief Transmits three timestamps.
+ *  time0: from own id.
+ *  time1: time received from rxId.
+ *
+ * Uses one global variable:
+ * timeBuf
+ *
+ * data: either time or distance.
+ *  time: uint32, 3 timestamps.
+ *  distance, double, 1 distance.
+ */
+void nodeTxTime() {
+  uint8 data[12];
+  memcpy(data + 1, timeBuf + 3*NODE_ID, 2*sizeof(uint32));
+  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
+  memcpy(data, &timeEst, sizeof(uint32));
+
+  // TODO put timeEst in timeBuf
+
+  msg_template msg = { header, NODE_ID, data };
+  txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+}
+
+/**
  * @brief Protocol implementation
  *
  * @param[id] ID of node executing this protocol
@@ -372,20 +413,18 @@ void nodeRxStore() {
  * Else, receive previous ID's transmission, then broadcast
  */
 void nodeProtocol(int id) {
-  uint8 rxBuf[32];
-
-  // No time/dist, no timestamp, isRequest
-  uint8 requestMsg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, id, 0, 0, 1};
-
-  // Implementation
   for (int i = 1; i < id; i++) {
     nodeRxStore();
   }
-  txMsg(requestMsg, 14, DWT_START_TX_IMMEDIATE);
+
+  nodeTxId();
+
   for (int i = 1; i < N; i++) {
     nodeRxStore();
   }
-  txMsg(requestMsg, 14, DWT_START_TX_IMMEDIATE);
+
+  nodeTxTime();
+
   for (int i = id; i < N; i++) {
     nodeRxStore();
   }
