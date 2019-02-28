@@ -64,7 +64,8 @@ static dwt_config_t config = {
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 // Frames related
-#define DATA_LEN 2*(N-1)+1 // Length (bytes) of data in standard message
+#define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
+#define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
 #define NODE_ID 1 // Node ID
@@ -120,8 +121,8 @@ uint32 rxTime; // Receive duration until sleep
 int counter = 0; // debugging purpose
 
 /** Buffer for timestamps */
-double timeBuf[2*N];
-for (int i = 0; i < 2*N; i++) {
+double timeBuf[NUM_STAMPS_PER_NODE*N];
+for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeBuf[i] = -1;
 }
 
@@ -329,7 +330,7 @@ void nodeListen() {
 void nodeRxStore(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + 2*msg.id, msg.data, 2*sizeof(uint32));
+      memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id, msg.data, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = msg.id;
@@ -349,6 +350,7 @@ msg_template nodeTxId() {
 
 /**
  * @brief Reads and Stores actual transmitted time into data timeBuf.
+ * Note, memcpy only copies one uint32.
  *
  * Uses one global variable:
  * timeBuf
@@ -356,7 +358,7 @@ msg_template nodeTxId() {
 void storeTxTimestamp() {
   uint32 time;
   dwt_readtxtimestamp(&time);
-  memcpy(timeBuf + 2*NODE_ID, time, sizeof(uint32));
+  memcpy(timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
 }
 
 /**
@@ -374,7 +376,7 @@ void storeTxTimestamp() {
  */
 msg_template nodeTxTime() {
   uint8 data[DATA_LEN];
-  memcpy(data, timeBuf + 2*NODE_ID, 2*sizeof(uint32));
+  memcpy(data, timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
 
