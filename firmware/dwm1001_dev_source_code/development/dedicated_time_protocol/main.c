@@ -359,13 +359,15 @@ msg_template nodeTxId() {
  * @brief Reads and Stores actual transmitted time into data timeBuf.
  * Note, memcpy only copies one uint32.
  *
+ * @param data - pointer to data field of msg
+ *
  * Uses one global variable:
  * timeBuf
  */
-void storeTxTimestamp() {
+void storeTxTimestamp(uint8 *data) {
   uint32 time;
   dwt_readtxtimestamp(&time);
-  memcpy(timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
+  memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
 }
 
 /**
