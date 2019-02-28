@@ -63,7 +63,7 @@ static dwt_config_t config = {
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 // Frames related
-#define MSG_LEN 24 // Length (bytes) of the standard message
+#define MSG_LEN 25 // Length (bytes) of the standard message
 // Ranging related
 #define NODE_ID 1 // Node ID
 #define RANGE_FREQ 1 // Frequency of the cycles
