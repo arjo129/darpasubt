@@ -59,16 +59,17 @@ static dwt_config_t config = {
 //--------------dw1000---end---------------
 
 /* Macros definitions */
+#define N 4 /**< Number of nodes */
 // Antenna delays
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 // Frames related
-#define MSG_LEN 25 // Length (bytes) of the standard message
+#define DATA_LEN 2*(N-1)+1 // Length (bytes) of data in standard message
+#define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
 #define NODE_ID 1 // Node ID
 #define RANGE_FREQ 1 // Frequency of the cycles
 #define TX_INTERVAL 40000 // In microseconds
-#define N 4 /**< Number of nodes */
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
@@ -126,12 +127,12 @@ for (int i = 0; i < 2*N; i++) {
 
 /** Message template
  * data: time.
- *  time: uint32, 2*(N-1)+1 timestamps.
+ *  time: uint32, DATA_LEN timestamps.
  */
 typedef struct {
   uint8 header[10];
   uint8 id;
-  uint8 data[2*(N-1)+1];
+  uint8 data[DATA_LEN];
   uint8 crc[2];
 } msg_template
 
@@ -319,7 +320,7 @@ void nodeListen() {
  * timeBuf
  *
  * data: time.
- *  time: uint32, 2*(N-1)+1 timestamps.
+ *  time: uint32, DATA_LEN timestamps.
  *
  * @param msg - uint8[MSG_LEN] of data to be transmitted
  *        msgType - pointer to be used to indicate the type of message in the
@@ -368,11 +369,11 @@ void storeTxTimestamp() {
  * timeBuf
  *
  * data: time.
- *  time: uint32, 2*(N-1)+1 timestamps.
+ *  time: uint32, DATA_LEN timestamps.
  * @return msg_template
  */
 msg_template nodeTxTime() {
-  uint8 data[12];
+  uint8 data[DATA_LEN];
   memcpy(data, timeBuf + 2*NODE_ID, 2*sizeof(uint32));
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
