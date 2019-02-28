@@ -76,8 +76,8 @@ static dwt_config_t config = {
 #define TX_GAP 400 /**< Time interval between transmits, in microseconds */
 
 /** Buffer for timestamps */
-double timeBuf[N];
-for (int i = 0; i < N; i++) {
+double timeBuf[3*N];
+for (int i = 0; i < 3*N; i++) {
   timeBuf[i] = -1;
 }
 
