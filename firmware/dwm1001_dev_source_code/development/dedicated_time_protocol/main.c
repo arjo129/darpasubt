@@ -320,13 +320,12 @@ void nodeListen() {
  *
  * data: time.
  *  time: uint32, 2*(N-1)+1 timestamps.
+ *
+ * @param msg - uint8[MSG_LEN] of data to be transmitted
+ *        msgType - pointer to be used to indicate the type of message in the
+ *        received frame. See file: message_transceiver.c.
  */
-void nodeRxStore() {
-  uint8 rxBuf[MSG_LEN];
-  MsgType msgType;
-
-  rxMsg(rxBuf, &msgType);
-
+void nodeRxStore(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
       memcpy(timeBuf + 2*msg.id, msg.data, 3*sizeof(uint32));
@@ -338,17 +337,22 @@ void nodeRxStore() {
 }
 
 /**
- * @brief Transmits id of node.
+ * @brief Prepare message to be transmitted.
+ *
+ * @return msg_template
+ */
+msg_template nodeTxId() {
+  msg_template msg = { header, NODE_ID };
+  return msg;
+}
+
+/**
+ * @brief Reads and Stores actual transmitted time into data timeBuf.
  *
  * Uses one global variable:
  * timeBuf
- *
- * Stores actual transmitted time into data timeBuf.
  */
-void nodeTxId() {
-  msg_template msg = { header, NODE_ID };
-  txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
-
+void storeTxTimestamp() {
   uint32 time;
   dwt_readtxtimestamp(&time);
   memcpy(timeBuf + 2*NODE_ID, time, sizeof(uint32));
@@ -365,8 +369,9 @@ void nodeTxId() {
  *
  * data: time.
  *  time: uint32, 2*(N-1)+1 timestamps.
+ * @return msg_template
  */
-void nodeTxTime() {
+msg_template nodeTxTime() {
   uint8 data[12];
   memcpy(data, timeBuf + 2*NODE_ID, 2*sizeof(uint32));
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
@@ -375,7 +380,7 @@ void nodeTxTime() {
   // TODO put timeEst in timeBuf
 
   msg_template msg = { header, NODE_ID, data };
-  txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+  return msg;
 }
 
 /**
@@ -386,6 +391,9 @@ void nodeTxTime() {
  * Else, receive previous ID's transmission, then broadcast
  */
 void nodeProtocol(int id) {
+
+  // TODO reimplement with RX and TX that update global vars on callback
+
   for (int i = 1; i < id; i++) {
     nodeRxStore();
   }
