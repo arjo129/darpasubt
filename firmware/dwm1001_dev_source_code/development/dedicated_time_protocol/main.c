@@ -342,10 +342,10 @@ void nodeRxStore() {
 
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf[id], data, 3*sizeof(uint32));
+      memcpy(timeBuf + 3*id, data, 3*sizeof(uint32));
       break;
     switch MSG_TYPE_DISTANCE:
-      memcpy(distanceBuf[id], data, sizeof(double));
+      memcpy(distanceBuf + id, data, sizeof(double));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = id;
