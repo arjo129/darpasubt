@@ -331,15 +331,13 @@ void nodeRxStore() {
   MsgType msgType;
 
   rxMsg(rxBuf, &msgType);
-  uint8 id = rxBuf[0];
-  uint8 data = rxBuf + 1;
 
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + 2*id, data, 3*sizeof(uint32));
+      memcpy(timeBuf + 2*msg.id, msg.data, 3*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
-      rxId = id;
+      rxId = msg.id;
       break;
   }
 }
