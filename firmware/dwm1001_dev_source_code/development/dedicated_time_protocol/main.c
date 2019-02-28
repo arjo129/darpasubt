@@ -127,6 +127,9 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
 }
 
 /** Message template
+ *
+ * Note, at most 127 bytes long.
+ *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
  */
