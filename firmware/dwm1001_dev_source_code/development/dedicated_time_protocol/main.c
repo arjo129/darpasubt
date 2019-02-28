@@ -293,11 +293,6 @@ void enterNetwork(int id) {
   nodeLoop(id);
 }
 
-void nodeListen() {
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  nodeRxStore();
-}
-
 void nodeLoop(int id) {
   while(true) {
     nodeWakeUp();
