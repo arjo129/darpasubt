@@ -121,6 +121,17 @@ for (int i = 0; i < N; i++) {
   distanceBuf[i] = -1;
 }
 
+/** Message template */
+typedef struct {
+  uint8 header[10];
+  uint8 id;
+  uint8 data[12];
+  uint8 crc[2];
+} msg_template
+
+/** Default header */
+uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
+
 /** ID of node that requested from this node */
 uint8 rxId;
 
