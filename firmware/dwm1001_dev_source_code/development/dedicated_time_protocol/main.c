@@ -371,6 +371,20 @@ void storeTxTimestamp(uint8 *data) {
 }
 
 /**
+ * @brief Reads and Stores actual transmitted time into data timeBuf.
+ * Note, memcpy only copies one uint32.
+ *
+ * @param data - pointer to data field of msg
+ *
+ * Uses one global variable:
+ * timeBuf
+ */
+void storeTxTimestampDelayed(uint8 *data) {
+  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
+  memcpy(data, &timeEst, sizeof(uint32));
+}
+
+/**
  * @brief Transmits many timestamps.
  *  time_i: time0 received from rxId_i.
  *  time_i+1: time1 received from rxId_i.
@@ -386,8 +400,7 @@ void storeTxTimestamp(uint8 *data) {
 msg_template nodeTxTime() {
   uint8 data[DATA_LEN];
   memcpy(data, timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
-  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
-  memcpy(data, &timeEst, sizeof(uint32));
+  storeTxTimestampDelayed();
 
   // TODO put timeEst in timeBuf
 
