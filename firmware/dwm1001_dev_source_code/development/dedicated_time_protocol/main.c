@@ -110,8 +110,8 @@ APP_TIMER_DEF(sleepTimer);
 int counter = 0; // debugging purpose
 
 /** Buffer for timestamps */
-double timeBuf[3*N];
-for (int i = 0; i < 3*N; i++) {
+double timeBuf[2*N];
+for (int i = 0; i < 2*N; i++) {
   timeBuf[i] = -1;
 }
 
@@ -352,7 +352,7 @@ void nodeRxStore() {
 
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + 3*id, data, 3*sizeof(uint32));
+      memcpy(timeBuf + 2*id, data, 3*sizeof(uint32));
       break;
     switch MSG_TYPE_DISTANCE:
       memcpy(distanceBuf + id, data, sizeof(double));
@@ -378,7 +378,7 @@ void nodeTxId() {
 
   uint32 time;
   dwt_readtxtimestamp(&time);
-  memcpy(timeBuf + 3*id, time, sizeof(uint32));
+  memcpy(timeBuf + 2*id, time, sizeof(uint32));
 }
 
 /**
@@ -395,7 +395,7 @@ void nodeTxId() {
  */
 void nodeTxTime() {
   uint8 data[12];
-  memcpy(data + 1, timeBuf + 3*NODE_ID, 2*sizeof(uint32));
+  memcpy(data, timeBuf + 2*NODE_ID, 2*sizeof(uint32));
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
 
