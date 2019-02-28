@@ -356,7 +356,7 @@ void nodeTxId() {
 
   uint32 time;
   dwt_readtxtimestamp(&time);
-  memcpy(timeBuf + 2*id, time, sizeof(uint32));
+  memcpy(timeBuf + 2*NODE_ID, time, sizeof(uint32));
 }
 
 /**
