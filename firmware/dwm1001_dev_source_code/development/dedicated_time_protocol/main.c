@@ -325,24 +325,32 @@ void nodeListen() {
  *
  * Uses two global variables:
  * timeBuf
- * distBuf
+ * distanceBuf
  */
 void nodeRxStore() {
   double rxBuf[3];
-  rxMsg(rxBuf, &msgType); // receives: id, time/dist, timestamp, isRequest
-  double id = rxBuf[0];
-  double dataType = rxBuf[1];
-  double data = rxBuf[2];
-  double isRequest = rxBuf[3];
+  MsgType msgType;
 
-  if (dataType == 0) { // 0 == time
-    timeBuf[id] = data;
-  } else { // 1 == distance
-    distBuf[id] = data;
+  rxMsg(rxBuf, &msgType);
+  double id = rxBuf[0];
+  double data1 = rxBuf[1]; // time1 / distance
+  double data2 = rxBuf[2]; // time2 / distance
+  double data3 = rxBuf[3]; // time3 / distance
+
+  case (msgType) {
+    switch MSG_TYPE_TIME:
+      timeBuf[3*id] = data1;
+      timeBuf[3*id+1] = data2;
+      timeBuf[3*id+2] = data3;
+      break;
+    switch MSG_TYPE_DISTANCE:
+      distanceBuf[id] = data1;
+      break;
+    switch MSG_TYPE_REQUEST:
+      rxId = id;
+      break;
   }
-  if (isRequest) {
-    rxId = id;
-  }
+
 }
 
 /**
