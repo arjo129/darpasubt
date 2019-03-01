@@ -390,14 +390,13 @@ msg_template getMsgEmpty() {
 
 /**
  * @brief Reads and Stores actual transmitted time into data timeBuf.
- * Note, memcpy only copies one uint32.
  *
  * @param data - pointer to data field of msg
  *
  * Uses one global variable:
  * timeBuf
  */
-void setTimestamp(uint8 *data) {
+void setTxTimestamp(uint8 *data) {
   uint32 time;
   dwt_readtxtimestamp(&time);
   memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
@@ -412,7 +411,7 @@ void setTimestamp(uint8 *data) {
  * Uses one global variable:
  * timeBuf
  */
-void setTimestampDelayed(uint8 *data) {
+void setTxTimestampDelayed(uint8 *data) {
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
 }
@@ -433,7 +432,7 @@ msg_template getTimestamps() {
   uint8 data[DATA_LEN];
   memcpy(data, timeBuf, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
   memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeBuf + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  setTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE);
+  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE);
 
   // TODO put timeEst in timeBuf
 
