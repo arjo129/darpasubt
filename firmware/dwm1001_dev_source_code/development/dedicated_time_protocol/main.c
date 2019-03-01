@@ -349,6 +349,7 @@ void nodeListen() {
  *
  * Uses two global variables:
  * timeOwn
+ * timeOthers
  *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
@@ -366,19 +367,25 @@ void setTimestamps1(msg_template msg, MsgType *msgType) {
       rxId = msg.id;
       break;
   }
-
 }
 
 /**
  * @brief Stores received data in the correct buffer.
  * Store timestamp of ith transmitting node in 2nd field in timeOwn.
+ * Extract only the NODE_ID fields of time buffer (see fig below).
+ * Store these fields in the msg.id fields of timeOthers.
  * If received request, store received id, for subsequent transmission.
  *
  * Uses two global variables:
- * timeOwn
+ *  timeOwn
+ *  timeOthers
  *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
+ *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
+ *    where NODE_ID is i
+ *      i elem: estimated transmission time, at the back of time array.
+ *      other elems: received time, received time
  *
  * @param msg - uint8[MSG_LEN] of data to be transmitted
  *        msgType - pointer to be used to indicate the type of message in the
@@ -420,12 +427,9 @@ void setTxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual received time into data timeOwn.
+ * @brief Reads and Stores actual received time into data.
  *
  * @param data - pointer to data field of msg
- *
- * Uses one global variable:
- * timeOwn
  */
 void setRxTimestamp(uint8 *data) {
   uint32 time;
@@ -434,13 +438,9 @@ void setRxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual transmitted time into data timeOwn.
- * Note, memcpy only copies one uint32.
+ * @brief Reads and Stores actual transmitted time into data.
  *
  * @param data - pointer to data field of msg
- *
- * Uses one global variable:
- * timeOwn
  */
 void setTxTimestampDelayed(uint8 *data) {
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
