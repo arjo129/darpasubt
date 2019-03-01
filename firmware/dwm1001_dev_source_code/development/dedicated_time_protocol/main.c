@@ -403,6 +403,20 @@ void setTxTimestamp(uint8 *data) {
 }
 
 /**
+ * @brief Reads and Stores actual received time into data timeBuf.
+ *
+ * @param data - pointer to data field of msg
+ *
+ * Uses one global variable:
+ * timeBuf
+ */
+void setRxTimestamp(uint8 *data) {
+  uint32 time;
+  dwt_readrxtimestamp(&time);
+  memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
+}
+
+/**
  * @brief Reads and Stores actual transmitted time into data timeBuf.
  * Note, memcpy only copies one uint32.
  *
