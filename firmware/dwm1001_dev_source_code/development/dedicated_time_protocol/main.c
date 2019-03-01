@@ -334,7 +334,7 @@ void nodeListen() {
  *        msgType - pointer to be used to indicate the type of message in the
  *        received frame. See file: message_transceiver.c.
  */
-void nodeRxStore(msg_template msg, MsgType *msgType) {
+void setTimestamps(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
       memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
@@ -350,7 +350,7 @@ void nodeRxStore(msg_template msg, MsgType *msgType) {
  *
  * @return msg_template
  */
-msg_template nodeTxId() {
+msg_template getMsgEmpty() {
   msg_template msg = { header, NODE_ID };
   return msg;
 }
@@ -364,7 +364,7 @@ msg_template nodeTxId() {
  * Uses one global variable:
  * timeBuf
  */
-void storeTxTimestamp(uint8 *data) {
+void setTimestamp(uint8 *data) {
   uint32 time;
   dwt_readtxtimestamp(&time);
   memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
@@ -379,7 +379,7 @@ void storeTxTimestamp(uint8 *data) {
  * Uses one global variable:
  * timeBuf
  */
-void storeTxTimestampDelayed(uint8 *data) {
+void setTimestampDelayed(uint8 *data) {
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
 }
@@ -397,10 +397,10 @@ void storeTxTimestampDelayed(uint8 *data) {
  *  time: uint32, DATA_LEN timestamps.
  * @return msg_template
  */
-msg_template nodeTxTime() {
+msg_template getTimestamps() {
   uint8 data[DATA_LEN];
   memcpy(data, timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
-  storeTxTimestampDelayed();
+  setTimestampDelayed();
 
   // TODO put timeEst in timeBuf
 
@@ -420,19 +420,19 @@ void nodeProtocol(int id) {
   // TODO reimplement with RX and TX that update global vars on callback
 
   for (int i = 1; i < id; i++) {
-    nodeRxStore();
+    setTimestamps();
   }
 
-  nodeTxId();
+  getMsgEmpty();
 
   for (int i = 1; i < N; i++) {
-    nodeRxStore();
+    setTimestamps();
   }
 
-  nodeTxTime();
+  getTimestamps();
 
   for (int i = id; i < N; i++) {
-    nodeRxStore();
+    setTimestamps();
   }
 }
 
