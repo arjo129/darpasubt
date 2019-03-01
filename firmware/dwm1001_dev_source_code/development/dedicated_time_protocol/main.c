@@ -102,6 +102,7 @@ static void goToSleep(bool rxOn);
 // Frames related
 // msg_template is the entire frame to transmitted out. there is a frame format 
 // (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
+uint8 msg[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod;
@@ -119,6 +120,7 @@ uint32 timeToTx1; // Duration until first transmission
 uint32 timeToTx2; //  Duration until second transmission
 uint32 rxTime; // Receive duration until sleep
 int counter = 0; // debugging purpose
+int txCounter = 0; // debugging purpose
 
 /** Buffer for timestamps */
 double timeBuf[NUM_STAMPS_PER_NODE*N];
@@ -276,11 +278,13 @@ void runTask (void * pvParameter)
   initListen();
   while (isInitiating) {};
   printf("%d\r\n", counter); // debugging purpose
+  counter = 0;
 
   isSleeping = false;
 
   while(true)
   {
+    counter = 0;
     while (isSleeping) {};
     isSleeping = true;
 
@@ -291,6 +295,7 @@ void runTask (void * pvParameter)
     }
     else
     {
+      dwt_rxenable(DWT_START_RX_IMMEDIATE);
       lowTimerStart(tx1Timer, timeToTx1);
     }
   }
@@ -344,6 +349,7 @@ void setTimestamps1(msg_template msg, MsgType *msgType) {
       rxId = msg.id;
       break;
   }
+
 }
 
 /**
@@ -412,10 +418,9 @@ void setTimestampDelayed(uint8 *data) {
 }
 
 /**
- * @brief Transmits many timestamps.
- *  time_i: time0 received from rxId_i.
- *  time_i+1: time1 received from rxId_i.
- *  time_N: from own id.
+ * @brief Transmits three timestamps.
+ *  time0: from own id.
+ *  time1: time received from rxId.
  *
  * Uses one global variable:
  * timeBuf
@@ -436,6 +441,25 @@ msg_template getTimestamps() {
   return msg;
 }
 
+/* Comments:
+  As part of the incremental development, we get each node to figure out the start of the cycle.
+  So, we set timers to time when should the next transmission (of the 2) happen. See: runTask() while loop.
+  
+  Thus, the protocol implementation is not coded sequentially since we are relying on interrupts on reception.
+  The TX moments are fixed (using the timers) moments in the timeline, at any other points of time, 
+  the receiver is on and node gets interrupted (RX callback) when frames are received.
+
+  So we cannot use 'for' loops to receive data but rather, the RX interrupts will update the data structure
+  during the 'RX on' duration. ie when N=4, between first and second TX, there should be 3 RX interrupts in
+  synced and ideal scenario.
+
+  See the while loop in runTask() for the protocol implementation, notice the use of several timers 
+  (tx1Timer, tx2Timer, rxTimer) to figure out the TX moments. The handlers for when each timer expires will 
+  handle the actual TX for the node.
+
+  In other words, we need to have a "fast updating" of the data structure whenever RX interrupt occurs, so the
+  node does not spend too much time computating, and can move on to be ready for the next RX interrupt.
+*/
 /**
  * @brief Protocol implementation
  *
@@ -476,7 +500,6 @@ static void initTimerHandler(void *pContext)
   // Stop receiving frames
   dwt_forcetrxoff();
   isInitiating = false;
-  counter = 0; // debugging purpose
 }
 
 /**
@@ -497,6 +520,8 @@ static void sleepTimerHandler(void *pContext)
  */
 static void firstTxHandler(void *pContext)
 {
+  printf("%d\r\n", counter);
+  counter = 0;
   firstTx(NODE_ID);
   lowTimerStart(tx2Timer, timeToTx2);
 }
@@ -508,6 +533,8 @@ static void firstTxHandler(void *pContext)
  */
 static void secondTxHandler(void *pContext)
 {
+  printf("%d\r\n", counter);
+  counter = 0;
   secondTx(NODE_ID);
   if (rxTimer == 0)
   {
@@ -526,6 +553,8 @@ static void secondTxHandler(void *pContext)
  */
 static void rxTimerHandler(void *pContext)
 {
+  printf("%d\r\n", counter);
+  counter = 0;
   goToSleep(false);
 }
 
@@ -568,11 +597,11 @@ static void initListen(void)
  */
 static void firstTx(int nodeId)
 {
-  txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+  txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   if (txStatus == TX_SUCCESS)
   {
-    counter++;
-    printf("1: %d\r\n", counter); // debugging purpose
+    txCounter++;
+    printf("1: %d\r\n", txCounter); // debugging purpose
   }
 }
 
@@ -583,11 +612,11 @@ static void firstTx(int nodeId)
  */
 static void secondTx(int nodeId)
 {
-  txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+  txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   if (txStatus == TX_SUCCESS)
   {
-    counter++;
-    printf("2: %d\r\n", counter); // debugging purpose
+    txCounter++;
+    printf("2: %d\r\n", txCounter); // debugging purpose
   }
 }
 
@@ -598,15 +627,7 @@ static void secondTx(int nodeId)
  */
 static void goToSleep(bool rxOn)
 {
-<<<<<<< HEAD
   printf("sleep\r\n"); // debugging purpose
   dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleepPeriod);
 }
-=======
-  uint64 sysTime = (dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET)) << 8;
-  uint64 intv = ((TX_INTERVAL * N) * UUS_TO_DWT_TIME);
-  uint32 startTime = (sysTime + intv) >> 8;
-  dwt_setdelayedtrxtime(startTime);
-}
->>>>>>> 58e71dac26457584aa8f502b98290cc9ef79274f
