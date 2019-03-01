@@ -129,6 +129,12 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeOwn[i] = -1;
 }
 
+// Times that other nodes (not NODE_ID) stamped.
+double timeOthers[NUM_STAMPS_PER_NODE*N];
+for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
+  timeOthers[i] = -1;
+}
+
 /** Message template
  *
  * Note, at most 127 bytes long.
