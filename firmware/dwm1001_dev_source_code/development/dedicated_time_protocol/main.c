@@ -426,7 +426,8 @@ void setTimestampDelayed(uint8 *data) {
  */
 msg_template getTimestamps() {
   uint8 data[DATA_LEN];
-  memcpy(data, timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
+  memcpy(data, timeBuf, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
+  memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeBuf + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
   setTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE);
 
   // TODO put timeEst in timeBuf
