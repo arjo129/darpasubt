@@ -123,9 +123,10 @@ int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 
 /** Buffer for timestamps */
-double timeBuf[NUM_STAMPS_PER_NODE*N];
+// Times that NODE_ID stamped.
+double timeOwn[NUM_STAMPS_PER_NODE*N];
 for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-  timeBuf[i] = -1;
+  timeOwn[i] = -1;
 }
 
 /** Message template
@@ -327,11 +328,11 @@ void nodeListen() {
 
 /**
  * @brief Stores received data in the correct buffer.
- * Store timestamp of ith transmitting node in 1st field in timeBuf.
+ * Store timestamp of ith transmitting node in 1st field in timeOwn.
  * If received request, store received id, for subsequent transmission.
  *
  * Uses two global variables:
- * timeBuf
+ * timeOwn
  *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
@@ -343,7 +344,7 @@ void nodeListen() {
 void setTimestamps1(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
+      memcpy(timeOwn + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = msg.id;
@@ -354,11 +355,11 @@ void setTimestamps1(msg_template msg, MsgType *msgType) {
 
 /**
  * @brief Stores received data in the correct buffer.
- * Store timestamp of ith transmitting node in 2nd field in timeBuf.
+ * Store timestamp of ith transmitting node in 2nd field in timeOwn.
  * If received request, store received id, for subsequent transmission.
  *
  * Uses two global variables:
- * timeBuf
+ * timeOwn
  *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
@@ -370,7 +371,7 @@ void setTimestamps1(msg_template msg, MsgType *msgType) {
 void setTimestamps2(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id + 1, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
+      memcpy(timeOwn + NUM_STAMPS_PER_NODE*msg.id + 1, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = msg.id;
@@ -389,12 +390,12 @@ msg_template getMsgEmpty() {
 }
 
 /**
- * @brief Reads and Stores actual transmitted time into data timeBuf.
+ * @brief Reads and Stores actual transmitted time into data timeOwn.
  *
  * @param data - pointer to data field of msg
  *
  * Uses one global variable:
- * timeBuf
+ * timeOwn
  */
 void setTxTimestamp(uint8 *data) {
   uint32 time;
@@ -403,12 +404,12 @@ void setTxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual received time into data timeBuf.
+ * @brief Reads and Stores actual received time into data timeOwn.
  *
  * @param data - pointer to data field of msg
  *
  * Uses one global variable:
- * timeBuf
+ * timeOwn
  */
 void setRxTimestamp(uint8 *data) {
   uint32 time;
@@ -417,13 +418,13 @@ void setRxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual transmitted time into data timeBuf.
+ * @brief Reads and Stores actual transmitted time into data timeOwn.
  * Note, memcpy only copies one uint32.
  *
  * @param data - pointer to data field of msg
  *
  * Uses one global variable:
- * timeBuf
+ * timeOwn
  */
 void setTxTimestampDelayed(uint8 *data) {
   uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
@@ -436,7 +437,7 @@ void setTxTimestampDelayed(uint8 *data) {
  *  time1: time received from rxId.
  *
  * Uses one global variable:
- * timeBuf
+ * timeOwn
  *
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
@@ -444,11 +445,11 @@ void setTxTimestampDelayed(uint8 *data) {
  */
 msg_template getTimestamps() {
   uint8 data[DATA_LEN];
-  memcpy(data, timeBuf, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeBuf + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
+  memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
+  memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
   setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE);
 
-  // TODO put timeEst in timeBuf
+  // TODO put timeEst in timeOwn
 
   msg_template msg = { header, NODE_ID, data };
   return msg;
