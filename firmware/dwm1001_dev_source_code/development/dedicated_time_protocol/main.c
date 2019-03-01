@@ -410,7 +410,7 @@ msg_template getMsgEmpty() {
 void setTxTimestamp(uint8 *data) {
   uint32 time;
   dwt_readtxtimestamp(&time);
-  memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
+  memcpy(data, time, sizeof(uint32));
 }
 
 /**
@@ -421,7 +421,7 @@ void setTxTimestamp(uint8 *data) {
 void setRxTimestamp(uint8 *data) {
   uint32 time;
   dwt_readrxtimestamp(&time);
-  memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
+  memcpy(data, time, sizeof(uint32));
 }
 
 /**
