@@ -59,16 +59,24 @@ static dwt_config_t config = {
 //--------------dw1000---end---------------
 
 /* Macros definitions */
+#define N 4 /**< Number of nodes */
 // Antenna delays
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 // Frames related
-#define MSG_LEN 25 // Length (bytes) of the standard message
+#define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
+#define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
+#define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
 #define NODE_ID 1 // Node ID
+<<<<<<< HEAD
 #define RANGE_FREQ 50 // Frequency of the cycles
 #define TX_INTERVAL 600 // In microseconds
 #define N 4 /**< Number of nodes */
+=======
+#define RANGE_FREQ 1 // Frequency of the cycles
+#define TX_INTERVAL 40000 // In microseconds
+>>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
@@ -121,16 +129,34 @@ int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 
 /** Buffer for timestamps */
-double timeBuf[2*N];
-for (int i = 0; i < 2*N; i++) {
+double timeBuf[NUM_STAMPS_PER_NODE*N];
+for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeBuf[i] = -1;
 }
 
+<<<<<<< HEAD
 /** Message template */
 typedef struct {
   uint8 header[10];
   uint8 id;
   uint8 data[12];
+=======
+/** Message template
+ *
+ * Note, at most 127 bytes long.
+ *
+ * data: time.
+ *  time: uint32, DATA_LEN timestamps.
+ *    |0|0|1|1|...|N-1|N-1|
+ *    where NODE_ID is i
+ *      i elems: actual transmitted time, estimated transmission time
+ *      other elems: received time, received time
+ */
+typedef struct {
+  uint8 header[10];
+  uint8 id;
+  uint8 data[DATA_LEN];
+>>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
   uint8 crc[2];
 } msg_template
 
@@ -295,11 +321,6 @@ void enterNetwork(int id) {
   nodeLoop(id);
 }
 
-void nodeListen() {
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  nodeRxStore();
-}
-
 void nodeLoop(int id) {
   while(true) {
     nodeWakeUp();
@@ -326,42 +347,65 @@ void nodeListen() {
  * timeBuf
  *
  * data: time.
+<<<<<<< HEAD
  *  time: uint32, 3 timestamps.
+=======
+ *  time: uint32, DATA_LEN timestamps.
+ *
+ * @param msg - uint8[MSG_LEN] of data to be transmitted
+ *        msgType - pointer to be used to indicate the type of message in the
+ *        received frame. See file: message_transceiver.c.
+>>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
  */
-void nodeRxStore() {
-  uint8 rxBuf[MSG_LEN];
-  MsgType msgType;
-
-  rxMsg(rxBuf, &msgType);
-  uint8 id = rxBuf[0];
-  uint8 data = rxBuf + 1;
-
+void setTimestamps(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
-      memcpy(timeBuf + 2*id, data, 3*sizeof(uint32));
+      memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
-      rxId = id;
+      rxId = msg.id;
       break;
   }
 
 }
 
 /**
- * @brief Transmits id of node.
+ * @brief Prepare message to be transmitted.
+ *
+ * @return msg_template
+ */
+msg_template getMsgEmpty() {
+  msg_template msg = { header, NODE_ID };
+  return msg;
+}
+
+/**
+ * @brief Reads and Stores actual transmitted time into data timeBuf.
+ * Note, memcpy only copies one uint32.
+ *
+ * @param data - pointer to data field of msg
  *
  * Uses one global variable:
  * timeBuf
- *
- * Stores actual transmitted time into data timeBuf.
  */
-void nodeTxId() {
-  msg_template msg = { header, NODE_ID };
-  txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
-
+void setTimestamp(uint8 *data) {
   uint32 time;
   dwt_readtxtimestamp(&time);
-  memcpy(timeBuf + 2*id, time, sizeof(uint32));
+  memcpy(data + NUM_STAMPS_PER_NODE*NODE_ID, time, sizeof(uint32));
+}
+
+/**
+ * @brief Reads and Stores actual transmitted time into data timeBuf.
+ * Note, memcpy only copies one uint32.
+ *
+ * @param data - pointer to data field of msg
+ *
+ * Uses one global variable:
+ * timeBuf
+ */
+void setTimestampDelayed(uint8 *data) {
+  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
+  memcpy(data, &timeEst, sizeof(uint32));
 }
 
 /**
@@ -373,20 +417,24 @@ void nodeTxId() {
  * timeBuf
  *
  * data: time.
+<<<<<<< HEAD
  *  time: uint32, 2*(N-1)+1 timestamps.
  *    2*(N-1) receiving timestamps from other nodes.
  *    1 timestamp of current node.
+=======
+ *  time: uint32, DATA_LEN timestamps.
+ * @return msg_template
+>>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
  */
-void nodeTxTime() {
-  uint8 data[12];
-  memcpy(data, timeBuf + 2*NODE_ID, 2*sizeof(uint32));
-  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
-  memcpy(data, &timeEst, sizeof(uint32));
+msg_template getTimestamps() {
+  uint8 data[DATA_LEN];
+  memcpy(data, timeBuf + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
+  setTimestampDelayed();
 
   // TODO put timeEst in timeBuf
 
   msg_template msg = { header, NODE_ID, data };
-  txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE);
+  return msg;
 }
 
 /**
@@ -397,20 +445,23 @@ void nodeTxTime() {
  * Else, receive previous ID's transmission, then broadcast
  */
 void nodeProtocol(int id) {
+
+  // TODO reimplement with RX and TX that update global vars on callback
+
   for (int i = 1; i < id; i++) {
-    nodeRxStore();
+    setTimestamps();
   }
 
-  nodeTxId();
+  getMsgEmpty();
 
   for (int i = 1; i < N; i++) {
-    nodeRxStore();
+    setTimestamps();
   }
 
-  nodeTxTime();
+  getTimestamps();
 
   for (int i = id; i < N; i++) {
-    nodeRxStore();
+    setTimestamps();
   }
 }
 
