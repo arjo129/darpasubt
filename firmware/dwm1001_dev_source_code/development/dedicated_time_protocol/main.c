@@ -322,6 +322,7 @@ void nodeListen() {
 
 /**
  * @brief Stores received data in the correct buffer.
+ * Store timestamp of ith transmitting node in 1st field in timeBuf.
  * If received request, store received id, for subsequent transmission.
  *
  * Uses two global variables:
@@ -334,10 +335,36 @@ void nodeListen() {
  *        msgType - pointer to be used to indicate the type of message in the
  *        received frame. See file: message_transceiver.c.
  */
-void setTimestamps(msg_template msg, MsgType *msgType) {
+void setTimestamps1(msg_template msg, MsgType *msgType) {
   case (msgType) {
     switch MSG_TYPE_TIME:
       memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
+      break;
+    switch MSG_TYPE_REQUEST:
+      rxId = msg.id;
+      break;
+  }
+}
+
+/**
+ * @brief Stores received data in the correct buffer.
+ * Store timestamp of ith transmitting node in 2nd field in timeBuf.
+ * If received request, store received id, for subsequent transmission.
+ *
+ * Uses two global variables:
+ * timeBuf
+ *
+ * data: time.
+ *  time: uint32, DATA_LEN timestamps.
+ *
+ * @param msg - uint8[MSG_LEN] of data to be transmitted
+ *        msgType - pointer to be used to indicate the type of message in the
+ *        received frame. See file: message_transceiver.c.
+ */
+void setTimestamps2(msg_template msg, MsgType *msgType) {
+  case (msgType) {
+    switch MSG_TYPE_TIME:
+      memcpy(timeBuf + NUM_STAMPS_PER_NODE*msg.id + 1, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = msg.id;
