@@ -123,13 +123,23 @@ int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 
 /** Buffer for timestamps */
-// Times that NODE_ID stamped.
+/**
+ * Times that NODE_ID stamped.
+ *  |0|0|1|1|...|N-1|N-1|
+ * Each elem i is the timestamp where node NODE_ID received the transmission 
+ * from node i.
+ */
 double timeOwn[NUM_STAMPS_PER_NODE*N];
 for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeOwn[i] = -1;
 }
 
-// Times that other nodes (not NODE_ID) stamped.
+/**
+ * Times that other nodes (not NODE_ID) stamped.
+ *  |0|0|1|1|...|N-1|N-1|
+ * Each elem i is the timestamp where node i received the transmission from 
+ * node NODE_ID.
+ */
 double timeOthers[NUM_STAMPS_PER_NODE*N];
 for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeOthers[i] = -1;
