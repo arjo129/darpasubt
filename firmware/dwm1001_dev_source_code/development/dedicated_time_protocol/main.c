@@ -100,7 +100,7 @@ static void goToSleep(bool rxOn);
 
 /* Global variables */
 // Frames related
-// msg_template is the entire frame to transmitted out. there is a frame format 
+// msg_template is the entire frame to tx out. there is a frame format 
 // (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
 uint8 msg[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint32 cyclePeriod;
@@ -126,7 +126,7 @@ int txCounter = 0; // debugging purpose
 /**
  * Times that NODE_ID stamped.
  *  |0|0|1|1|...|N-1|N-1|
- * Each elem i is the timestamp where node NODE_ID received the transmission 
+ * Each elem i is the timestamp where node NODE_ID rx the transmission 
  * from node i.
  */
 double timeOwn[NUM_STAMPS_PER_NODE*N];
@@ -137,7 +137,7 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
 /**
  * Times that other nodes (not NODE_ID) stamped.
  *  |0|0|1|1|...|N-1|N-1|
- * Each elem i is the timestamp where node i received the transmission from 
+ * Each elem i is the timestamp where node i rx the transmission from 
  * node NODE_ID.
  */
 double timeOthers[NUM_STAMPS_PER_NODE*N];
@@ -153,8 +153,8 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  *  time: uint32, DATA_LEN timestamps.
  *    |0|0|1|1|...|N-1|N-1|
  *    where NODE_ID is i
- *      i elems: actual transmitted time, estimated transmission time
- *      other elems: received time, received time
+ *      i elems: actual tx time, estimated transmission time
+ *      other elems: rx time, rx time
  */
 typedef struct {
   uint8 header[10];
@@ -343,7 +343,7 @@ void nodeListen() {
 }
 
 /**
- * @brief Stores received data in the correct buffer.
+ * @brief Stores rx data in the correct buffer.
  *
  * Uses two global variables:
  *  timeOwn
@@ -351,7 +351,7 @@ void nodeListen() {
  *
  * @param msg - uint8[MSG_LEN] of data to be tx
  *        msgType - pointer to be used to indicate the type of message in the
- *        received frame. See file: message_transceiver.c.
+ *        rx frame. See file: message_transceiver.c.
  */
 void setTimestamps(msg_template msg, MsgType *msgType) {
   case (msgType) {
@@ -390,7 +390,7 @@ void setTimestamps(msg_template msg, MsgType *msgType) {
 }
 
 /**
- * @brief Prepare message to be transmitted.
+ * @brief Prepare message to be tx.
  *
  * @return msg_template
  */
@@ -400,7 +400,7 @@ msg_template getMsgEmpty() {
 }
 
 /**
- * @brief Reads and Stores actual transmitted time into data timeOwn.
+ * @brief Reads and Stores actual tx time into data timeOwn.
  *
  * @param data - pointer to data field of msg
  *
@@ -414,7 +414,7 @@ void setTxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual received time into data.
+ * @brief Reads and Stores actual rx time into data.
  *
  * @param data - pointer to data field of msg
  */
@@ -425,7 +425,7 @@ void setRxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual transmitted time into data.
+ * @brief Reads and Stores actual tx time into data.
  *
  * @param data - pointer to data field of msg
  */
@@ -437,7 +437,7 @@ void setTxTimestampDelayed(uint8 *data) {
 /**
  * @brief Transmits three timestamps.
  *  time0: from own id.
- *  time1: time received from rxId.
+ *  time1: time rx from rxId.
  *
  * Uses one global variable:
  * timeOwn
