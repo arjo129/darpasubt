@@ -344,57 +344,44 @@ void nodeListen() {
 
 /**
  * @brief Stores received data in the correct buffer.
- * Store timestamp of ith transmitting node in 1st field in timeOwn.
- * If received request, store received id, for subsequent transmission.
- *
- * Uses two global variables:
- * timeOwn
- * timeOthers
- *
- * data: time.
- *  time: uint32, DATA_LEN timestamps.
- *
- * @param msg - uint8[MSG_LEN] of data to be transmitted
- *        msgType - pointer to be used to indicate the type of message in the
- *        received frame. See file: message_transceiver.c.
- */
-void setTimestamps1(msg_template msg, MsgType *msgType) {
-  case (msgType) {
-    switch MSG_TYPE_TIME:
-      memcpy(timeOwn + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
-      break;
-    switch MSG_TYPE_REQUEST:
-      rxId = msg.id;
-      break;
-  }
-}
-
-/**
- * @brief Stores received data in the correct buffer.
- * Store timestamp of ith transmitting node in 2nd field in timeOwn.
- * Extract only the NODE_ID fields of time buffer (see fig below).
- * Store these fields in the msg.id fields of timeOthers.
- * If received request, store received id, for subsequent transmission.
  *
  * Uses two global variables:
  *  timeOwn
  *  timeOthers
  *
- * data: time.
- *  time: uint32, DATA_LEN timestamps.
- *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
- *    where NODE_ID is i
- *      i elem: estimated transmission time, at the back of time array.
- *      other elems: received time, received time
- *
- * @param msg - uint8[MSG_LEN] of data to be transmitted
+ * @param msg - uint8[MSG_LEN] of data to be tx
  *        msgType - pointer to be used to indicate the type of message in the
  *        received frame. See file: message_transceiver.c.
  */
-void setTimestamps2(msg_template msg, MsgType *msgType) {
+void setTimestamps(msg_template msg, MsgType *msgType) {
   case (msgType) {
-    switch MSG_TYPE_TIME:
-      memcpy(timeOwn + NUM_STAMPS_PER_NODE*msg.id + 1, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
+    switch MSG_TYPE_TIME_OWN:
+      /**
+       * Store timestamp of ith transmitting node in 1st field in timeOwn.
+       * If rx request, store rx id, for subsequent transmission.
+       *
+       * data: time.
+       *  time: uint32, DATA_LEN timestamps.
+       *    |0|0|1|1|...|N-1|N-1|
+       *      i elems: actual tx time, estimated tx time
+       *      other elems: rx time, rx time
+       */
+      memcpy(timeOwn + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*msg.id, NUM_STAMPS_PER_NODE*sizeof(uint32));
+      break;
+    switch MSG_TYPE_TIME_OTHERS:
+      /**
+       * Extract only the NODE_ID fields of time buffer.
+       * Store these fields in the msg.id fields of timeOthers.
+       * If rx request, store rx id, for subsequent transmission.
+       *
+       * data: time.
+       *  time: uint32, DATA_LEN timestamps.
+       *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
+       *    where NODE_ID is i
+       *      i elem: estimated transmission time, at the back of time array.
+       *      other elems: rx time, rx time
+       */
+      memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
     switch MSG_TYPE_REQUEST:
       rxId = msg.id;
