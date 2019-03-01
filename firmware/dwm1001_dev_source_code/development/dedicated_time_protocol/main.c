@@ -69,14 +69,8 @@ static dwt_config_t config = {
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
 #define NODE_ID 1 // Node ID
-<<<<<<< HEAD
-#define RANGE_FREQ 50 // Frequency of the cycles
-#define TX_INTERVAL 600 // In microseconds
-#define N 4 /**< Number of nodes */
-=======
 #define RANGE_FREQ 1 // Frequency of the cycles
 #define TX_INTERVAL 40000 // In microseconds
->>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
@@ -134,13 +128,6 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeBuf[i] = -1;
 }
 
-<<<<<<< HEAD
-/** Message template */
-typedef struct {
-  uint8 header[10];
-  uint8 id;
-  uint8 data[12];
-=======
 /** Message template
  *
  * Note, at most 127 bytes long.
@@ -156,7 +143,6 @@ typedef struct {
   uint8 header[10];
   uint8 id;
   uint8 data[DATA_LEN];
->>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
   uint8 crc[2];
 } msg_template
 
@@ -347,15 +333,11 @@ void nodeListen() {
  * timeBuf
  *
  * data: time.
-<<<<<<< HEAD
- *  time: uint32, 3 timestamps.
-=======
  *  time: uint32, DATA_LEN timestamps.
  *
  * @param msg - uint8[MSG_LEN] of data to be transmitted
  *        msgType - pointer to be used to indicate the type of message in the
  *        received frame. See file: message_transceiver.c.
->>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
  */
 void setTimestamps(msg_template msg, MsgType *msgType) {
   case (msgType) {
@@ -417,14 +399,8 @@ void setTimestampDelayed(uint8 *data) {
  * timeBuf
  *
  * data: time.
-<<<<<<< HEAD
- *  time: uint32, 2*(N-1)+1 timestamps.
- *    2*(N-1) receiving timestamps from other nodes.
- *    1 timestamp of current node.
-=======
  *  time: uint32, DATA_LEN timestamps.
  * @return msg_template
->>>>>>> 7cd9991f4841a95cee7bb4ab48578a640cf4e58e
  */
 msg_template getTimestamps() {
   uint8 data[DATA_LEN];
@@ -437,6 +413,25 @@ msg_template getTimestamps() {
   return msg;
 }
 
+/* Comments:
+  As part of the incremental development, we get each node to figure out the start of the cycle.
+  So, we set timers to time when should the next transmission (of the 2) happen. See: runTask() while loop.
+  
+  Thus, the protocol implementation is not coded sequentially since we are relying on interrupts on reception.
+  The TX moments are fixed (using the timers) moments in the timeline, at any other points of time, 
+  the receiver is on and node gets interrupted (RX callback) when frames are received.
+
+  So we cannot use 'for' loops to receive data but rather, the RX interrupts will update the data structure
+  during the 'RX on' duration. ie when N=4, between first and second TX, there should be 3 RX interrupts in
+  synced and ideal scenario.
+
+  See the while loop in runTask() for the protocol implementation, notice the use of several timers 
+  (tx1Timer, tx2Timer, rxTimer) to figure out the TX moments. The handlers for when each timer expires will 
+  handle the actual TX for the node.
+
+  In other words, we need to have a "fast updating" of the data structure whenever RX interrupt occurs, so the
+  node does not spend too much time computating, and can move on to be ready for the next RX interrupt.
+*/
 /**
  * @brief Protocol implementation
  *
