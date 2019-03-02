@@ -10,6 +10,8 @@ from utils.constant import Sensor
 from utils.debug_tools import get_channels
 from utils.conversions import to_gray
 
+from detectors.cnnDetector import CNNDetector
+
 MAIN_CAM_FREQ = 1
 
 class VisionPipeline ():
@@ -29,6 +31,9 @@ class VisionPipeline ():
 
         # Processes - if we need more might need to consider threading
         self.process("main")
+
+        # CNN detector
+        self.cnn = CNNDetector()
 
 
     def init_publishers(self):
@@ -61,7 +66,12 @@ class VisionPipeline ():
 
         while True:
             if name in self.data:
-                self.process_cvimg(self.data[name], name)
+                image = self.data[name]
+                boxes = self.cnn.detect(image)
+
+                print (boxes)
+
+                self.process_cvimg(image, name)
                 del self.data[name]
             else:
                 time.sleep(MAIN_CAM_FREQ)
