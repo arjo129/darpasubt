@@ -70,8 +70,9 @@ static dwt_config_t config = {
 // Ranging related
 #define NODE_ID 1 // Node ID
 #define RANGE_FREQ 1 // Frequency of the cycles
-#define TX_INTERVAL 40000 // In microseconds
+#define TX_INTERVAL 60000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
+#define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
@@ -89,6 +90,7 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 void runTask (void * pvParameter);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
+static void wakeTimerHandler(void *pContext);
 static void firstTxHandler(void *pContext);
 static void secondTxHandler(void *pContext);
 static void rxTimerHandler(void *pContext);
@@ -105,17 +107,20 @@ static void goToSleep(bool rxOn);
 uint8 msg[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint32 cyclePeriod;
 uint32 activePeriod;
-uint32 sleepPeriod;
+uint32 sleepPeriod; // Time duration for actual hardware sleeping
+uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cycle
 TxStatus txStatus;
 // States related
 bool isInitiating = false;
 bool isSleeping = false;
+bool hasActivity = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
 APP_TIMER_DEF(tx1Timer);
 APP_TIMER_DEF(tx2Timer);
 APP_TIMER_DEF(rxTimer);
+APP_TIMER_DEF(wakeTimer);
 uint32 timeToTx1; // Duration until first transmission
 uint32 timeToTx2; //  Duration until second transmission
 uint32 rxTime; // Receive duration until sleep
@@ -262,6 +267,7 @@ int main(void)
   lowTimerSingleCreate(&tx1Timer, firstTxHandler);
   lowTimerSingleCreate(&tx2Timer, secondTxHandler);
   lowTimerSingleCreate(&rxTimer, rxTimerHandler);
+  lowTimerSingleCreate(&wakeTimer, wakeTimerHandler);
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
@@ -301,7 +307,6 @@ void runTask (void * pvParameter)
 
   while(true)
   {
-    counter = 0;
     while (isSleeping) {};
     isSleeping = true;
 
@@ -312,7 +317,6 @@ void runTask (void * pvParameter)
     }
     else
     {
-      dwt_rxenable(DWT_START_RX_IMMEDIATE);
       lowTimerStart(tx1Timer, timeToTx1);
     }
   }
@@ -501,9 +505,17 @@ void nodeProtocol(int id) {
  */
 static void initTimerHandler(void *pContext)
 {
-  // Stop receiving frames
-  dwt_forcetrxoff();
-  isInitiating = false;
+  if (hasActivity)
+  {
+    isInitiating = false;
+    printf("active network\r\n"); // debugging purpose
+  }
+  else
+  {
+    lowTimerStart(initTimer, cyclePeriod);
+    printf("silent network\r\n"); // debugging purpose
+    return;
+  }
 }
 
 /**
@@ -513,8 +525,17 @@ static void initTimerHandler(void *pContext)
  */
 static void sleepTimerHandler(void *pContext)
 {
-  isSleeping = false;
   dwWake();
+}
+
+/**
+ * @brief Handler function for when the waking timer timeouts.
+ * 
+ * @param pContext General parameter that can be passed into the handler.
+ */
+static void wakeTimerHandler(void *pContext)
+{
+  isSleeping = false;
 }
 
 /**
@@ -542,7 +563,7 @@ static void secondTxHandler(void *pContext)
   secondTx(NODE_ID);
   if (rxTimer == 0)
   {
-    goToSleep(false);
+    goToSleep(true);
   }
   else
   {
@@ -559,7 +580,7 @@ static void rxTimerHandler(void *pContext)
 {
   printf("%d\r\n", counter);
   counter = 0;
-  goToSleep(false);
+  goToSleep(true);
 }
 
 /**
@@ -572,7 +593,8 @@ static void initCycleTimings(void)
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
   activePeriod = ((2 * N - 1) * (TX_INTERVAL)); // Number of intervals in N nodes.
   // sleepPeriod = cyclePeriod - activePeriod - (NODE_ID * SLEEP_DIFF); // Staggered sleep times
-  sleepPeriod = cyclePeriod - activePeriod;
+  wakePeriod = cyclePeriod - activePeriod;
+  sleepPeriod = wakePeriod * WAKE_INIT_FACTOR;
   timeToTx1 = TX_INTERVAL * NODE_ID;
   timeToTx2 = N * TX_INTERVAL;
   rxTime = (N - NODE_ID - 1) * TX_INTERVAL;
@@ -584,7 +606,12 @@ static void initCycleTimings(void)
  */
 static void initListen(void)
 {
+  if (NODE_ID == 0)
+  {
+    return;
+  }
   isInitiating = true;
+  hasActivity = false;
 
   // Start listening for one cycle
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -636,4 +663,5 @@ static void goToSleep(bool rxOn)
   printf("sleep\r\n"); // debugging purpose
   dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleepPeriod);
+  lowTimerStart(wakeTimer, wakePeriod);
 }

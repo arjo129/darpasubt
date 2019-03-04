@@ -8,6 +8,7 @@
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 extern int counter; // debugging purpose
+extern bool hasActivity;
 
 /* Public functions */
 /**
@@ -52,6 +53,11 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
   rxStatus = rxMsg(buffer, &msgType);
   if (rxStatus == RX_SUCCESS) {
     counter++; // debugging purpose
+    // Check if the incoming frame is from 'master' node 0
+    if (buffer[10] == 1)
+    {
+      hasActivity = true;
+    }
   }
 
   // Make sure to enable receiver again
