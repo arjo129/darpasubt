@@ -601,6 +601,7 @@ static void initListen(void)
  */
 static void firstTx(int nodeId)
 {
+  dwt_forcetrxoff();
   txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   if (txStatus == TX_SUCCESS)
   {
@@ -616,6 +617,7 @@ static void firstTx(int nodeId)
  */
 static void secondTx(int nodeId)
 {
+  dwt_forcetrxoff();
   txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   if (txStatus == TX_SUCCESS)
   {
