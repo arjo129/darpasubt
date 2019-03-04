@@ -412,12 +412,13 @@ void setRxTimestamp(uint8 *data) {
 }
 
 /**
- * @brief Reads and Stores actual tx time into data.
+ * @brief Reads and Stores estimated tx time into data.
  *
  * @param data - pointer to data field of msg
+ * @param addDelay - additional time this transmission was delayed by
  */
-void setTxTimestampDelayed(uint8 *data) {
-  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
+void setTxTimestampDelayed(uint8 *data, uint32 addDelay) {
+  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + addDelay + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
 }
 
