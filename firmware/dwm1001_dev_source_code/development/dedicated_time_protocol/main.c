@@ -98,7 +98,7 @@ static void initCycleTimings(void);
 static void initListen(void);
 static void firstTx(int nodeId);
 static void secondTx(int nodeId);
-static void goToSleep(bool rxOn);
+static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 
 /* Global variables */
 // Frames related
@@ -563,7 +563,7 @@ static void secondTxHandler(void *pContext)
   secondTx(NODE_ID);
   if (rxTime == 0)
   {
-    goToSleep(true);
+    goToSleep(true, sleepPeriod, wakePeriod);
   }
   else
   {
@@ -580,7 +580,7 @@ static void rxTimerHandler(void *pContext)
 {
   printf("%d\r\n", counter);
   counter = 0;
-  goToSleep(true);
+  goToSleep(true, sleepPeriod, wakePeriod);
 }
 
 /**
@@ -656,12 +656,14 @@ static void secondTx(int nodeId)
 /**
  * @brief Puts DW1000 to sleep.
  * 
- * @param rxOn set to true if the device should wake up with receiver on.
+ * @param rxOn rxOn set to true if the device needs to wake up with receiver on.
+ * @param sleep time duration for actual hardware sleeping
+ * @param wake time duration to the next cycle
  */
-static void goToSleep(bool rxOn)
+static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
 {
   printf("sleep\r\n"); // debugging purpose
   dwSleep(rxOn);
-  lowTimerStart(sleepTimer, sleepPeriod);
-  lowTimerStart(wakeTimer, wakePeriod);
+  lowTimerStart(sleepTimer, sleep);
+  lowTimerStart(wakeTimer, wake);
 }
