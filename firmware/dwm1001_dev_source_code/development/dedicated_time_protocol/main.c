@@ -438,7 +438,7 @@ msg_template getTimestamps() {
   uint8 data[DATA_LEN];
   memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
   memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE);
+  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE, 0);
 
   // TODO put timeEst in timeOwn
 
