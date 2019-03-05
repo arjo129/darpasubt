@@ -561,7 +561,7 @@ static void secondTxHandler(void *pContext)
   printf("%d\r\n", counter);
   counter = 0;
   secondTx(NODE_ID);
-  if (rxTimer == 0)
+  if (rxTime == 0)
   {
     goToSleep(true);
   }
