@@ -149,12 +149,15 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  *
  * Note, at most 127 bytes long.
  *
+ * header: usually fixed.
+ * id: id of node that sent this message.
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
  *    |0|0|1|1|...|N-1|N-1|
  *    where NODE_ID is i
  *      i elems: actual tx time, estimated transmission time
  *      other elems: rx time, rx time
+ * crc: needs to be the final two bytes.
  */
 typedef struct {
   uint8 header[10];
