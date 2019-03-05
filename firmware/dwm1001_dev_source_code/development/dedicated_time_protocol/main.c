@@ -308,7 +308,6 @@ void runTask (void * pvParameter)
     if (NODE_ID == 0)
     {
       firstTx(NODE_ID);
-      setTxTimestampDelayed(timeOwn + NUM_STAMPS_PER_NODE*NODE_ID, timeToTx2);
       lowTimerStart(tx2Timer, timeToTx2);
     }
     else
@@ -529,6 +528,7 @@ static void firstTxHandler(void *pContext)
   printf("%d\r\n", counter);
   counter = 0;
   firstTx(NODE_ID);
+  setTxTimestampDelayed(timeOwn + NUM_STAMPS_PER_NODE*NODE_ID, timeToTx2);
   lowTimerStart(tx2Timer, timeToTx2);
 }
 
