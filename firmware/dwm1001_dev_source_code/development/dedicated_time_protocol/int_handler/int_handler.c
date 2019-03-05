@@ -4,11 +4,12 @@
 #include "app_error.h"
 #include "deca_device_api.h"
 #include "message_transceiver.h"
+#include "main.h"
 
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 extern int counter; // debugging purpose
-extern bool hasActivity;
+extern bool isInitiating;
 
 /* Public functions */
 /**
@@ -54,9 +55,10 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
   if (rxStatus == RX_SUCCESS) {
     counter++; // debugging purpose
     // Check if the incoming frame is from 'master' node 0
-    if (buffer[10] == 1)
+    // Note: temporary way to check if node is master
+    if (buffer[10] == 1 && isInitiating)
     {
-      hasActivity = true;
+      syncCycle();
     }
   }
 

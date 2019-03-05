@@ -68,7 +68,7 @@ static dwt_config_t config = {
 #define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
-#define NODE_ID 1 // Node ID
+#define NODE_ID 3 // Node ID
 #define RANGE_FREQ 1 // Frequency of the cycles
 #define TX_INTERVAL 60000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
@@ -88,6 +88,7 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
+void syncCycle(void);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
@@ -105,6 +106,7 @@ static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 // msg_template is the entire frame to tx out. there is a frame format 
 // (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
 uint8 msg[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8 msg1[MSG_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod; // Time duration for actual hardware sleeping
@@ -113,7 +115,6 @@ TxStatus txStatus;
 // States related
 bool isInitiating = false;
 bool isSleeping = false;
-bool hasActivity = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
@@ -299,11 +300,8 @@ void runTask (void * pvParameter)
 
   // Listen for activity in the network
   initListen();
-  while (isInitiating) {};
   printf("%d\r\n", counter); // debugging purpose
   counter = 0;
-
-  isSleeping = false;
 
   while(true)
   {
@@ -505,17 +503,9 @@ void nodeProtocol(int id) {
  */
 static void initTimerHandler(void *pContext)
 {
-  if (hasActivity)
-  {
-    isInitiating = false;
-    printf("active network\r\n"); // debugging purpose
-  }
-  else
-  {
-    lowTimerStart(initTimer, cyclePeriod);
-    printf("silent network\r\n"); // debugging purpose
-    return;
-  }
+  lowTimerStart(initTimer, cyclePeriod);
+  printf("silent network\r\n"); // debugging purpose
+  return;
 }
 
 /**
@@ -608,17 +598,18 @@ static void initListen(void)
 {
   if (NODE_ID == 0)
   {
+    isSleeping = false;
     return;
   }
+
   isInitiating = true;
-  hasActivity = false;
+  isSleeping = true;
 
   // Start listening for one cycle
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
   lowTimerStart(initTimer, cyclePeriod);
 
-  // TODO: Determine how long to sleep after this listening. So the node wakes up at the correct time where protocol cycle
-  // in the network begins.
+  while (isInitiating) {};
 }
 
 /**
@@ -656,6 +647,11 @@ static void secondTx(int nodeId)
 /**
  * @brief Puts DW1000 to sleep.
  * 
+ * @details Note: \p sleep must be lesser than \p wake. Time is needed for the
+ *          transceivers to initialise before actual reception can take place.
+ *          Hence, there must be adequate time allocated for the transceiver to
+ *          be ready before the next cycle begins.
+ * 
  * @param rxOn rxOn set to true if the device needs to wake up with receiver on.
  * @param sleep time duration for actual hardware sleeping
  * @param wake time duration to the next cycle
@@ -666,4 +662,22 @@ static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
   dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleep);
   lowTimerStart(wakeTimer, wake);
+}
+
+/**
+ * @brief Syncs this node's cycle with master node by putting the device to sleep
+ *        and wake up at determined time.
+ * 
+ * @details This function should be called immediately once the first TX of the
+ *          master node is heard.
+ *          The sleep timers will ensure this node wakes up at the same time as
+ *          the master node.
+ * 
+ */
+void syncCycle(void)
+{
+  goToSleep(true, cyclePeriod * WAKE_INIT_FACTOR, cyclePeriod);
+  lowTimerStop(initTimer);
+  printf("sync-ing cycle by sleeping\r\n"); // debugging purpose
+  isInitiating = false;
 }
