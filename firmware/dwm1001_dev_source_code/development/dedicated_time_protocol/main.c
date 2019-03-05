@@ -151,6 +151,7 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  *
  * header: usually fixed.
  * id: id of node that sent this message.
+ * isFirst: whether this message is first in the cycle.
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
  *    |0|0|1|1|...|N-1|N-1|
@@ -162,6 +163,7 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
 typedef struct {
   uint8 header[10];
   uint8 id;
+  bool isFirst;
   uint8 data[DATA_LEN];
   uint8 crc[2];
 } msg_template
@@ -385,7 +387,7 @@ void setTimestamps(msg_template msg, MsgType *msgType) {
  * @return msg_template
  */
 msg_template getMsgEmpty() {
-  msg_template msg = { header, NODE_ID };
+  msg_template msg = { header, NODE_ID, true };
   return msg;
 }
 
@@ -445,7 +447,7 @@ msg_template getTimestamps() {
 
   // TODO put timeEst in timeOwn
 
-  msg_template msg = { header, NODE_ID, data };
+  msg_template msg = { header, NODE_ID, false, data };
   return msg;
 }
 
