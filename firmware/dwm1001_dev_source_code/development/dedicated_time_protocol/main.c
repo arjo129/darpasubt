@@ -155,16 +155,21 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  *
  * Note, at most 127 bytes long.
  *
+ * header: usually fixed.
+ * id: id of node that sent this message.
+ * isFirst: whether this message is first in the cycle.
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
  *    |0|0|1|1|...|N-1|N-1|
  *    where NODE_ID is i
  *      i elems: actual tx time, estimated transmission time
  *      other elems: rx time, rx time
+ * crc: needs to be the final two bytes.
  */
 typedef struct {
   uint8 header[10];
   uint8 id;
+  bool isFirst;
   uint8 data[DATA_LEN];
   uint8 crc[2];
 } msg_template
@@ -384,7 +389,7 @@ void setTimestamps(msg_template msg, MsgType *msgType) {
  * @return msg_template
  */
 msg_template getMsgEmpty() {
-  msg_template msg = { header, NODE_ID };
+  msg_template msg = { header, NODE_ID, true };
   return msg;
 }
 
@@ -398,7 +403,7 @@ msg_template getMsgEmpty() {
  */
 void setTxTimestamp(uint8 *data) {
   uint32 time;
-  dwt_readtxtimestamp(&time);
+  time = dwt_readtxtimestamphi32();
   memcpy(data, time, sizeof(uint32));
 }
 
@@ -409,17 +414,18 @@ void setTxTimestamp(uint8 *data) {
  */
 void setRxTimestamp(uint8 *data) {
   uint32 time;
-  dwt_readrxtimestamp(&time);
+  time = dwt_readrxtimestamphi32();
   memcpy(data, time, sizeof(uint32));
 }
 
 /**
- * @brief Reads and Stores actual tx time into data.
+ * @brief Reads and Stores estimated tx time into data.
  *
  * @param data - pointer to data field of msg
+ * @param addDelay - additional time this transmission was delayed by
  */
-void setTxTimestampDelayed(uint8 *data) {
-  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + TX_ANT_DLY;
+void setTxTimestampDelayed(uint8 *data, uint32 addDelay) {
+  uint32 timeEst = dwt_read32bitoffsetreg(SYS_TIME_ID, SYS_TIME_OFFSET) + addDelay + TX_ANT_DLY;
   memcpy(data, &timeEst, sizeof(uint32));
 }
 
@@ -439,11 +445,11 @@ msg_template getTimestamps() {
   uint8 data[DATA_LEN];
   memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
   memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE);
+  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE, 0);
 
   // TODO put timeEst in timeOwn
 
-  msg_template msg = { header, NODE_ID, data };
+  msg_template msg = { header, NODE_ID, false, data };
   return msg;
 }
 
@@ -538,6 +544,7 @@ static void firstTxHandler(void *pContext)
   printf("%d\r\n", counter);
   counter = 0;
   firstTx(NODE_ID);
+  setTxTimestampDelayed(timeOwn + NUM_STAMPS_PER_NODE*NODE_ID, timeToTx2);
   lowTimerStart(tx2Timer, timeToTx2);
 }
 
