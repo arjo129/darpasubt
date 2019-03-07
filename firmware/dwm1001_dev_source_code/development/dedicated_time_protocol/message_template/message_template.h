@@ -21,7 +21,7 @@
 typedef struct {
   uint8 header[10];
   uint8 id;
-  bool isFirst;
+  uint8 isFirst;
   uint8 data[DATA_LEN];
   uint8 crc[2];
 } msg_template
