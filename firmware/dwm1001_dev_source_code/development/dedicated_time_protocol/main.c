@@ -68,9 +68,9 @@ static dwt_config_t config = {
 #define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
-#define NODE_ID 3 // Node ID
-#define RANGE_FREQ 1 // Frequency of the cycles
-#define TX_INTERVAL 60000 // In microseconds
+#define NODE_ID 0 // Node ID
+#define RANGE_FREQ 5 // Frequency of the cycles
+#define TX_INTERVAL 12000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 #define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
 
@@ -172,7 +172,7 @@ typedef struct {
   bool isFirst;
   uint8 data[DATA_LEN];
   uint8 crc[2];
-} msg_template
+} msg_template;
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -312,16 +312,6 @@ void runTask (void * pvParameter)
   {
     while (isSleeping) {};
     isSleeping = true;
-
-    if (NODE_ID == 0)
-    {
-      firstTx(NODE_ID);
-      lowTimerStart(tx2Timer, timeToTx2);
-    }
-    else
-    {
-      lowTimerStart(tx1Timer, timeToTx1);
-    }
   }
 }
 
@@ -532,6 +522,15 @@ static void sleepTimerHandler(void *pContext)
 static void wakeTimerHandler(void *pContext)
 {
   isSleeping = false;
+  if (timeToTx1 == 0)
+  {
+    firstTx(NODE_ID);
+    lowTimerStart(tx2Timer, timeToTx2);
+  }
+  else
+  {
+    lowTimerStart(tx1Timer, timeToTx1);
+  }
 }
 
 /**
@@ -558,14 +557,7 @@ static void secondTxHandler(void *pContext)
   printf("%d\r\n", counter);
   counter = 0;
   secondTx(NODE_ID);
-  if (rxTime == 0)
-  {
-    goToSleep(true, sleepPeriod, wakePeriod);
-  }
-  else
-  {
-    lowTimerStart(rxTimer, rxTime);
-  }
+  lowTimerStart(rxTimer, rxTime);
 }
 
 /**
@@ -588,13 +580,20 @@ static void rxTimerHandler(void *pContext)
 static void initCycleTimings(void)
 {
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
-  activePeriod = ((2 * N - 1) * (TX_INTERVAL)); // Number of intervals in N nodes.
+  activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
   // sleepPeriod = cyclePeriod - activePeriod - (NODE_ID * SLEEP_DIFF); // Staggered sleep times
   wakePeriod = cyclePeriod - activePeriod;
   sleepPeriod = wakePeriod * WAKE_INIT_FACTOR;
   timeToTx1 = TX_INTERVAL * NODE_ID;
   timeToTx2 = N * TX_INTERVAL;
-  rxTime = (N - NODE_ID - 1) * TX_INTERVAL;
+  rxTime = (N - NODE_ID) * TX_INTERVAL;
+  printf("cyclePeriod: %u\r\n", cyclePeriod);
+  printf("activePeriod: %u\r\n", activePeriod);
+  printf("wakePeriod: %u\r\n", wakePeriod);
+  printf("sleepPeriod: %u\r\n", sleepPeriod);
+  printf("timeToTx1: %u\r\n", timeToTx1);
+  printf("timeToTx2: %u\r\n", timeToTx2);
+  printf("rxTime: %u\r\n", rxTime);
 }
 
 /**
@@ -606,6 +605,8 @@ static void initListen(void)
   if (NODE_ID == 0)
   {
     isSleeping = false;
+    firstTx(NODE_ID);
+    lowTimerStart(tx2Timer, timeToTx2);
     return;
   }
 
@@ -627,7 +628,7 @@ static void initListen(void)
 static void firstTx(int nodeId)
 {
   dwt_forcetrxoff();
-  txStatus = txMsg(msg, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+  txStatus = txMsg(msg1, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
   if (txStatus == TX_SUCCESS)
   {
     txCounter++;
