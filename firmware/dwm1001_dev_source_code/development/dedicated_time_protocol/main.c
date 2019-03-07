@@ -114,7 +114,6 @@ uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cyc
 TxStatus txStatus;
 // States related
 bool isInitiating = false;
-bool isSleeping = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
@@ -308,11 +307,7 @@ void runTask (void * pvParameter)
   printf("%d\r\n", counter); // debugging purpose
   counter = 0;
 
-  while(true)
-  {
-    while (isSleeping) {};
-    isSleeping = true;
-  }
+  while(true) {};
 }
 
 void enterNetwork(int id) {
@@ -521,7 +516,6 @@ static void sleepTimerHandler(void *pContext)
  */
 static void wakeTimerHandler(void *pContext)
 {
-  isSleeping = false;
   if (timeToTx1 == 0)
   {
     firstTx(NODE_ID);
@@ -604,14 +598,12 @@ static void initListen(void)
 {
   if (NODE_ID == 0)
   {
-    isSleeping = false;
     firstTx(NODE_ID);
     lowTimerStart(tx2Timer, timeToTx2);
     return;
   }
 
   isInitiating = true;
-  isSleeping = true;
 
   // Start listening for one cycle
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
