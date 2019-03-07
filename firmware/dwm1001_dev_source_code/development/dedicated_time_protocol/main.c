@@ -86,11 +86,10 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 void runTask (void * pvParameter);
 void initTimeBuffers();
 void setTimestamps(msg_template msg);
-msg_template getMsgEmpty();
 void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
 void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
-msg_template getTimestamps();
+msg_template getTimestamps(uint8 isFirst);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void firstTxHandler(void *pContext);
@@ -350,17 +349,9 @@ void setTimestamps(msg_template msg) {
    *      i elem: estimated transmission time, at the back of time array.
    *      other elems: rx time, rx time
    */
-  memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
-}
-
-/**
- * @brief Prepare message to be tx.
- *
- * @return msg_template
- */
-msg_template getMsgEmpty() {
-  msg_template msg = { header, NODE_ID, true };
-  return msg;
+  if (!msg.isFirst) {
+    memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
+  }
 }
 
 /**
@@ -410,15 +401,20 @@ void setTxTimestampDelayed(uint8 *data, uint32 addDelay) {
  *  time: uint32, DATA_LEN timestamps.
  * @return msg_template
  */
-msg_template getTimestamps() {
-  uint8 data[DATA_LEN];
-  memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE, 0);
+msg_template getTimestamps(uint8 isFirst) {
+  msg_template msg = { header, NODE_ID, isFirst };
 
-  // TODO put timeEst in timeOwn
+  if (isFirst == 0) {
+    uint8 data[DATA_LEN];
+    memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
+    memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
+    setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE, 0);
 
-  msg_template msg = { header, NODE_ID, false, data };
+    // TODO put timeEst in timeOwn
+
+    msg.data = data;
+  }
+
   return msg;
 }
 
