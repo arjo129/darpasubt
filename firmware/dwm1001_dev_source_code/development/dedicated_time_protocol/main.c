@@ -127,9 +127,6 @@ int txCounter = 0; // debugging purpose
  * from node i.
  */
 double timeOwn[NUM_STAMPS_PER_NODE*N];
-for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-  timeOwn[i] = -1;
-}
 
 /**
  * Times that other nodes (not NODE_ID) stamped.
@@ -138,9 +135,6 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  * node NODE_ID.
  */
 double timeOthers[NUM_STAMPS_PER_NODE*N];
-for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-  timeOthers[i] = -1;
-}
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -244,6 +238,7 @@ int main(void)
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
+  initTimeBuffers();
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -320,6 +315,14 @@ void nodeListen() {
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
 }
+
+void initTimeBuffers() {
+  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
+    timeOwn[i] = -1;
+    timeOthers[i] = -1;
+  }
+}
+
 
 /**
  * @brief Stores rx data in the correct buffer.
