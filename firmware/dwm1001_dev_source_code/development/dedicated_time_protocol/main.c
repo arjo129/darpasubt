@@ -146,9 +146,6 @@ double timeOthers[NUM_STAMPS_PER_NODE*N];
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
 
-/** ID of node that requested from this node */
-uint8 rxId;
-
 #ifdef USE_FREERTOS
 
   /**@brief LED0 task entry function.
@@ -359,9 +356,6 @@ void setTimestamps(msg_template msg, MsgType *msgType) {
        */
       memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
-    switch MSG_TYPE_REQUEST:
-      rxId = msg.id;
-      break;
   }
 }
 
@@ -414,7 +408,6 @@ void setTxTimestampDelayed(uint8 *data, uint32 addDelay) {
 /**
  * @brief Transmits three timestamps.
  *  time0: from own id.
- *  time1: time rx from rxId.
  *
  * Uses one global variable:
  * timeOwn
