@@ -591,7 +591,13 @@ static void initCycleTimings(void)
 }
 
 /**
- * @brief Listens for activity in the network at initial phase.
+ * @brief Listens for activity in the network at initial phase and joins network.
+ * 
+ * @details This function listens for master node's activity in the network and attempts
+ *          to join the network by sync-ing it's cycle with that of master node's. This
+ *          is done with syncCycle() in the RX success interrupt callback function.
+ * 
+ *          If this node is a master node, it joins the network immediately.
  * 
  */
 static void initListen(void)
