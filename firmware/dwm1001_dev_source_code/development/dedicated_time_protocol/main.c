@@ -85,7 +85,7 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 /* Local function prototypes */
 void runTask (void * pvParameter);
 void initTimeBuffers();
-void setTimestamps(msg_template msg, MsgType *msgType);
+void setTimestamps(msg_template msg);
 msg_template getMsgEmpty();
 void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
@@ -337,26 +337,20 @@ void initTimeBuffers() {
  *  timeOthers
  *
  * @param msg - uint8[MSG_LEN] of data to be tx
- *        msgType - pointer to be used to indicate the type of message in the
- *        rx frame. See file: message_transceiver.c.
  */
-void setTimestamps(msg_template msg, MsgType *msgType) {
-  case (msgType) {
-    switch MSG_TYPE_TIME:
-      /**
-       * Extract only the NODE_ID elems of time buffer.
-       * Store these elems in the msg.id elems of timeOthers.
-       *
-       * data: time.
-       *  time: uint32, DATA_LEN timestamps.
-       *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
-       *    where msg.id is i
-       *      i elem: estimated transmission time, at the back of time array.
-       *      other elems: rx time, rx time
-       */
-      memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
-      break;
-  }
+void setTimestamps(msg_template msg) {
+  /**
+   * Extract only the NODE_ID elems of time buffer.
+   * Store these elems in the msg.id elems of timeOthers.
+   *
+   * data: time.
+   *  time: uint32, DATA_LEN timestamps.
+   *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
+   *    where msg.id is i
+   *      i elem: estimated transmission time, at the back of time array.
+   *      other elems: rx time, rx time
+   */
+  memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
 }
 
 /**

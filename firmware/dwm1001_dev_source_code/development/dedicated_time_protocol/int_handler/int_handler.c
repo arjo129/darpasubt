@@ -44,12 +44,11 @@ void vInterruptInit (void)
 void rx_ok_cb(const dwt_cb_data_t *cb_data)
 {
   RxStatus rxStatus;
-  MsgType msgType;
   uint8 buffer[32] = {0};
 
 
   // Eg: Read received frame data and print
-  rxStatus = rxMsg(buffer, &msgType);
+  rxStatus = rxMsg(buffer);
   if (rxStatus == RX_SUCCESS) {
     counter++; // debugging purpose
   }
