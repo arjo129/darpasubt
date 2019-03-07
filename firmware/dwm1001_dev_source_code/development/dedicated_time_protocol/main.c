@@ -349,7 +349,9 @@ void setTimestamps(msg_template msg) {
    *      i elem: estimated transmission time, at the back of time array.
    *      other elems: rx time, rx time
    */
-  if (!msg.isFirst) {
+  if (msg.isFirst) {
+    setRxTimestamp(timeOwn + NUM_STAMPS_PER_NODE*msg.id);
+  } else {
     memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
   }
 }
