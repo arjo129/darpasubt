@@ -84,6 +84,13 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
+void initTimeBuffers();
+void setTimestamps(msg_template msg, MsgType *msgType);
+msg_template getMsgEmpty();
+void setTxTimestamp(uint8 *data);
+void setRxTimestamp(uint8 *data);
+void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
+msg_template getTimestamps();
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void firstTxHandler(void *pContext);
