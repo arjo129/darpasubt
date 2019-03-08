@@ -40,6 +40,7 @@
 #include "int_handler.h"
 #include "low_timer.h"
 #include "timestamper.h"
+#include "message_template.h"
 
 //-----------------dw1000----------------------------
 
@@ -63,10 +64,6 @@ static dwt_config_t config = {
 // Antenna delays
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
-// Frames related
-#define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
-#define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
-#define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 // Ranging related
 #define NODE_ID 0 // Node ID
 #define RANGE_FREQ 5 // Frequency of the cycles
@@ -149,29 +146,6 @@ double timeOthers[NUM_STAMPS_PER_NODE*N];
 for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
   timeOthers[i] = -1;
 }
-
-/** Message template
- *
- * Note, at most 127 bytes long.
- *
- * header: usually fixed.
- * id: id of node that sent this message.
- * isFirst: whether this message is first in the cycle.
- * data: time.
- *  time: uint32, DATA_LEN timestamps.
- *    |0|0|1|1|...|N-1|N-1|
- *    where NODE_ID is i
- *      i elems: actual tx time, estimated transmission time
- *      other elems: rx time, rx time
- * crc: needs to be the final two bytes.
- */
-typedef struct {
-  uint8 header[10];
-  uint8 id;
-  bool isFirst;
-  uint8 data[DATA_LEN];
-  uint8 crc[2];
-} msg_template;
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
