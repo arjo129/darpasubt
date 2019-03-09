@@ -36,7 +36,6 @@
 #include "deca_device_api.h"
 #include "nrf_drv_gpiote.h"
 #include "UART.h"
-#include "message_transceiver.h"
 #include "int_handler.h"
 #include "low_timer.h"
 #include "timestamper.h"

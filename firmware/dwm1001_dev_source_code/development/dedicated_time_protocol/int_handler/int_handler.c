@@ -3,7 +3,6 @@
 #include "dw1001_dev.h"
 #include "app_error.h"
 #include "deca_device_api.h"
-#include "message_transceiver.h"
 
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
