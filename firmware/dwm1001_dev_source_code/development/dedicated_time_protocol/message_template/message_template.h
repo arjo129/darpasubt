@@ -1,4 +1,5 @@
 // Frames related
+#define N 4
 #define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
 #define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
@@ -21,7 +22,12 @@
 typedef struct {
   uint8 header[10];
   uint8 id;
-  bool isFirst;
+  uint8 isFirst;
   uint8 data[DATA_LEN];
   uint8 crc[2];
-} msg_template
+} msg_template;
+
+
+/* Public functions */
+void setTimestamps(msg_template msg, MsgType *msgType);
+void setTxTimestamp(uint32 *data);

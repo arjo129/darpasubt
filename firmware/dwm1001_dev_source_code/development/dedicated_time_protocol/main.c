@@ -70,10 +70,13 @@ static dwt_config_t config = {
 #define TX_INTERVAL 12000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 #define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
-
+#define MSG_LEN 32
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
 #define TX_GAP 400 /**< Time interval between transmits, in microseconds */
+// Timestamps related
+#define FIRST_TX_IDX 0
+#define SECOND_TX_IDX 1
 
 #ifdef USE_FREERTOS
 
@@ -86,6 +89,7 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 /* Local function prototypes */
 void runTask (void * pvParameter);
 void syncCycle(void);
+static void initBuffers(void);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
@@ -123,8 +127,7 @@ uint32 timeToTx2; //  Duration until second transmission
 uint32 rxTime; // Receive duration until sleep
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
-
-/** Buffer for timestamps */
+// Buffer for timestamps
 /**
  * Times that NODE_ID stamped.
  *  |0|0|1|1|...|N-1|N-1|
@@ -132,10 +135,6 @@ int txCounter = 0; // debugging purpose
  * from node i.
  */
 double timeOwn[NUM_STAMPS_PER_NODE*N];
-for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-  timeOwn[i] = -1;
-}
-
 /**
  * Times that other nodes (not NODE_ID) stamped.
  *  |0|0|1|1|...|N-1|N-1|
@@ -143,9 +142,9 @@ for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
  * node NODE_ID.
  */
 double timeOthers[NUM_STAMPS_PER_NODE*N];
-for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-  timeOthers[i] = -1;
-}
+
+uint32 txTs[2] = {0};
+uint8 txSeq = -1;
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -251,6 +250,9 @@ int main(void)
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
 
+  // Initialises buffers
+  initBuffers();
+
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
 
@@ -284,30 +286,6 @@ void runTask (void * pvParameter)
   while(true) {};
 }
 
-void enterNetwork(int id) {
-  nodeListen();
-  nodeSleep();
-  nodeLoop(id);
-}
-
-void nodeLoop(int id) {
-  while(true) {
-    nodeWakeUp();
-    nodeProtocol(id);
-    nodeSleep(id);
-  }
-}
-
-void nodeListen() {
-
-  /* Clear reception timeout to start next ranging process. */
-  dwt_setrxtimeout(0);
-
-  /* Activate reception immediately. */
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-
-}
-
 /**
  * @brief Stores rx data in the correct buffer.
  * If rx request, store rx id, for subsequent transmission.
@@ -321,8 +299,8 @@ void nodeListen() {
  *        rx frame. See file: message_transceiver.c.
  */
 void setTimestamps(msg_template msg, MsgType *msgType) {
-  case (msgType) {
-    switch MSG_TYPE_TIME:
+  switch ((int)msgType) {
+    case MSG_TYPE_TIME:
       /**
        * Extract only the NODE_ID elems of time buffer.
        * Store these elems in the msg.id elems of timeOthers.
@@ -336,8 +314,10 @@ void setTimestamps(msg_template msg, MsgType *msgType) {
        */
       memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
       break;
-    switch MSG_TYPE_REQUEST:
+    case MSG_TYPE_REQUEST:
       rxId = msg.id;
+      break;
+    default:
       break;
   }
 }
@@ -355,15 +335,10 @@ msg_template getMsgEmpty() {
 /**
  * @brief Reads and Stores actual tx time into data timeOwn.
  *
- * @param data - pointer to data field of msg
- *
- * Uses one global variable:
- * timeOwn
+ * @param data - pointer to field of storage
  */
-void setTxTimestamp(uint8 *data) {
-  uint32 time;
-  time = dwt_readtxtimestamphi32();
-  memcpy(data, time, sizeof(uint32));
+void setTxTimestamp(uint32 *data) {
+  *data = dwt_readtxtimestamphi32();
 }
 
 /**
@@ -459,6 +434,23 @@ void nodeProtocol(int id) {
   }
 }
 
+/* Local functions */
+
+/**
+ * @brief Initialises the buffers required for timetamps storage.
+ * 
+ */
+static void initBuffers(void)
+{
+  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
+    timeOwn[i] = -1;
+  }
+
+  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
+    timeOthers[i] = -1;
+  }
+}
+
 /* Protocol functions */
 
 /**
@@ -511,7 +503,7 @@ static void firstTxHandler(void *pContext)
   printf("%d\r\n", counter);
   counter = 0;
   firstTx(NODE_ID);
-  setTxTimestampDelayed(timeOwn + NUM_STAMPS_PER_NODE*NODE_ID, timeToTx2);
+  // setTxTimestampDelayed(timeOwn + NUM_STAMPS_PER_NODE*NODE_ID, timeToTx2);
   lowTimerStart(tx2Timer, timeToTx2);
 }
 
@@ -522,6 +514,7 @@ static void firstTxHandler(void *pContext)
  */
 static void secondTxHandler(void *pContext)
 {
+  setTxTimestamp(&txTs[FIRST_TX_IDX]);
   printf("%d\r\n", counter);
   counter = 0;
   secondTx(NODE_ID);
@@ -535,6 +528,7 @@ static void secondTxHandler(void *pContext)
  */
 static void rxTimerHandler(void *pContext)
 {
+  setTxTimestamp(&txTs[SECOND_TX_IDX]);
   printf("%d\r\n", counter);
   counter = 0;
   goToSleep(true, sleepPeriod, wakePeriod);
@@ -606,6 +600,7 @@ static void firstTx(int nodeId)
     txCounter++;
     printf("1: %d\r\n", txCounter); // debugging purpose
   }
+  txSeq = 0;
 }
 
 /**
@@ -622,6 +617,7 @@ static void secondTx(int nodeId)
     txCounter++;
     printf("2: %d\r\n", txCounter); // debugging purpose
   }
+  txSeq = 1;
 }
 
 /**
