@@ -63,13 +63,6 @@ void convertToArr(msg_template msg, uint8 *array)
  * 
  * @param table 2D array representing the timestamps table.
  * @param msg structure containing the timestamps.
- */
-
-/**
- * @brief Updates the timestamps table given the structure containing the timestamps.
- * 
- * @param table 2D array representing the timestamps table.
- * @param msg structure containing the timestamps.
  * @param ts the reception timestamp of the incoming second TX.
  */
 void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts)
