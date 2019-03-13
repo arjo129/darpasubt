@@ -375,28 +375,6 @@ msg_template getTimestamps(uint8 isFirst) {
   return msg;
 }
 
-<<<<<<< HEAD
-=======
-/* Comments:
-  As part of the incremental development, we get each node to figure out the start of the cycle.
-  So, we set timers to time when should the next transmission (of the 2) happen. See: runTask() while loop.
-  
-  Thus, the protocol implementation is not coded sequentially since we are relying on interrupts on reception.
-  The TX moments are fixed (using the timers) moments in the timeline, at any other points of time, 
-  the receiver is on and node gets interrupted (RX callback) when frames are received.
-
-  So we cannot use 'for' loops to receive data but rather, the RX interrupts will update the data structure
-  during the 'RX on' duration. ie when N=4, between first and second TX, there should be 3 RX interrupts in
-  synced and ideal scenario.
-
-  See the while loop in runTask() for the protocol implementation, notice the use of several timers 
-  (tx1Timer, tx2Timer, rxTimer) to figure out the TX moments. The handlers for when each timer expires will 
-  handle the actual TX for the node.
-
-  In other words, we need to have a "fast updating" of the data structure whenever RX interrupt occurs, so the
-  node does not spend too much time computating, and can move on to be ready for the next RX interrupt.
-*/
->>>>>>> a67f6c70040b3a617048b9eab5371622fd3b7fe2
 /* Protocol functions */
 
 /**
