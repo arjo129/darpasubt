@@ -69,6 +69,12 @@ static dwt_config_t config = {
 #define TX_INTERVAL 40000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 #define SPEED_OF_LIGHT 299702547
+#define IDX_TS_1 0
+#define IDX_TS_2 1
+#define IDX_TS_3 2
+#define IDX_TS_4 3
+#define IDX_TS_5 4
+#define IDX_TS_6 5
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
