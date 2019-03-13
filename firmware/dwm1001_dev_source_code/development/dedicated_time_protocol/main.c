@@ -276,30 +276,6 @@ void runTask (void * pvParameter)
   }
 }
 
-void enterNetwork(int id) {
-  nodeListen();
-  nodeSleep();
-  nodeLoop(id);
-}
-
-void nodeLoop(int id) {
-  while(true) {
-    nodeWakeUp();
-    nodeProtocol(id);
-    nodeSleep(id);
-  }
-}
-
-void nodeListen() {
-
-  /* Clear reception timeout to start next ranging process. */
-  dwt_setrxtimeout(0);
-
-  /* Activate reception immediately. */
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-
-}
-
 /**
  * @brief Stores rx data in the correct buffer.
  * If rx request, store rx id, for subsequent transmission.
@@ -391,53 +367,6 @@ msg_template getTimestamps(uint8 isFirst) {
   }
 
   return msg;
-}
-
-/* Comments:
-  As part of the incremental development, we get each node to figure out the start of the cycle.
-  So, we set timers to time when should the next transmission (of the 2) happen. See: runTask() while loop.
-  
-  Thus, the protocol implementation is not coded sequentially since we are relying on interrupts on reception.
-  The TX moments are fixed (using the timers) moments in the timeline, at any other points of time, 
-  the receiver is on and node gets interrupted (RX callback) when frames are received.
-
-  So we cannot use 'for' loops to receive data but rather, the RX interrupts will update the data structure
-  during the 'RX on' duration. ie when N=4, between first and second TX, there should be 3 RX interrupts in
-  synced and ideal scenario.
-
-  See the while loop in runTask() for the protocol implementation, notice the use of several timers 
-  (tx1Timer, tx2Timer, rxTimer) to figure out the TX moments. The handlers for when each timer expires will 
-  handle the actual TX for the node.
-
-  In other words, we need to have a "fast updating" of the data structure whenever RX interrupt occurs, so the
-  node does not spend too much time computating, and can move on to be ready for the next RX interrupt.
-*/
-/**
- * @brief Protocol implementation
- *
- * @param[id] ID of node executing this protocol
- * If ID is 1, then broadcast immediately
- * Else, receive previous ID's transmission, then broadcast
- */
-void nodeProtocol(int id) {
-
-  // TODO reimplement with RX and TX that update global vars on callback
-
-  for (int i = 1; i < id; i++) {
-    setTimestamps();
-  }
-
-  getMsgEmpty();
-
-  for (int i = 1; i < N; i++) {
-    setTimestamps();
-  }
-
-  getTimestamps();
-
-  for (int i = id; i < N; i++) {
-    setTimestamps();
-  }
 }
 
 /* Protocol functions */
