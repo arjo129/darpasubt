@@ -36,7 +36,6 @@
 #include "deca_device_api.h"
 #include "nrf_drv_gpiote.h"
 #include "UART.h"
-#include "message_transceiver.h"
 #include "int_handler.h"
 #include "low_timer.h"
 #include "timestamper.h"
@@ -88,8 +87,17 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
+<<<<<<< HEAD
 void syncCycle(void);
 static void initBuffers(void);
+=======
+void initTimeBuffers();
+void setTimestamps(msg_template msg);
+void setTxTimestamp(uint8 *data);
+void setRxTimestamp(uint8 *data);
+void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
+msg_template getTimestamps(uint8 isFirst);
+>>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
@@ -134,23 +142,29 @@ int txCounter = 0; // debugging purpose
  * Each elem i is the timestamp where node NODE_ID rx the transmission 
  * from node i.
  */
+<<<<<<< HEAD
 double timeOwn[NUM_STAMPS_PER_NODE*N];
+=======
+uint32 timeOwn[NUM_STAMPS_PER_NODE*N];
+
+>>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
 /**
  * Times that other nodes (not NODE_ID) stamped.
  *  |0|0|1|1|...|N-1|N-1|
  * Each elem i is the timestamp where node i rx the transmission from 
  * node NODE_ID.
  */
+<<<<<<< HEAD
 double timeOthers[NUM_STAMPS_PER_NODE*N];
 
 uint32 txTs[2] = {0};
 uint8 txSeq = -1;
+=======
+uint32 timeOthers[NUM_STAMPS_PER_NODE*N];
+>>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
-
-/** ID of node that requested from this node */
-uint8 rxId;
 
 #ifdef USE_FREERTOS
 
@@ -249,6 +263,7 @@ int main(void)
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
+  initTimeBuffers();
 
   // Initialises buffers
   initBuffers();
@@ -286,6 +301,14 @@ void runTask (void * pvParameter)
   while(true) {};
 }
 
+void initTimeBuffers() {
+  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
+    timeOwn[i] = 0;
+    timeOthers[i] = 0;
+  }
+}
+
+
 /**
  * @brief Stores rx data in the correct buffer.
  * If rx request, store rx id, for subsequent transmission.
@@ -295,9 +318,8 @@ void runTask (void * pvParameter)
  *  timeOthers
  *
  * @param msg - uint8[MSG_LEN] of data to be tx
- *        msgType - pointer to be used to indicate the type of message in the
- *        rx frame. See file: message_transceiver.c.
  */
+<<<<<<< HEAD
 void setTimestamps(msg_template msg, MsgType *msgType) {
   switch ((int)msgType) {
     case MSG_TYPE_TIME:
@@ -319,17 +341,25 @@ void setTimestamps(msg_template msg, MsgType *msgType) {
       break;
     default:
       break;
+=======
+void setTimestamps(msg_template msg) {
+  /**
+   * Extract only the NODE_ID elems of time buffer.
+   * Store these elems in the msg.id elems of timeOthers.
+   *
+   * data: time.
+   *  time: uint32, DATA_LEN timestamps.
+   *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
+   *    where msg.id is i
+   *      i elem: estimated transmission time, at the back of time array.
+   *      other elems: rx time, rx time
+   */
+  if (msg.isFirst) {
+    setRxTimestamp(timeOwn + NUM_STAMPS_PER_NODE*msg.id);
+  } else {
+    memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
+>>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
   }
-}
-
-/**
- * @brief Prepare message to be tx.
- *
- * @return msg_template
- */
-msg_template getMsgEmpty() {
-  msg_template msg = { header, NODE_ID, true };
-  return msg;
 }
 
 /**
@@ -366,7 +396,6 @@ void setTxTimestampDelayed(uint8 *data, uint32 addDelay) {
 /**
  * @brief Transmits three timestamps.
  *  time0: from own id.
- *  time1: time rx from rxId.
  *
  * Uses one global variable:
  * timeOwn
@@ -375,15 +404,20 @@ void setTxTimestampDelayed(uint8 *data, uint32 addDelay) {
  *  time: uint32, DATA_LEN timestamps.
  * @return msg_template
  */
-msg_template getTimestamps() {
-  uint8 data[DATA_LEN];
-  memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
-  setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE, 0);
+msg_template getTimestamps(uint8 isFirst) {
+  msg_template msg = { header, NODE_ID, isFirst };
 
-  // TODO put timeEst in timeOwn
+  if (isFirst == 0) {
+    uint8 data[DATA_LEN];
+    memcpy(data, timeOwn, NODE_ID*NUM_STAMPS_PER_NODE*sizeof(uint32));
+    memcpy(data + NODE_ID*NUM_STAMPS_PER_NODE, timeOwn + NODE_ID*NUM_STAMPS_PER_NODE, (N-NODE_ID-1)*NUM_STAMPS_PER_NODE*sizeof(uint32));
+    setTxTimestampDelayed(data + (N-1)*NUM_STAMPS_PER_NODE, 0);
 
-  msg_template msg = { header, NODE_ID, false, data };
+    // TODO put timeEst in timeOwn
+
+    msg.data = data;
+  }
+
   return msg;
 }
 

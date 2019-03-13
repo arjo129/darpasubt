@@ -107,9 +107,9 @@
       <file file_name="../UART/UART.c" />
       <file file_name="../UART/UART.h" />
     </folder>
-    <folder Name="message_transceiver">
-      <file file_name="../message_transceiver/message_transceiver.h" />
-      <file file_name="../message_transceiver/message_transceiver.c" />
+    <folder Name="message_template">
+      <file file_name="../message_template/message_template.h" />
+      <file file_name="../message_template/message_template.c" />
     </folder>
     <folder Name="int_handler">
       <file file_name="../int_handler/int_handler.c" />
