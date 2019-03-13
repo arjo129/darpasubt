@@ -1,7 +1,16 @@
+#include "deca_types.h"
+
 // Frames related
 #define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
 #define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
+#define NUM_STAMPS_PER_CYCLE 6 // Total number of timestamps needed to compute distance
+
+// Position index of frame elements
+#define IDX_ID 10
+#define IDX_ISFIRST 11
+#define IDX_DATA 12
+#define IDX_CRC MSG_LEN - 2
 
 /** Message template
  *
@@ -24,4 +33,14 @@ typedef struct {
   uint8 isFirst;
   uint8 data[DATA_LEN];
   uint8 crc[2];
-} msg_template
+} msg_template;
+
+/* Function prototypes */
+void initTsTable(void);
+void convertToStruct(uint8 *array, msg_template *msg);
+void convertToArr(msg_template msg, uint8 *array);
+void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg);
+void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 id);
+
+/* Public variables */
+extern uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];

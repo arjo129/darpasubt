@@ -83,7 +83,6 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
-void initTimeBuffers();
 void setTimestamps(msg_template msg);
 void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
@@ -123,23 +122,6 @@ uint32 timeToTx2; //  Duration until second transmission
 uint32 rxTime; // Receive duration until sleep
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
-
-/** Buffer for timestamps */
-/**
- * Times that NODE_ID stamped.
- *  |0|0|1|1|...|N-1|N-1|
- * Each elem i is the timestamp where node NODE_ID rx the transmission 
- * from node i.
- */
-uint32 timeOwn[NUM_STAMPS_PER_NODE*N];
-
-/**
- * Times that other nodes (not NODE_ID) stamped.
- *  |0|0|1|1|...|N-1|N-1|
- * Each elem i is the timestamp where node i rx the transmission from 
- * node NODE_ID.
- */
-uint32 timeOthers[NUM_STAMPS_PER_NODE*N];
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -317,14 +299,6 @@ void nodeListen() {
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
 }
-
-void initTimeBuffers() {
-  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-    timeOwn[i] = 0;
-    timeOthers[i] = 0;
-  }
-}
-
 
 /**
  * @brief Stores rx data in the correct buffer.
