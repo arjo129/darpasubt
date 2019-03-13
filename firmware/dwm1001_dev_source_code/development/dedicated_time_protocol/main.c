@@ -87,17 +87,14 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
-<<<<<<< HEAD
 void syncCycle(void);
 static void initBuffers(void);
-=======
 void initTimeBuffers();
 void setTimestamps(msg_template msg);
 void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
 void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
 msg_template getTimestamps(uint8 isFirst);
->>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
@@ -142,26 +139,15 @@ int txCounter = 0; // debugging purpose
  * Each elem i is the timestamp where node NODE_ID rx the transmission 
  * from node i.
  */
-<<<<<<< HEAD
-double timeOwn[NUM_STAMPS_PER_NODE*N];
-=======
 uint32 timeOwn[NUM_STAMPS_PER_NODE*N];
 
->>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
 /**
  * Times that other nodes (not NODE_ID) stamped.
  *  |0|0|1|1|...|N-1|N-1|
  * Each elem i is the timestamp where node i rx the transmission from 
  * node NODE_ID.
  */
-<<<<<<< HEAD
-double timeOthers[NUM_STAMPS_PER_NODE*N];
-
-uint32 txTs[2] = {0};
-uint8 txSeq = -1;
-=======
 uint32 timeOthers[NUM_STAMPS_PER_NODE*N];
->>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -319,29 +305,6 @@ void initTimeBuffers() {
  *
  * @param msg - uint8[MSG_LEN] of data to be tx
  */
-<<<<<<< HEAD
-void setTimestamps(msg_template msg, MsgType *msgType) {
-  switch ((int)msgType) {
-    case MSG_TYPE_TIME:
-      /**
-       * Extract only the NODE_ID elems of time buffer.
-       * Store these elems in the msg.id elems of timeOthers.
-       *
-       * data: time.
-       *  time: uint32, DATA_LEN timestamps.
-       *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
-       *    where msg.id is i
-       *      i elem: estimated transmission time, at the back of time array.
-       *      other elems: rx time, rx time
-       */
-      memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
-      break;
-    case MSG_TYPE_REQUEST:
-      rxId = msg.id;
-      break;
-    default:
-      break;
-=======
 void setTimestamps(msg_template msg) {
   /**
    * Extract only the NODE_ID elems of time buffer.
@@ -358,7 +321,6 @@ void setTimestamps(msg_template msg) {
     setRxTimestamp(timeOwn + NUM_STAMPS_PER_NODE*msg.id);
   } else {
     memcpy(timeOthers + NUM_STAMPS_PER_NODE*msg.id, msg.data + NUM_STAMPS_PER_NODE*NODE_ID, NUM_STAMPS_PER_NODE*sizeof(uint32));
->>>>>>> 71fb7f46f02bab0b8b7d5f8a14210d5d3bb23d3a
   }
 }
 
