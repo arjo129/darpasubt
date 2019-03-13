@@ -69,6 +69,12 @@ static dwt_config_t config = {
 #define TX_INTERVAL 40000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 #define SPEED_OF_LIGHT 299702547
+#define IDX_TS_1 0
+#define IDX_TS_2 1
+#define IDX_TS_3 2
+#define IDX_TS_4 3
+#define IDX_TS_5 4
+#define IDX_TS_6 5
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
@@ -89,6 +95,7 @@ void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
 void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
 msg_template getTimestamps(uint8 isFirst);
+void rxHandler(uint8 buffer[MSG_LEN]);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void firstTxHandler(void *pContext);
@@ -379,6 +386,32 @@ msg_template getTimestamps(uint8 isFirst) {
   return msg;
 }
 
+/**
+ * @brief Handler function when reception of a frame is successful.
+ * 
+ * @param buffer array containing data from the frame.
+ */
+void rxHandler(uint8 buffer[MSG_LEN])
+{
+  msg_template msg;
+  uint32 rxTs;
+
+  rxTs = dwt_readrxtimestamphi32();
+  convertToStruct(buffer, &msg);
+
+  if (msg.isFirst)
+  {
+    // Update a single entry.
+    updateTs(tsTable, rxTs, NODE_ID, msg.id);
+  }
+  else
+  {
+    // Else we complete the table entries with incoming node's frame.
+    updateTable(tsTable, msg, rxTs);
+  }
+  
+}
+
 /* Protocol functions */
 
 /**
@@ -527,6 +560,7 @@ static void goToSleep(bool rxOn)
 /**
  * @brief Calculates the distance using the timestamp table.
  * 
+ * @param id identifier of the node to calculate the distance with.
  * @return double the calculated distance.
  */
 static double calcDist(uint8 id)
