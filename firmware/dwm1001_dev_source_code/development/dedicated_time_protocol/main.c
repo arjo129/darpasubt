@@ -293,9 +293,9 @@ void setTimestamps(msg_template msg) {
    *
    * data: time.
    *  time: uint32, DATA_LEN timestamps.
-   *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
+   *    |0|0|1|1|...|i-1|i-1|i+1|i+1|...|N-1|N-1|i|i|
    *    where msg.id is i
-   *      i elem: estimated transmission time, at the back of time array.
+   *      i elem: actual tx time, estimated tx time
    *      other elems: rx time, rx time
    */
   if (msg.isFirst) {

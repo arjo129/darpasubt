@@ -21,9 +21,9 @@
  * isFirst: whether this message is first in the cycle.
  * data: time.
  *  time: uint32, DATA_LEN timestamps.
- *    |0|0|1|1|...|N-1|N-1|
- *    where NODE_ID is i
- *      i elems: actual tx time, estimated transmission time
+ *    |0|0|1|1|...|i-1|i-1|i+1|i+1|...|N-1|N-1|i|i|
+ *    where msg.id is i
+ *      i elem: actual tx time, estimated tx time
  *      other elems: rx time, rx time
  * crc: needs to be the final two bytes.
  */
