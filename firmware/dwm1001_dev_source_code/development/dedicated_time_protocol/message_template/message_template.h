@@ -40,6 +40,7 @@ void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N]);
 void convertToStruct(uint8 *array, msg_template *msg);
 void convertToArr(msg_template msg, uint8 *array);
 void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg);
+void updateTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts, uint8 thisId, uint8 otherId)
 void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 id);
 
 /* Public variables */

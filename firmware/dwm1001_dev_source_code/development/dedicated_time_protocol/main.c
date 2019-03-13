@@ -89,6 +89,7 @@ void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
 void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
 msg_template getTimestamps(uint8 isFirst);
+void rxHandler(uint8 buffer[MSG_LEN]);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void firstTxHandler(void *pContext);
@@ -373,6 +374,22 @@ msg_template getTimestamps(uint8 isFirst) {
   }
 
   return msg;
+}
+
+/**
+ * @brief Handler function when reception of a frame is successful.
+ * 
+ * @param buffer array containing data from the frame.
+ */
+void rxHandler(uint8 buffer[MSG_LEN])
+{
+  msg_template msg;
+
+  convertToStruct(buffer, &msg);
+  if (msg.isFirst)
+  {
+    updateTs(tsTable, rxTs, NODE_ID, msg.id);
+  }
 }
 
 /* Protocol functions */
