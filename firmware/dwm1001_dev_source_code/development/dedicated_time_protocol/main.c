@@ -68,6 +68,7 @@ static dwt_config_t config = {
 #define RANGE_FREQ 1 // Frequency of the cycles
 #define TX_INTERVAL 40000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
+#define SPEED_OF_LIGHT 299702547
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
@@ -98,6 +99,7 @@ static void initListen(void);
 static void firstTx(int nodeId);
 static void secondTx(int nodeId);
 static void goToSleep(bool rxOn);
+static double calcDist(uint8 id);
 
 /* Global variables */
 // Frames related
@@ -108,6 +110,7 @@ uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod;
 TxStatus txStatus;
+uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
 // States related
 bool isInitiating = false;
 bool isSleeping = false;
@@ -223,6 +226,9 @@ int main(void)
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
   initTimeBuffers();
+
+  // Initialise the timestamps table.
+  initTsTable(tsTable);
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -369,25 +375,6 @@ msg_template getTimestamps(uint8 isFirst) {
   return msg;
 }
 
-/* Comments:
-  As part of the incremental development, we get each node to figure out the start of the cycle.
-  So, we set timers to time when should the next transmission (of the 2) happen. See: runTask() while loop.
-  
-  Thus, the protocol implementation is not coded sequentially since we are relying on interrupts on reception.
-  The TX moments are fixed (using the timers) moments in the timeline, at any other points of time, 
-  the receiver is on and node gets interrupted (RX callback) when frames are received.
-
-  So we cannot use 'for' loops to receive data but rather, the RX interrupts will update the data structure
-  during the 'RX on' duration. ie when N=4, between first and second TX, there should be 3 RX interrupts in
-  synced and ideal scenario.
-
-  See the while loop in runTask() for the protocol implementation, notice the use of several timers 
-  (tx1Timer, tx2Timer, rxTimer) to figure out the TX moments. The handlers for when each timer expires will 
-  handle the actual TX for the node.
-
-  In other words, we need to have a "fast updating" of the data structure whenever RX interrupt occurs, so the
-  node does not spend too much time computating, and can move on to be ready for the next RX interrupt.
-*/
 /* Protocol functions */
 
 /**
@@ -531,4 +518,29 @@ static void goToSleep(bool rxOn)
   printf("sleep\r\n"); // debugging purpose
   dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleepPeriod);
+}
+
+/**
+ * @brief Calculates the distance using the timestamp table.
+ * 
+ * @return double the calculated distance.
+ */
+static double calcDist(uint8 id)
+{
+  double roundTrip1, roundTrip2, replyTrip2, replyTrip1, tof;
+  uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
+  int64 tof64;
+
+  // Get values to calculate.
+  getFullTs(tsTable, ts, id);
+
+  roundTrip1 = (double)(ts[IDX_TS_4] - ts[IDX_TS_1]);
+  roundTrip2 = (double)(ts[IDX_TS_6] - ts[IDX_TS_3]);
+  replyTrip1 = (double)(ts[IDX_TS_3] - ts[IDX_TS_2]);
+  replyTrip2 = (double)(ts[IDX_TS_5] - ts[IDX_TS_4]);
+
+  tof64 = (int64)((roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2));
+
+  tof = tof64 * DWT_TIME_UNITS;
+  return tof * SPEED_OF_LIGHT;
 }
