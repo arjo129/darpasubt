@@ -556,6 +556,7 @@ static void goToSleep(bool rxOn)
 /**
  * @brief Calculates the distance using the timestamp table.
  * 
+ * @param id identifier of the node to calculate the distance with.
  * @return double the calculated distance.
  */
 static double calcDist(uint8 id)
