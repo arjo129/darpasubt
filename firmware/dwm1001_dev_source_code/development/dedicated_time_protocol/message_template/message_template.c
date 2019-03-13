@@ -3,7 +3,7 @@
 
 /**
  * @brief Initialises the timestamp tables with zeros.
- * 
+ *
  */
 void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
 {
@@ -19,8 +19,40 @@ void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
 }
 
 /**
+ * @brief Initialise indexes to table.
+ * These indexes point to where in table message data should be copied to.
+ *
+ */
+void initTableIndexes(uint8 tableIndexes[N])
+{
+  int i;
+  for (i = 0; i < NODE_ID; i++)
+  {
+    tableIndexes[i] = 1;
+  }
+  for (i = NODE_ID+1; i < N-1; i++)
+  {
+    tableIndexes[i] = 0;
+  }
+}
+
+/**
+ * @brief Initialise indexes to data.
+ * These indexes point to message data to be copied to table.
+ *
+ */
+void initDataIndexes(uint8 dataIndexes[N])
+{
+  int i;
+  for (i = 0; i < N-1; i++)
+  {
+    dataIndexes[i] = 2*N-2;
+  }
+}
+
+/**
  * @brief Converts a given uint8 array to msg_template struct.
- * 
+ *
  * @param array the array to convert from.
  * @param msg pointer to the struct to store the conversion.
  */
@@ -40,7 +72,7 @@ void convertToStruct(uint8 *array, msg_template *msg)
 
 /**
  * @brief Converts a given msg_template struct to a uin8t array.
- * 
+ *
  * @param msg the struct to convert from.
  * @param array pointer to the array to store the conversion.
  */
@@ -60,19 +92,46 @@ void convertToArr(msg_template msg, uint8 *array)
 
 /**
  * @brief Updates the timestamps table given the structure containing the timestamps.
- * 
+ * Only updates when receiving a message.
+ *
  * @param table 2D array representing the timestamps table.
  * @param msg structure containing the timestamps.
  */
-void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
+void updateTableRx(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
 {
-  // TODO: Logic to determine where in the table to copy the timestamps to
-  //       given the ID of the msg.
+  if (msg.isFirst == 1) {
+    setRxTimestamp(table[tableIndexes[msg.id]][msg.id]);
+  } else {
+    table[tableIndexes[msg.id]][msg.id] = msg.data[dataIndexes[msg.id]];
+    dataIndexes[msg.id]++;
+  }
+
+  // Always increment table index after receive
+  tableIndexes[msg.id]++;
+}
+
+/**
+ * @brief Updates the timestamps table given the structure containing the timestamps.
+ * Only updates when transmitting a message.
+ *
+ * @param table 2D array representing the timestamps table.
+ * @param msg structure containing the timestamps.
+ */
+void updateTableTx(uint32 table[NUM_STAMPS_PER_CYCLE][N])
+{
+  if (msg.isFirst == 1) {
+    setTxTimestamp(table[tableIndexes[NODE_ID]][NODE_ID]);
+  } else {
+    setTxTimestampDelayed(table[tableIndexes[NODE_ID]][NODE_ID], 0); // TODO adjust delay
+  }
+
+  // Always increment table index after transmit
+  tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
 }
 
 /**
  * @brief Retrieves all the timestamp values stamped with one particular node.
- * 
+ *
  * @param table 2D array representing the timestamps table.
  * @param ts array to contain the retrieved values.
  * @param id identifier of target node of retrieved values.
@@ -80,7 +139,7 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
 void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE], uint8 id)
 {
   int i;
-  
+
   for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
   {
     ts[i] = table[i][id];
@@ -89,7 +148,7 @@ void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
 
 /**
  * @brief Retrieves all non zero timestamp values stamped with one particular node so far.
- * 
+ *
  * @param table 2D array representing the timestamps table.
  * @param ts array to contain the retrieved values.
  * @param id identifier of target node of retrieved values.

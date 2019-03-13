@@ -111,6 +111,8 @@ uint32 activePeriod;
 uint32 sleepPeriod;
 TxStatus txStatus;
 uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
+uint8 tableIndexes[N];
+uint8 dataIndexes[N];
 // States related
 bool isInitiating = false;
 bool isSleeping = false;
@@ -227,8 +229,10 @@ int main(void)
   initCycleTimings();
   initTimeBuffers();
 
-  // Initialise the timestamps table.
+  // Initialise timestamp-related data structures.
   initTsTable(tsTable);
+  initTableIndexes(tableIndexes);
+  initDataIndexes(dataIndexes);
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK

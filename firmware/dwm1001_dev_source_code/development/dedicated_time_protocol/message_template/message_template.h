@@ -37,6 +37,8 @@ typedef struct {
 
 /* Function prototypes */
 void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N]);
+void initTableIndexes(uint8 tableIndexes[N]);
+void initDataIndexes(uint8 dataIndexes[N]);
 void convertToStruct(uint8 *array, msg_template *msg);
 void convertToArr(msg_template msg, uint8 *array);
 void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg);
@@ -44,3 +46,5 @@ void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
 
 /* Public variables */
 extern uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
+extern uint8 tableIndexes[N];
+extern uint8 dataIndexes[N];
