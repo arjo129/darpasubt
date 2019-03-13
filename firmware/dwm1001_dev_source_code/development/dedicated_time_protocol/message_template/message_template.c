@@ -64,10 +64,21 @@ void convertToArr(msg_template msg, uint8 *array)
  * @param table 2D array representing the timestamps table.
  * @param msg structure containing the timestamps.
  */
-void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
+
+/**
+ * @brief Updates the timestamps table given the structure containing the timestamps.
+ * 
+ * @param table 2D array representing the timestamps table.
+ * @param msg structure containing the timestamps.
+ * @param ts the reception timestamp of the incoming second TX.
+ */
+void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts)
 {
   // TODO: Logic to determine where in the table to copy the timestamps to
   //       given the ID of the msg.
+  //       Note: @param ts refers to the timestamp when receiving the second TX.
+  //             For some nodes, the first 3 timestamps will only be complete after
+  //             receiving the second TX. Eg: Node(U2) See the TX dots diagram.
 }
 
 /**
