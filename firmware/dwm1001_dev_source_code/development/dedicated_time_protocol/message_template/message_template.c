@@ -22,6 +22,10 @@ void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
  * @brief Initialise indexes to table.
  * These indexes point to where in table message data should be copied to.
  *
+ * There are only two types of initial values:
+ *   0: for all other node ids > NODE_ID
+ *   1: for all other node ids < NODE_ID
+ * Value of index of NODE_ID is undefined.
  */
 void initTableIndexes(uint8 tableIndexes[N])
 {
