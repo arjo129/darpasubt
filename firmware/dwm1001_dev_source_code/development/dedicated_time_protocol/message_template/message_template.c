@@ -96,26 +96,6 @@ void convertToArr(msg_template msg, uint8 *array)
 
 /**
  * @brief Updates the timestamps table given the structure containing the timestamps.
- * Only updates when receiving a message.
- *
- * @param table 2D array representing the timestamps table.
- * @param msg structure containing the timestamps.
- */
-void updateTableRx(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
-{
-  if (msg.isFirst == 1) {
-    setRxTimestamp(table[tableIndexes[msg.id]][msg.id]);
-  } else {
-    table[tableIndexes[msg.id]][msg.id] = msg.data[dataIndexes[msg.id]];
-    dataIndexes[msg.id]++;
-  }
-
-  // Always increment table index after receive
-  tableIndexes[msg.id]++;
-}
-
-/**
- * @brief Updates the timestamps table given the structure containing the timestamps.
  * Two behaviours depending on node ids.
  *
  * @param table 2D array representing the timestamps table.
