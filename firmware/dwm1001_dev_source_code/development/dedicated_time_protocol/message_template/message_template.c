@@ -118,27 +118,13 @@ void updateTableRx(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
  * @param msg structure containing the timestamps.
  * @param ts the reception timestamp of the incoming second TX.
  */
-<<<<<<< HEAD
-void updateTableTx(uint32 table[NUM_STAMPS_PER_CYCLE][N])
-||||||| merged common ancestors
-void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
-=======
 void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts)
->>>>>>> 11c54a935c1e152db9162fe8cbef93793482e175
 {
-<<<<<<< HEAD
-  if (msg.isFirst == 1) {
-    setTxTimestamp(table[tableIndexes[NODE_ID]][NODE_ID]);
-  } else {
-    setTxTimestampDelayed(table[tableIndexes[NODE_ID]][NODE_ID], 0); // TODO adjust delay
-  }
+  setTxTimestampDelayed(table[tableIndexes[NODE_ID]][NODE_ID], 0); // TODO adjust delay
 
   // Always increment table index after transmit
   tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
-||||||| merged common ancestors
-  // TODO: Logic to determine where in the table to copy the timestamps to
-  //       given the ID of the msg.
-=======
+
   // TODO: Logic to determine where in the table to copy the timestamps to
   //       given the ID of the msg.
   //       Note: @param ts refers to the timestamp when receiving the second TX.
@@ -149,7 +135,7 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
 /**
  * @brief Updates the timestamps table with a single value depending on this node's and
  *        incoming node's id.
- * 
+ *
  * @param table 2D array representing the timestamps table.
  * @param ts timestamp value to update with.
  * @param thisId current node's id.
@@ -159,7 +145,6 @@ void updateTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts, uint8 thisId, ui
 {
   // TODO: Logic to determine where in the table to update a single value in the table.
   //       2 separate behaviours depnding on the this node's and incoming node's id.
->>>>>>> 11c54a935c1e152db9162fe8cbef93793482e175
 }
 
 /**
