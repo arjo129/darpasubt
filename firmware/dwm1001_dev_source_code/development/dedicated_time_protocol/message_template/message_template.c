@@ -41,20 +41,6 @@ void initTableIndexes(uint8 tableIndexes[N])
 }
 
 /**
- * @brief Initialise indexes to data.
- * These indexes point to message data to be copied to table.
- *
- */
-void initDataIndexes(uint8 dataIndexes[N])
-{
-  int i;
-  for (i = 0; i < N-1; i++)
-  {
-    dataIndexes[i] = 2*N-2;
-  }
-}
-
-/**
  * @brief Converts a given uint8 array to msg_template struct.
  *
  * @param array the array to convert from.
