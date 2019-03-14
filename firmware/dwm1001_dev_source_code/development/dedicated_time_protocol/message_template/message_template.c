@@ -162,6 +162,26 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
     } // else {}
 
   }
+
+  // Copy msg.data to table
+  // msg.data is populated only if msg.isFirst is false
+  if (msg.isFirst == 0) {
+
+    // Where in table to copy msg.data
+    // TODO remove hardcoded indexes
+    if (NODE_ID < msg.id) {
+      memcpy(table[1][NODE_ID], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
+      memcpy(table[2][NODE_ID], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
+      memcpy(table[5][NODE_ID], msg.data + NUM_STAMPS_PER_NODE*NODE_ID+1, sizeof(uint32));
+
+    } else if (NODE_ID > msg.id) {
+      memcpy(table[0][NODE_ID], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
+      memcpy(table[3][NODE_ID], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
+      memcpy(table[4][NODE_ID], msg.data + NUM_STAMPS_PER_NODE*(N-1)+1, sizeof(uint32));
+
+    } // else {}
+  }
+
 }
 
 /**
