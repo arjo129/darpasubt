@@ -112,7 +112,7 @@ void updateTableRx(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
 
 /**
  * @brief Updates the timestamps table given the structure containing the timestamps.
- * Only updates when transmitting a message.
+ * Two behaviours depending on node ids.
  *
  * @param table 2D array representing the timestamps table.
  * @param msg structure containing the timestamps.
@@ -120,16 +120,44 @@ void updateTableRx(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg)
  */
 void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts)
 {
-  setTxTimestampDelayed(table[tableIndexes[NODE_ID]][NODE_ID], 0); // TODO adjust delay
+  // Only copy @param ts to table if tableIndex < 6
+  if (tableIndexes[NODE_ID] < 6) {
+    // Copy @param ts to table
+    memcpy(table[tableIndexes[NODE_ID]][NODE_ID], ts, sizeof(uint32));
 
-  // Always increment table index after transmit
-  tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
+    // Change to tableIndex depends on whether
+    // the node with NODE_ID is currently rx or tx
+    // This is determined by comparing NODE_ID with msg.id
+    // TODO find better way to change index, maybe preprocessor?
+    if (NODE_ID < msg.id) {
+      // NODE_ID is tx
+      switch (tableIndexes[NODE_ID]) {
+        case 0:
+          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
+          break;
+        case 3:
+          tableIndexes[NODE_ID]++;
+          break;
+        default:
+          break;
+      }
 
-  // TODO: Logic to determine where in the table to copy the timestamps to
-  //       given the ID of the msg.
-  //       Note: @param ts refers to the timestamp when receiving the second TX.
-  //             For some nodes, the first 3 timestamps will only be complete after
-  //             receiving the second TX. Eg: Node(U2) See the TX dots diagram.
+    } else if (NODE_ID > msg.id) {
+      // NODE_ID is rx
+      switch (tableIndexes[NODE_ID]) {
+        case 1:
+          tableIndexes[NODE_ID]++;
+          break;
+        case 2:
+          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
+          break;
+        default:
+          break;
+      }
+
+    } // else {}
+
+  }
 }
 
 /**
@@ -144,7 +172,6 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
 void updateTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts, uint8 thisId, uint8 otherId)
 {
   // TODO: Logic to determine where in the table to update a single value in the table.
-  //       2 separate behaviours depnding on the this node's and incoming node's id.
 }
 
 /**
