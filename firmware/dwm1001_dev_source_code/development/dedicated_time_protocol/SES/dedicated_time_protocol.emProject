@@ -105,32 +105,32 @@
     <folder Name="::Device" />
     <folder Name="modules">
       <folder Name="message_template">
-        <file file_name="../message_template/message_template.h" />
-        <file file_name="../message_template/message_template.c" />
+        <file file_name="../modules/message_template/message_template.c" />
+        <file file_name="../modules/message_template/message_template.h" />
       </folder>
       <folder Name="low_timer">
-        <file file_name="../low_timer/low_timer.h" />
-        <file file_name="../low_timer/low_timer.c" />
+        <file file_name="../modules/low_timer/low_timer.c" />
+        <file file_name="../modules/low_timer/low_timer.h" />
       </folder>
       <folder Name="int_handler">
-        <file file_name="../int_handler/int_handler.c" />
-        <file file_name="../int_handler/int_handler.h" />
+        <file file_name="../modules/int_handler/int_handler.c" />
+        <file file_name="../modules/int_handler/int_handler.h" />
       </folder>
       <folder Name="dw_sleeper">
-        <file file_name="../dw_sleeper/dw_sleeper.h" />
-        <file file_name="../dw_sleeper/dw_sleeper.c" />
+        <file file_name="../modules/dw_sleeper/dw_sleeper.c" />
+        <file file_name="../modules/dw_sleeper/dw_sleeper.h" />
       </folder>
       <folder Name="Uart">
-        <file file_name="../UART/UART.c" />
-        <file file_name="../UART/UART.h" />
+        <file file_name="../modules/UART/UART.c" />
+        <file file_name="../modules/UART/UART.h" />
       </folder>
       <folder Name="timestamper">
-        <file file_name="../timestamper/timestamper.h" />
-        <file file_name="../timestamper/timestamper.c" />
+        <file file_name="../modules/timestamper/timestamper.c" />
+        <file file_name="../modules/timestamper/timestamper.h" />
       </folder>
       <folder Name="message_transceiver">
-        <file file_name="../message_transceiver/message_transceiver.h" />
-        <file file_name="../message_transceiver/message_transceiver.c" />
+        <file file_name="../modules/message_transceiver/message_transceiver.c" />
+        <file file_name="../modules/message_transceiver/message_transceiver.h" />
       </folder>
     </folder>
   </project>
