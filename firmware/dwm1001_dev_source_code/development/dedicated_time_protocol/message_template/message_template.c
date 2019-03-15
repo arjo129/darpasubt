@@ -108,6 +108,9 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
         case 3:
           tableIndexes[NODE_ID]++;
           break;
+        case 4:
+          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
+          break;
         default:
           break;
       }
@@ -120,6 +123,9 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
           break;
         case 2:
           tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
+          break;
+        case 5:
+          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
           break;
         default:
           break;
