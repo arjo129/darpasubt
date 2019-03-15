@@ -1,4 +1,5 @@
 #include "deca_types.h"
+#include "common.h"
 
 // Frames related
 #define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
