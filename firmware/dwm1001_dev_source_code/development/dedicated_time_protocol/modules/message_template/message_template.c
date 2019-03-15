@@ -138,20 +138,6 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
 }
 
 /**
- * @brief Updates the timestamps table with a single value depending on this node's and
- *        incoming node's id.
- *
- * @param table 2D array representing the timestamps table.
- * @param ts timestamp value to update with.
- * @param thisId current node's id.
- * @param otherId incoming node's id.
- */
-void updateTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts, uint8 thisId, uint8 otherId)
-{
-  // TODO: Logic to determine where in the table to update a single value in the table.
-}
-
-/**
  * @brief Retrieves all the timestamp values stamped with one particular node.
  *
  * @param table 2D array representing the timestamps table.
