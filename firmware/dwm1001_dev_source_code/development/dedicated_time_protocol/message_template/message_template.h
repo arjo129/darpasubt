@@ -36,8 +36,7 @@ typedef struct {
 } msg_template;
 
 /* Function prototypes */
-void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N]);
-void initTableIndexes(uint8 tableIndexes[N]);
+void initTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 indices[N]);
 void convertToStruct(uint8 *array, msg_template *msg);
 void convertToArr(msg_template msg, uint8 *array);
 void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts);

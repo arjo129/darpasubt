@@ -396,18 +396,7 @@ void rxHandler(uint8 buffer[MSG_LEN])
 
   rxTs = dwt_readrxtimestamphi32();
   convertToStruct(buffer, &msg);
-
-  if (msg.isFirst)
-  {
-    // Update a single entry.
-    updateTs(tsTable, rxTs, NODE_ID, msg.id);
-  }
-  else
-  {
-    // Else we complete the table entries with incoming node's frame.
-    updateTable(tsTable, msg, rxTs);
-  }
-  
+  updateTable(tsTable, msg, rxTs);
 }
 
 /* Protocol functions */
