@@ -39,6 +39,7 @@
 #include "int_handler.h"
 #include "low_timer.h"
 #include "timestamper.h"
+#include "message_transceiver.h"
 #include "message_template.h"
 #include "common.h"
 
