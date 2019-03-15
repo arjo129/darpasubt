@@ -122,16 +122,15 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
   if (msg.isFirst == 0) {
 
     // Where in table to copy msg.data
-    // TODO remove hardcoded indexes
     if (NODE_ID < msg.id) {
-      memcpy(table[1][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
-      memcpy(table[2][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
-      memcpy(table[5][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID+1, sizeof(uint32));
+      memcpy(table[IDX_TS_2][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
+      memcpy(table[IDX_TS_3][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
+      memcpy(table[IDX_TS_6][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID+1, sizeof(uint32));
 
     } else if (NODE_ID > msg.id) {
-      memcpy(table[0][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
-      memcpy(table[3][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
-      memcpy(table[4][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1)+1, sizeof(uint32));
+      memcpy(table[IDX_TS_1][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
+      memcpy(table[IDX_TS_4][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
+      memcpy(table[IDX_TS_5][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1)+1, sizeof(uint32));
 
     } // else {}
   }

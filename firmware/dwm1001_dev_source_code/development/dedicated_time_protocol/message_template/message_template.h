@@ -11,6 +11,12 @@
 #define IDX_ISFIRST 11
 #define IDX_DATA 12
 #define IDX_CRC MSG_LEN - 2
+#define IDX_TS_1 0
+#define IDX_TS_2 1
+#define IDX_TS_3 2
+#define IDX_TS_4 3
+#define IDX_TS_5 4
+#define IDX_TS_6 5
 
 /** Message template
  *
