@@ -81,13 +81,13 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
     if (NODE_ID < msg.id) {
       // NODE_ID is tx
       switch (tableIndexes[NODE_ID]) {
-        case 0:
+        case IDX_TS_1:
           tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
           break;
-        case 3:
+        case IDX_TS_4:
           tableIndexes[NODE_ID]++;
           break;
-        case 4:
+        case IDX_TS_5:
           tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
           break;
         default:
@@ -97,13 +97,13 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
     } else if (NODE_ID > msg.id) {
       // NODE_ID is rx
       switch (tableIndexes[NODE_ID]) {
-        case 1:
+        case IDX_TS_2:
           tableIndexes[NODE_ID]++;
           break;
-        case 2:
+        case IDX_TS_3:
           tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
           break;
-        case 5:
+        case IDX_TS_6:
           tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
           break;
         default:

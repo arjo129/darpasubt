@@ -6,6 +6,8 @@
 #define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
 #define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
 #define NUM_STAMPS_PER_CYCLE 6 // Total number of timestamps needed to compute distance
+#define HEADER_LEN 10
+#define CRC_LEN 2
 
 // Position index of frame elements
 #define IDX_ID 10
@@ -35,11 +37,11 @@
  * crc: needs to be the final two bytes.
  */
 typedef struct {
-  uint8 header[10];
+  uint8 header[HEADER_LEN];
   uint8 id;
   uint8 isFirst;
   uint8 data[DATA_LEN];
-  uint8 crc[2];
+  uint8 crc[CRC_LEN];
 } msg_template;
 
 /* Function prototypes */
