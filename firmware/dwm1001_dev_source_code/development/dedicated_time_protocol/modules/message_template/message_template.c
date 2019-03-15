@@ -72,7 +72,7 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
   // Only copy @param ts to table if tableIndex < NUM_STAMPS_PER_CYCLE
   if (tableIndexes[NODE_ID] < NUM_STAMPS_PER_CYCLE) {
     // Copy @param ts to table
-    memcpy(table[tableIndexes[NODE_ID]][NODE_ID], ts, sizeof(uint32));
+    memcpy(table[tableIndexes[NODE_ID]][msg.id], ts, sizeof(uint32));
 
     // Change to tableIndex depends on whether
     // the node with NODE_ID is currently rx or tx
