@@ -109,9 +109,24 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
         default:
           break;
       }
-
-    } // else {}
-
+    }
+    else
+    {
+      // Otherwise, this message is this node's own TX out.
+      switch (tableIndexes[NODE_ID]) {
+        case IDX_TS_2:
+          tableIndexes[NODE_ID]++;
+          break;
+        case IDX_TS_3:
+          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
+          break;
+        case IDX_TS_6:
+          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
+          break;
+        default:
+          break;
+      }
+    }
   }
 
   // NOTE: this does not account for TXs update. If this node is updating after second TX,
@@ -209,10 +224,10 @@ static void initTableIndexes(uint8 tableIndexes[N])
   int i;
   for (i = 0; i < NODE_ID; i++)
   {
-    tableIndexes[i] = 1;
+    tableIndexes[i] = IDX_TS_2;
   }
   for (i = NODE_ID+1; i < N-1; i++)
   {
-    tableIndexes[i] = 0;
+    tableIndexes[i] = IDX_TS_1;
   }
 }
