@@ -48,9 +48,9 @@ typedef struct {
 void initTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 indices[N]);
 void convertToStruct(uint8 *array, msg_template *msg);
 void convertToArr(msg_template msg, uint8 *array);
-void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts);
-void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE], uint8 id);
-void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 id);
+void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts, uint8 thisId);
+void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE], uint8 thisId, uint8 targetId);
+void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 thisId, uint8 targetId);
 
 /* Public variables */
 extern uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];

@@ -60,112 +60,138 @@ void convertToArr(msg_template msg, uint8 *array)
 }
 
 /**
- * @brief Updates the timestamps table given the structure containing the timestamps.
- * Two behaviours depending on node ids.
- *
+ * @brief Updates the timestamps table given the TX/RX message.
+ * 
  * @param table 2D array representing the timestamps table.
  * @param msg structure containing the timestamps.
  * @param ts the reception timestamp of the incoming second TX.
+ * @param thisId identifier of calling node.
  */
-void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts)
+void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts, uint8 thisId)
 {
-  // Only copy @param ts to table if tableIndex < NUM_STAMPS_PER_CYCLE
-  if (tableIndexes[NODE_ID] < NUM_STAMPS_PER_CYCLE) {
-    // Copy @param ts to table
-    memcpy(table[tableIndexes[NODE_ID]][msg.id], ts, sizeof(uint32));
-
-    // Change to tableIndex depends on whether
-    // the node with NODE_ID is currently rx or tx
-    // This is determined by comparing NODE_ID with msg.id
-    // TODO find better way to change index, maybe preprocessor?
-    if (NODE_ID < msg.id) {
-      // NODE_ID is tx
-      switch (tableIndexes[NODE_ID]) {
-        case IDX_TS_1:
-          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
-          break;
-        case IDX_TS_4:
-          tableIndexes[NODE_ID]++;
-          break;
-        case IDX_TS_5:
-          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
-          break;
-        default:
-          break;
-      }
-
-    } else if (NODE_ID > msg.id) {
-      // NODE_ID is rx
-      switch (tableIndexes[NODE_ID]) {
-        case IDX_TS_2:
-          tableIndexes[NODE_ID]++;
-          break;
-        case IDX_TS_3:
-          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
-          break;
-        case IDX_TS_6:
-          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
-          break;
-        default:
-          break;
-      }
+  // This message is from own node.
+  if (msg.id == thisId)
+  {
+    // Own TX timestamps are store in the first two row of its own column.
+    // For perfornance and simplicity sake.
+    if (msg.isFirst == 1)
+    {
+      table[IDX_TS_1][thisId] = ts;
     }
     else
     {
-      // Otherwise, this message is this node's own TX out.
-      switch (tableIndexes[NODE_ID]) {
-        case IDX_TS_2:
-          tableIndexes[NODE_ID]++;
-          break;
-        case IDX_TS_3:
-          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + 3;
-          break;
-        case IDX_TS_6:
-          tableIndexes[NODE_ID] = tableIndexes[NODE_ID] + NUM_STAMPS_PER_CYCLE;
-          break;
-        default:
-          break;
-      }
+      table[IDX_TS_2][thisId] = ts;
+    }
+    return;
+  }
+
+  // This message is the first TX from another node.
+  // We want to store the reception timestamp of this message in that node's dedicated column.
+  if (msg.isFirst == 1)
+  {
+    /*
+      Two behaviours here:
+      
+      All the columns with thisId < msg.id will DEFINITELY have TX1 and TX2
+      timestamps (both of which from thisId) in IDX_TS_1 and IDX_TS_5 
+      (though we store at IDX_TS_1 and IDX_TS_2 instead for performance and simplicity sake)
+      respectively.
+
+      In this case, we will only need RX timestamp (stamped when receive from another
+      node) at IDX_TS_4.
+      
+      All columns with thisId > msg.id will DEFINITELY have TX1 timestamp
+      (from thisId) in IDX_TS_3 (though we store at IDX_TS_1 instead for performance and
+      simplicity sake). And TX2 timestamp is not required for calculation.
+      
+      In this case, we will only need RX timestamp (stamped when receive from another
+      node) at IDX_TS_2 and IDX_TS_6.
+
+      Since all states are easily predetermined, we can hardcode the location to
+      store the individual timestamps.
+      
+      NOTE: these will only occur for the first 3 timestamps (All the first TXes).
+      For the reception of other node's timestamps from their second TX, we will have
+      still determine where to place their timestamps in this node's table. Which is the
+      second portion in this function scope.
+    */
+   
+    if (thisId < msg.id)
+    {
+      table[IDX_TS_4][msg.id] = ts;
+    }
+    else if (thisId > msg.id)
+    {
+      table[IDX_TS_2][msg.id] = ts; 
+    }
+    else
+    {
+      // Will not reach here.
     }
   }
+  else
+  {
+    // This message is the second TX from another node. Handle the timestamps in the payload.
 
-  // NOTE: this does not account for TXs update. If this node is updating after second TX,
-  // the code below will still run. But in fact, we do not want to.
-
-  // Copy msg.data to table
-  // msg.data is populated only if msg.isFirst is false
-  if (msg.isFirst == 0) {
-
-    // Where in table to copy msg.data
-    if (NODE_ID < msg.id) {
-      memcpy(table[IDX_TS_2][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
-      memcpy(table[IDX_TS_3][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
-      memcpy(table[IDX_TS_6][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID+1, sizeof(uint32));
-
-    } else if (NODE_ID > msg.id) {
-      memcpy(table[IDX_TS_1][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1), sizeof(uint32));
-      memcpy(table[IDX_TS_4][msg.id], msg.data + NUM_STAMPS_PER_NODE*NODE_ID, sizeof(uint32));
-      memcpy(table[IDX_TS_5][msg.id], msg.data + NUM_STAMPS_PER_NODE*(N-1)+1, sizeof(uint32));
-
-    } // else {}
+    if (thisId < msg.id)
+    {
+      memcpy(&table[IDX_TS_2][msg.id], msg.data + NUM_STAMPS_PER_NODE * NODE_ID, sizeof(uint32));
+      memcpy(&table[IDX_TS_3][msg.id], msg.data + NUM_STAMPS_PER_NODE * (N - 1), sizeof(uint32));
+      memcpy(&table[IDX_TS_6][msg.id], msg.data + NUM_STAMPS_PER_NODE * NODE_ID + 1, sizeof(uint32));
+    }
+    else if (thisId > msg.id)
+    {
+      table[IDX_TS_6][msg.id] = ts; // Store the reception timestamp
+      memcpy(&table[IDX_TS_1][msg.id], msg.data + NUM_STAMPS_PER_NODE * (N - 1), sizeof(uint32));
+      memcpy(&table[IDX_TS_4][msg.id], msg.data + NUM_STAMPS_PER_NODE * NODE_ID, sizeof(uint32));
+      memcpy(&table[IDX_TS_5][msg.id], msg.data + NUM_STAMPS_PER_NODE * (N - 1) + 1, sizeof(uint32));
+    }
+    else
+    {
+      // Will not reach here.
+    }
   }
-
 }
 
 /**
  * @brief Retrieves all the timestamp values stamped with one particular node.
  *
+ * @details When @param thisId is equal to @param targetId, zeroed @param ts is returned.
+ * 
  * @param table 2D array representing the timestamps table.
  * @param ts array to contain the retrieved values.
- * @param id identifier of target node of retrieved values.
+ * @param thisId identifier of calling node.
+ * @param targetId identifier of target node.
  */
-void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE], uint8 id)
+void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE], uint8 thisId, uint8 targetId)
 {
+  // Invalid call, zero all field to indicate.
+  if (thisId == targetId)
+  {
+    memset(ts, 0, sizeof(ts));
+    return;
+  }
+
   int i;
 
-  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
+  for (i = IDX_TS_1; i <= IDX_TS_6; i++)
   {
-    ts[i] = table[i][id];
+    if (thisId < targetId && i == IDX_TS_1)
+    {
+      ts[IDX_TS_1] = table[IDX_TS_1][thisId];
+    }
+    else if (thisId < targetId && i == IDX_TS_5)
+    {
+      ts[IDX_TS_5] = table[IDX_TS_2][thisId];
+    }
+    else if (thisId > targetId && i == IDX_TS_3)
+    {
+      ts[IDX_TS_3] = table[IDX_TS_1][thisId];
+    }
+    else
+    {
+      ts[i] = table[i][targetId];
+    }
   }
 }
 
@@ -174,21 +200,30 @@ void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
  *
  * @param table 2D array representing the timestamps table.
  * @param ts array to contain the retrieved values.
- * @param id identifier of target node of retrieved values.
+ * @param thisId identifier of calling node.
+ * @param targetId identifier of target node.
  */
-void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 id)
+void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 thisId, uint8 targetId)
 {
-  int i;
-  int j = 0;
-
-  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
+  if (thisId < targetId)
   {
-    if (table[i][id] != 0)
-    {
-      ts[j] = table[i][id];
-      j++;
-    }
+    ts[IDX_TS_1] = table[IDX_TS_1][targetId];
+    ts[IDX_TS_2] = table[IDX_TS_4][targetId];
+    ts[IDX_TS_3] = table[IDX_TS_5][targetId];
   }
+  else if (thisId > targetId)
+  {
+    ts[IDX_TS_1] = table[IDX_TS_2][targetId];
+    ts[IDX_TS_2] = table[IDX_TS_3][targetId];
+    ts[IDX_TS_3] = table[IDX_TS_6][targetId];
+  }
+  else
+  {
+    // Invalid call, zero all field to indicate.
+    memset(ts, 0, sizeof(ts));
+    return;
+  }
+  
 }
 
 /* Local functions */
