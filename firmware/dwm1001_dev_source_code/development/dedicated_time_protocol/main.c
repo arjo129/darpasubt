@@ -226,8 +226,7 @@ int main(void)
   initTimeBuffers();
 
   // Initialise timestamp-related data structures.
-  initTsTable(tsTable);
-  initTableIndexes(tableIndexes);
+  initTable(tsTable);
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK

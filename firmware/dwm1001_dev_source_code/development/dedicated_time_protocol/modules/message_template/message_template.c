@@ -1,22 +1,24 @@
 #include "string.h"
 #include "message_template.h"
 
-/* Local functions prototypes */
-void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N]);
-void initTableIndexes(uint8 tableIndexes[N]);
-
 /* Public functions */
 
 /**
- * @brief Initialises all arrays related to timestamp table.
+ * @brief Initialises timestamp table.
  * 
  * @param table pointer to the 2D array representing the timestamp table.
- * @param indices pointer to the array containing the indices to help track timestamp table positions.
  */
-void initTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 indices[N])
+void initTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
 {
-  initTsTable(table);
-  initTableIndexes(indices);
+  int i, j;
+
+  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
+  {
+    for (j = 0; j < N; j++)
+    {
+      table[i][j] = 0;
+    }
+  }
 }
 
 /**
@@ -222,47 +224,5 @@ void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
     // Invalid call, zero all field to indicate.
     memset(ts, 0, sizeof(ts));
     return;
-  }
-  
-}
-
-/* Local functions */
-
-/**
- * @brief Initialises the timestamp tables with zeros.
- *
- */
-static void initTsTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
-{
-  int i, j;
-
-  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
-  {
-    for (j = 0; j < N; j++)
-    {
-      table[i][j] = 0;
-    }
-  }
-}
-
-/**
- * @brief Initialise indexes to table.
- * These indexes point to where in table message data should be copied to.
- *
- * There are only two types of initial values:
- *   0: for all other node ids > NODE_ID
- *   1: for all other node ids < NODE_ID
- * Value of index of NODE_ID is undefined.
- */
-static void initTableIndexes(uint8 tableIndexes[N])
-{
-  int i;
-  for (i = 0; i < NODE_ID; i++)
-  {
-    tableIndexes[i] = IDX_TS_2;
-  }
-  for (i = NODE_ID+1; i < N-1; i++)
-  {
-    tableIndexes[i] = IDX_TS_1;
   }
 }
