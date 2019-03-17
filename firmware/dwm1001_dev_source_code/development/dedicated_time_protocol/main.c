@@ -39,7 +39,9 @@
 #include "int_handler.h"
 #include "low_timer.h"
 #include "timestamper.h"
+#include "message_transceiver.h"
 #include "message_template.h"
+#include "common.h"
 
 //-----------------dw1000----------------------------
 
@@ -59,17 +61,11 @@ static dwt_config_t config = {
 //--------------dw1000---end---------------
 
 /* Macros definitions */
-#define N 4 /**< Number of nodes */
-// Antenna delays
-#define TX_ANT_DLY 16456
-#define RX_ANT_DLY 16456
+
 // Ranging related
-#define NODE_ID 0 // Node ID
-#define RANGE_FREQ 5 // Frequency of the cycles
-#define TX_INTERVAL 12000 // In microseconds
 #define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
-#define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
-#define MSG_LEN 32
+#define SPEED_OF_LIGHT 299702547
+
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
 #define TX_GAP 400 /**< Time interval between transmits, in microseconds */
@@ -88,13 +84,12 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 /* Local function prototypes */
 void runTask (void * pvParameter);
 void syncCycle(void);
-static void initBuffers(void);
-void initTimeBuffers();
 void setTimestamps(msg_template msg);
 void setTxTimestamp(uint8 *data);
 void setRxTimestamp(uint8 *data);
 void setTxTimestampDelayed(uint8 *data, uint32 addDelay);
 msg_template getTimestamps(uint8 isFirst);
+void rxHandler(uint8 buffer[MSG_LEN]);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
@@ -105,7 +100,8 @@ static void initCycleTimings(void);
 static void initListen(void);
 static void firstTx(int nodeId);
 static void secondTx(int nodeId);
-static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
+static void goToSleep(bool rxOn);
+static double calcDist(uint8 id);
 
 /* Global variables */
 // Frames related
@@ -118,6 +114,7 @@ uint32 activePeriod;
 uint32 sleepPeriod; // Time duration for actual hardware sleeping
 uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cycle
 TxStatus txStatus;
+uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
 // States related
 bool isInitiating = false;
 // Timers related
@@ -132,22 +129,6 @@ uint32 timeToTx2; //  Duration until second transmission
 uint32 rxTime; // Receive duration until sleep
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
-// Buffer for timestamps
-/**
- * Times that NODE_ID stamped.
- *  |0|0|1|1|...|N-1|N-1|
- * Each elem i is the timestamp where node NODE_ID rx the transmission 
- * from node i.
- */
-uint32 timeOwn[NUM_STAMPS_PER_NODE*N];
-
-/**
- * Times that other nodes (not NODE_ID) stamped.
- *  |0|0|1|1|...|N-1|N-1|
- * Each elem i is the timestamp where node i rx the transmission from 
- * node NODE_ID.
- */
-uint32 timeOthers[NUM_STAMPS_PER_NODE*N];
 
 /** Default header */
 uint8 header[10] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -249,10 +230,9 @@ int main(void)
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
-  initTimeBuffers();
 
-  // Initialises buffers
-  initBuffers();
+  // Initialise timestamp-related data structures.
+  initTable(tsTable);
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -287,14 +267,6 @@ void runTask (void * pvParameter)
   while(true) {};
 }
 
-void initTimeBuffers() {
-  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-    timeOwn[i] = 0;
-    timeOthers[i] = 0;
-  }
-}
-
-
 /**
  * @brief Stores rx data in the correct buffer.
  * If rx request, store rx id, for subsequent transmission.
@@ -312,9 +284,9 @@ void setTimestamps(msg_template msg) {
    *
    * data: time.
    *  time: uint32, DATA_LEN timestamps.
-   *    |0|0|1|1|...|i-1|i-1|...|i+1|i+1|...|N-1|N-1|i|
+   *    |0|0|1|1|...|i-1|i-1|i+1|i+1|...|N-1|N-1|i|i|
    *    where msg.id is i
-   *      i elem: estimated transmission time, at the back of time array.
+   *      i elem: actual tx time, estimated tx time
    *      other elems: rx time, rx time
    */
   if (msg.isFirst) {
@@ -383,21 +355,19 @@ msg_template getTimestamps(uint8 isFirst) {
   return msg;
 }
 
-/* Local functions */
-
 /**
- * @brief Initialises the buffers required for timetamps storage.
+ * @brief Handler function when reception of a frame is successful.
  * 
+ * @param buffer array containing data from the frame.
  */
-static void initBuffers(void)
+void rxHandler(uint8 buffer[MSG_LEN])
 {
-  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-    timeOwn[i] = -1;
-  }
+  msg_template msg;
+  uint32 rxTs;
 
-  for (int i = 0; i < NUM_STAMPS_PER_NODE*N; i++) {
-    timeOthers[i] = -1;
-  }
+  rxTs = dwt_readrxtimestamphi32();
+  convertToStruct(buffer, &msg);
+  updateTable(tsTable, msg, rxTs);
 }
 
 /* Protocol functions */
@@ -605,4 +575,30 @@ void syncCycle(void)
   lowTimerStop(initTimer);
   printf("sync-ing cycle by sleeping\r\n"); // debugging purpose
   isInitiating = false;
+}
+
+/**
+ * @brief Calculates the distance using the timestamp table.
+ * 
+ * @param id identifier of the node to calculate the distance with.
+ * @return double the calculated distance.
+ */
+static double calcDist(uint8 id)
+{
+  double roundTrip1, roundTrip2, replyTrip2, replyTrip1, tof;
+  uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
+  int64 tof64;
+
+  // Get values to calculate.
+  getFullTs(tsTable, ts, id);
+
+  roundTrip1 = (double)(ts[IDX_TS_4] - ts[IDX_TS_1]);
+  roundTrip2 = (double)(ts[IDX_TS_6] - ts[IDX_TS_3]);
+  replyTrip1 = (double)(ts[IDX_TS_3] - ts[IDX_TS_2]);
+  replyTrip2 = (double)(ts[IDX_TS_5] - ts[IDX_TS_4]);
+
+  tof64 = (int64)((roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2));
+
+  tof = tof64 * DWT_TIME_UNITS;
+  return tof * SPEED_OF_LIGHT;
 }
