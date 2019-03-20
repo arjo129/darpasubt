@@ -209,14 +209,14 @@ void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
 {
   if (thisId < targetId)
   {
-    ts[IDX_TS_1] = table[IDX_TS_1][targetId];
+    ts[IDX_TS_1] = table[IDX_TS_1][thisId];
     ts[IDX_TS_2] = table[IDX_TS_4][targetId];
-    ts[IDX_TS_3] = table[IDX_TS_5][targetId];
+    ts[IDX_TS_3] = table[IDX_TS_2][thisId];
   }
   else if (thisId > targetId)
   {
     ts[IDX_TS_1] = table[IDX_TS_2][targetId];
-    ts[IDX_TS_2] = table[IDX_TS_3][targetId];
+    ts[IDX_TS_2] = table[IDX_TS_1][thisId];
     ts[IDX_TS_3] = table[IDX_TS_6][targetId];
   }
   else
