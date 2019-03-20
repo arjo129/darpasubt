@@ -137,16 +137,16 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
 
     if (thisId < msg.id)
     {
-      memcpy(&table[IDX_TS_2][msg.id], msg.data + NUM_STAMPS_PER_NODE * NODE_ID, sizeof(uint32));
-      memcpy(&table[IDX_TS_3][msg.id], msg.data + NUM_STAMPS_PER_NODE * (N - 1), sizeof(uint32));
-      memcpy(&table[IDX_TS_6][msg.id], msg.data + NUM_STAMPS_PER_NODE * NODE_ID + 1, sizeof(uint32));
+      memcpy(&table[IDX_TS_2][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4), sizeof(uint32));
+      memcpy(&table[IDX_TS_3][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 4, sizeof(uint32));
+      memcpy(&table[IDX_TS_6][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 8, sizeof(uint32));
     }
     else if (thisId > msg.id)
     {
       table[IDX_TS_6][msg.id] = ts; // Store the reception timestamp
-      memcpy(&table[IDX_TS_1][msg.id], msg.data + NUM_STAMPS_PER_NODE * (N - 1), sizeof(uint32));
-      memcpy(&table[IDX_TS_4][msg.id], msg.data + NUM_STAMPS_PER_NODE * NODE_ID, sizeof(uint32));
-      memcpy(&table[IDX_TS_5][msg.id], msg.data + NUM_STAMPS_PER_NODE * (N - 1) + 1, sizeof(uint32));
+      memcpy(&table[IDX_TS_1][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4), sizeof(uint32));
+      memcpy(&table[IDX_TS_4][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 4, sizeof(uint32));
+      memcpy(&table[IDX_TS_5][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 8, sizeof(uint32));
     }
     else
     {

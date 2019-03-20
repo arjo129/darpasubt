@@ -343,7 +343,7 @@ void writeTx2(msg_template *msg) {
 
     // Retrieve values for each node and copy into data member at predefined slots.
     getHalfTs(tsTable, ts, NODE_ID, i);
-    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE), ts, sizeof(ts));
+    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE * 4), ts, sizeof(ts));
   }
 }
 
@@ -451,6 +451,8 @@ static void rxTimerHandler(void *pContext)
   printf("%d\r\n", counter);
   counter = 0;
   goToSleep(true, sleepPeriod, wakePeriod);
+  double dist = calcDist(1);
+  printf("%lf\r\n", dist);
 }
 
 /**
@@ -613,20 +615,23 @@ void updateRx(msg_template *msg)
  */
 static double calcDist(uint8 id)
 {
-  double roundTrip1, roundTrip2, replyTrip2, replyTrip1, tof;
+  uint32 roundTrip1, roundTrip2, replyTrip2, replyTrip1;
+  double tof;
   uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
-  int64 tof64;
+  uint64 num, dem;
 
   // Get values to calculate.
   getFullTs(tsTable, ts, NODE_ID, id);
 
-  roundTrip1 = (double)(ts[IDX_TS_4] - ts[IDX_TS_1]);
-  roundTrip2 = (double)(ts[IDX_TS_6] - ts[IDX_TS_3]);
-  replyTrip1 = (double)(ts[IDX_TS_3] - ts[IDX_TS_2]);
-  replyTrip2 = (double)(ts[IDX_TS_5] - ts[IDX_TS_4]);
+  roundTrip1 = (ts[IDX_TS_4] - ts[IDX_TS_1]);
+  roundTrip2 = (ts[IDX_TS_6] - ts[IDX_TS_3]);
+  replyTrip1 = (ts[IDX_TS_3] - ts[IDX_TS_2]);
+  replyTrip2 = (ts[IDX_TS_5] - ts[IDX_TS_4]);
 
-  tof64 = (int64)((roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2));
+  num = (roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2);
+  dem = (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
+  tof = ((double)(num) / (double)(dem));
 
-  tof = tof64 * DWT_TIME_UNITS;
+  tof = tof * DWT_TIME_UNITS;
   return tof * SPEED_OF_LIGHT;
 }
