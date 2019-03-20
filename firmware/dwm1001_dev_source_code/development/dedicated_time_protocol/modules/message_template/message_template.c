@@ -30,15 +30,15 @@ void initTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
 void convertToStruct(uint8 *array, msg_template *msg)
 {
   // Copy over the header bytes
-  memcpy(&(msg->header), &array[0], sizeof(msg->header));
+  memcpy(msg->header, &array[0], sizeof(msg->header));
   // Copy over the id
   memcpy(&(msg->id), &array[IDX_ID], sizeof(msg->id));
   // Copy over the isFirst flag
   memcpy(&(msg->isFirst), &array[IDX_ISFIRST], sizeof(msg->isFirst));
   // Copy over the timestamps payload
-  memcpy(msg->data, &array[IDX_DATA], sizeof(msg->id));
+  memcpy(msg->data, &array[IDX_DATA], sizeof(msg->data));
   // Copy over the CRC bytes
-  memcpy(&(msg->id), &array[IDX_CRC], sizeof(msg->id));
+  memcpy(msg->crc, &array[IDX_CRC], sizeof(msg->crc));
 }
 
 /**
@@ -50,15 +50,15 @@ void convertToStruct(uint8 *array, msg_template *msg)
 void convertToArr(msg_template msg, uint8 *array)
 {
   // Copy over the header bytes
-  memcpy(&array[0], &(msg.header), sizeof(msg.header));
+  memcpy(&array[0], msg.header, sizeof(msg.header));
   // Copy over the id
   memcpy(&array[IDX_ID], &(msg.id), sizeof(msg.id));
   // Copy over the isFirst flag
   memcpy(&array[IDX_ISFIRST], &(msg.isFirst), sizeof(msg.isFirst));
   // Copy over the timestamps payload
-  memcpy(&array[IDX_DATA], msg.data, sizeof(msg.id));
+  memcpy(&array[IDX_DATA], msg.data, sizeof(msg.data));
   // Copy over the CRC bytes
-  memcpy(&array[IDX_CRC], &(msg.id), sizeof(msg.id));
+  memcpy(&array[IDX_CRC], msg.crc, sizeof(msg.crc));
 }
 
 /**

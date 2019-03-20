@@ -2,9 +2,9 @@
 #include "common.h"
 
 // Frames related
-#define NUM_STAMPS_PER_NODE 2 // Number of timestamps stored that belong to each node
-#define DATA_LEN NUM_STAMPS_PER_NODE*(N-1)+1 // Length (bytes) of data in standard message
-#define MSG_LEN 13+DATA_LEN // Length (bytes) of the standard message
+#define NUM_STAMPS_PER_NODE 3 // Number of timestamps stored that belong to each node
+#define DATA_LEN NUM_STAMPS_PER_NODE * N * 4 // Length (bytes) of data in standard message. Each timestamp is 4 bytes.
+#define MSG_LEN HEADER_LEN + DATA_LEN + CRC_LEN // Length (bytes) of the standard message
 #define NUM_STAMPS_PER_CYCLE 6 // Total number of timestamps needed to compute distance
 #define HEADER_LEN 10
 #define CRC_LEN 2

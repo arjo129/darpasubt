@@ -5,7 +5,6 @@
 #include "deca_device_api.h"
 #include "message_transceiver.h"
 #include "main.h"
-#include "message_template.h"
 
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
@@ -48,23 +47,21 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
 {
   RxStatus rxStatus;
   uint8 buffer[MSG_LEN] = {0};
-  msg_template *msg;
-
+  msg_template msg;
 
   // Eg: Read received frame data and print
   rxStatus = rxMsg(buffer);
   if (rxStatus == RX_SUCCESS) {
     counter++; // debugging purpose
     // Cast the frame to the message structure first
-    // TODO: Find a better way to do this
-    msg = (msg_template *)buffer;
-    if (msg->isFirst && isInitiating)
+    convertToStruct(buffer, &msg);
+    if (msg.isFirst && msg.id == 0 && isInitiating)
     {
       syncCycle();
     }
     else
     {
-      // Store RX timestamp here
+      updateRx(&msg);
     }
   }
 
