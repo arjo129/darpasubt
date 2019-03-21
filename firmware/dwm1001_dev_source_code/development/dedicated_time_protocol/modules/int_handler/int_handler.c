@@ -80,6 +80,7 @@ void rx_to_cb(const dwt_cb_data_t *cb_data)
 {
   /* TESTING BREAKPOINT LOCATION #2 */
   printf("TimeOut\r\n");
+  dwt_rxreset();
 }
 
 /**
@@ -91,6 +92,7 @@ void rx_to_cb(const dwt_cb_data_t *cb_data)
  */
 void rx_err_cb(const dwt_cb_data_t *cb_data)
 {
+  dwt_rxreset();
   /* TESTING BREAKPOINT LOCATION #3 */
   // printf("Transmission Error : may receive package from different UWB device\r\n");
   dwt_rxenable(DWT_START_RX_IMMEDIATE);

@@ -316,13 +316,13 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2)
 uint32 calcTx2(uint32 addDelay) {
   // Get current system time (higher 32 bits).
   uint32 sys32 = dwt_readsystimestamphi32();
-
+  
   // Convert the delay we need into system time representation
   uint64 delay = addDelay * 128 * 499200000 / 1000000; // Divide by 1e6 to get seconds form.
   delay = delay >> 8; // Shift right by 8 to get the higher 32 bits
 
   // Calculate the approx. time by adding to the system time.
-  uint32 approx = sys32 + delay + TX_ANT_DLY;  
+  uint32 approx = sys32 + (uint32)delay + TX_ANT_DLY + 40114000;  
 }
 
 /**
@@ -450,9 +450,11 @@ static void rxTimerHandler(void *pContext)
 {
   printf("%d\r\n", counter);
   counter = 0;
-  goToSleep(true, sleepPeriod, wakePeriod);
+  printTable(tsTable);
   double dist = calcDist(1);
-  printf("%lf\r\n", dist);
+  printf("Distance: %lf\r\n", dist);
+  // printTable(tsTable);
+  goToSleep(true, sleepPeriod, wakePeriod);
 }
 
 /**
@@ -568,12 +570,6 @@ static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
   // dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleep);
   lowTimerStart(wakeTimer, wake);
-  printTable(tsTable);
-  uint32 ts1 = tsTable[1][NODE_ID];
-  uint32 ts2 = tsTable[0][NODE_ID];
-  uint32 tofD = ts1 - ts2;
-  double tof = ((double)tofD / (double)UUS_TO_DWT_TIME);
-  printf("%lf\r\n", tof);
   // Reset the timestamps table
   initTable(tsTable);
 }
@@ -615,23 +611,40 @@ void updateRx(msg_template *msg)
  */
 static double calcDist(uint8 id)
 {
-  uint32 roundTrip1, roundTrip2, replyTrip2, replyTrip1;
-  double tof;
+  double roundTrip1, roundTrip2, replyTrip2, replyTrip1, tof, num, dem;
   uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
-  uint64 num, dem;
+  int64 timeOfFlightInUnits;
 
   // Get values to calculate.
   getFullTs(tsTable, ts, NODE_ID, id);
 
-  roundTrip1 = (ts[IDX_TS_4] - ts[IDX_TS_1]);
-  roundTrip2 = (ts[IDX_TS_6] - ts[IDX_TS_3]);
-  replyTrip1 = (ts[IDX_TS_3] - ts[IDX_TS_2]);
-  replyTrip2 = (ts[IDX_TS_5] - ts[IDX_TS_4]);
+  int i;
+  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
+  {
+    if (ts[i] == 0)
+    {
+      return -1;
+    }
+  }
+
+  roundTrip1 = (double)(ts[IDX_TS_4] - ts[IDX_TS_1]);
+  roundTrip2 = (double)(ts[IDX_TS_6] - ts[IDX_TS_3]);
+  replyTrip1 = (double)(ts[IDX_TS_3] - ts[IDX_TS_2]);
+  replyTrip2 = (double)(ts[IDX_TS_5] - ts[IDX_TS_4]);
+
+  // TODO: These timings do not make sense if you calculate the distance by using their difference directly.
+  //       Maybe use previous protocol and see how those timings are like??
+  //       Also, could the turn-around time (aka the interval duration) be too long such that there is
+  //       vast clock drift and hence, bad calculated values?
+  printf("roundTrip1 = %lf\r\n", roundTrip1);
+  printf("roundTrip2 = %lf\r\n", roundTrip2);
+  printf("replyTrip1 = %lf\r\n", replyTrip1);
+  printf("replyTrip2 = %lf\r\n", replyTrip2);
 
   num = (roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2);
   dem = (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
-  tof = ((double)(num) / (double)(dem));
+  timeOfFlightInUnits = (int64)(num / dem);
 
-  tof = tof * DWT_TIME_UNITS;
+  tof = timeOfFlightInUnits * DWT_TIME_UNITS;
   return tof * SPEED_OF_LIGHT;
 }
