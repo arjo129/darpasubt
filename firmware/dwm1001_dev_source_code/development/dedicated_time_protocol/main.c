@@ -86,7 +86,8 @@ void runTask (void * pvParameter);
 void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
 void updateRx(msg_template *msg);
-uint32 calcTx2(uint32 addDelay);
+uint32 calcTx1(uint32 ts);
+uint32 calcTx2(uint32 ts);
 void writeTx2(msg_template *msg);
 void rxHandler(uint8 buffer[MSG_LEN]);
 static void initTimerHandler(void *pContext);
@@ -127,6 +128,8 @@ uint32 approxTx2; // Estimated timestamp for second TX
 uint32 timeToTx1; // Duration until first transmission
 uint32 timeToTx2; //  Duration until second transmission
 uint32 rxTime; // Receive duration until sleep
+uint64 var_delay;
+uint64 reg_delay;
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 
@@ -308,21 +311,39 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2)
 }
 
 /**
- * @brief Calculates the approximated time for second transmission.
+ * @brief (Synchronisation use) Calculates the tx time from u0 initial transmission.
  * 
- * @param addDelay the delay (in uint32) to add, given in Microseconds.
+ * @param ts the timestamp when u0 message is received.
  * @return uint32 the calculated time.
+ *
+ * NOTE: The chip will go into idle mode after writing the 40 bit timestamp
+ *       will not able to tx or rx messages during this time.
  */
-uint32 calcTx2(uint32 addDelay) {
+uint32 calcTx1(uint32 ts) {
   // Get current system time (higher 32 bits).
-  uint32 sys32 = dwt_readsystimestamphi32();
-
-  // Convert the delay we need into system time representation
-  uint64 delay = addDelay * 128 * 499200000 / 1000000; // Divide by 1e6 to get seconds form.
-  delay = delay >> 8; // Shift right by 8 to get the higher 32 bits
+  // uint32 sys32 = dwt_readsystimestamphi32();
 
   // Calculate the approx. time by adding to the system time.
-  uint32 approx = sys32 + delay + TX_ANT_DLY;  
+  uint32 approx = ts + (uint32)var_delay;
+  return approx;
+}
+
+/**
+ * @brief Calculates the approximated time for second transmission.
+ * 
+ * @param ts the timestamp after the first transmission is sent.
+ * @return uint32 the calculated time.
+ *
+ * NOTE: The chip will go into idle mode after writing the 40 bit timestamp
+ *       will not able to tx or rx messages during this time.
+ */
+uint32 calcTx2(uint32 ts) {
+  // Get current system time (higher 32 bits).
+  // uint32 sys32 = dwt_readsystimestamphi32();
+
+  // Calculate the approx. time by adding to the system time.
+  uint32 approx = ts + (uint32)reg_delay;
+  return approx;
 }
 
 /**
@@ -468,6 +489,10 @@ static void initCycleTimings(void)
   timeToTx1 = TX_INTERVAL * NODE_ID;
   timeToTx2 = N * TX_INTERVAL;
   rxTime = (N - NODE_ID) * TX_INTERVAL;
+  reg_delay = (4.0 * TX_INTERVAL * 10e-6 * UUS_TO_DWT_TIME);
+  reg_delay = reg_delay >> 8;
+  var_delay = (NODE_ID * TX_INTERVAL * 10e-6 * UUS_TO_DWT_TIME);
+  var_delay = var_delay >> 8;
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
   printf("wakePeriod: %u\r\n", wakePeriod);
