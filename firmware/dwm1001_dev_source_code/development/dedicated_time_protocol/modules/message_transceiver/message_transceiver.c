@@ -24,6 +24,7 @@ TxStatus txMsg(uint8 *msg, int msgLen, uint8 mode) {
   dwt_writetxfctrl(msgLen, 0, 1);
 
   /* Start transmission, indicating that a response is expected so that reception is enabled automatically after the frame is sent. */
+  uint32 sys = dwt_readsystimestamphi32();
   ret = dwt_starttx(mode);
   if (ret == DWT_SUCCESS) {
     /* Ensure transmission occurs. */

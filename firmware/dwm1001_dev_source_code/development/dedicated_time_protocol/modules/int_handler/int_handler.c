@@ -10,6 +10,10 @@
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 extern int counter; // debugging purpose
 extern bool isInitiating;
+extern bool tx1Sending;
+extern bool tx2Sending;
+extern bool waitingTx1;
+extern bool waitingTx2;
 
 /* Public functions */
 /**
@@ -55,15 +59,23 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
     counter++; // debugging purpose
     // Cast the frame to the message structure first
     convertToStruct(buffer, &msg);
-    if (msg.isFirst && msg.id == 0 && isInitiating)
+    printf("RX: %d, %d\r\n", msg.id, msg.isFirst);
+    if (msg.isFirst == 1)
     {
-      syncCycle();
+      printf("first  RX\r\n");
     }
     else
     {
-      updateRx(&msg);
+      printf("second RX\r\n");
     }
+    
+    rxHandler(&msg);
   }
+  else
+  {
+    printf("RX fail\r\n");
+  }
+  
 
   // Make sure to enable receiver again
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -79,8 +91,22 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
 void rx_to_cb(const dwt_cb_data_t *cb_data)
 {
   /* TESTING BREAKPOINT LOCATION #2 */
-  printf("TimeOut\r\n");
-  dwt_rxreset();
+  if (waitingTx1)
+  {
+    printf("RX timeout 1\r\n");
+    waitingTx1 = false;
+    configTx1();
+  }
+  else if (waitingTx2)
+  {
+    printf("RX timeout 2\r\n");
+    waitingTx2 = false;
+    configTx2();
+  }
+  else
+  {
+    // Will not reach here.
+  }
 }
 
 /**
@@ -113,8 +139,33 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   * An actual application that would not need this callback could simply not define it and set the corresponding field to NULL when calling
   * dwt_setcallbacks(). The ISR will not call it which will allow to save some interrupt processing time. */
 
-  // printf("frame transmitted\r\n");
-  /* TESTING BREAKPOINT LOCATION #4 */
+  if (tx1Sending)
+  {
+    printf("first  TX\r\n");
+    
+    uint32 ts = dwt_readtxtimestamphi32();
+    updateTx1Ts(ts);
+    setRxTimeout2();
+
+    tx1Sending = false;
+    waitingTx2 = true;
+  }
+  else if (tx2Sending)
+  {
+    printf("second TX\r\n");
+
+    // Make sure device is in IDLE before changing RX timeout.
+    dwt_forcetrxoff();
+    dwt_setrxtimeout(0);
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    
+    tx2Sending = false;
+  }
+  else
+  {
+    // Will not reach here.
+  }
+  
 }
 
 /* Local functions */

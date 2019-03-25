@@ -85,22 +85,23 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 void runTask (void * pvParameter);
 void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
-void updateRx(msg_template *msg);
+void rxHandler(msg_template *msg);
 uint32 calcTx2(uint32 addDelay);
 void writeTx2(msg_template *msg);
-void rxHandler(uint8 buffer[MSG_LEN]);
+void configTx2(void);
+void updateTx1Ts(uint32 ts);
+void setRxTimeout2(void);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
-static void firstTxHandler(void *pContext);
-static void secondTxHandler(void *pContext);
-static void rxTimerHandler(void *pContext);
+static void activeTimerHandler(void *pContext);
 static void initCycleTimings(void);
 static void initListen(void);
-static void firstTx(int nodeId);
-static void secondTx(int nodeId);
+static TxStatus firstTx(uint8 mode);
+static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
-static double calcDist(uint8 id);
+static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
+static void printDists(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 
 /* Global variables */
 // Frames related
@@ -112,23 +113,31 @@ uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod; // Time duration for actual hardware sleeping
 uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cycle
+uint32 dummyTime = (0x00FFFFFF / 2);
+uint64 intervalDwtTime;
+uint32 tx2DelayDwtTime;
+uint16 rxTimeout1;
+uint16 rxTimeout2;
+uint32 masterRx;
 TxStatus txStatus;
 uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
 // States related
 bool isInitiating = false;
+bool tx1Sending = false;
+bool tx2Sending = false;
+bool masterTx1Rdy = false;
+bool waitingTx1 = false;
+bool waitingTx2 = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
-APP_TIMER_DEF(tx1Timer);
-APP_TIMER_DEF(tx2Timer);
-APP_TIMER_DEF(rxTimer);
+APP_TIMER_DEF(activeTimer);
 APP_TIMER_DEF(wakeTimer);
-uint32 approxTx2; // Estimated timestamp for second TX
-uint32 timeToTx1; // Duration until first transmission
-uint32 timeToTx2; //  Duration until second transmission
-uint32 rxTime; // Receive duration until sleep
+APP_TIMER_DEF(dummyTimer);
+uint32 delayedTx; // Timestamp of delayed TX
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
+uint32 tx1DelayedDwtTime;
 
 /** Default header */
 uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -161,6 +170,9 @@ uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0}
     LEDS_INVERT(BSP_LED_1_MASK);
   }
 #endif   // #ifdef USE_FREERTOS
+
+static void dummyHandler(void *pContext) {
+}
 
 int main(void)
 {
@@ -223,10 +235,10 @@ int main(void)
   lowTimerInit();
   lowTimerSingleCreate(&initTimer, initTimerHandler);
   lowTimerSingleCreate(&sleepTimer, sleepTimerHandler);
-  lowTimerSingleCreate(&tx1Timer, firstTxHandler);
-  lowTimerSingleCreate(&tx2Timer, secondTxHandler);
-  lowTimerSingleCreate(&rxTimer, rxTimerHandler);
+  lowTimerSingleCreate(&activeTimer, activeTimerHandler);
   lowTimerSingleCreate(&wakeTimer, wakeTimerHandler);
+  lowTimerRepeatCreate(&dummyTimer, dummyHandler);
+  // lowTimerStart(dummyTimer, dummyTime);
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
@@ -262,12 +274,53 @@ void runTask (void * pvParameter)
   UNUSED_PARAMETER(pvParameter);
   dwt_setleds(DWT_LEDS_ENABLE);
 
+  uint32 id = NODE_ID;
+  tx1DelayedDwtTime = (intervalDwtTime >> 8) * id;
+  printf("tx1DelayedDwtTime = %u\r\n", tx1DelayedDwtTime);
+
   // Listen for activity in the network
-  initListen();
+  // initListen();
   printf("%d\r\n", counter); // debugging purpose
   counter = 0;
 
-  while(true) {};
+  if (NODE_ID == 0)
+  {
+    masterTx1Rdy = true;
+  }
+  else
+  {
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  }
+  
+  // TODO: Use RX timeout to time the first and second TX.
+  //       Note: RX timeout will reset to ZERO once a frame is received. 
+  //       So we need to reset the timeout to a desired value each time a
+  //       frame is received. Once the timeout expires, we handle it with
+  //       either TX1 or TX2.
+  
+  while(true)
+  {
+    if (masterTx1Rdy)
+    {
+      tx1Sending = true;
+
+      dwt_setrxtimeout(rxTimeout2); // Set BEFORE calling first TX.
+      txStatus = firstTx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+      lowTimerStart(activeTimer, activePeriod);
+
+      if (txStatus == TX_SUCCESS)
+      {
+        txCounter++;
+      }
+      else
+      {
+        tx1Sending = false;
+      }
+      
+
+      masterTx1Rdy = false;
+    }
+  }
 }
 
 void printTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
@@ -347,20 +400,77 @@ void writeTx2(msg_template *msg) {
   }
 }
 
+/**
+ * @brief Configure the register parameters for first TX.
+ * 
+ */
+void configTx1(void)
+{
+  uint32 delay = masterRx + tx1DelayedDwtTime;
+  dwt_setdelayedtrxtime(delay);
+  tx1Sending = true;
+  firstTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+}
 
 /**
- * @brief Handler function when reception of a frame is successful.
+ * @brief Configure the register parameters for second TX.
  * 
- * @param buffer array containing data from the frame.
+ * @param refTs reference timestamp to transmit the second TX from.
  */
-void rxHandler(uint8 buffer[MSG_LEN])
+void configTx2(void)
 {
-  msg_template msg;
-  uint32 rxTs;
+  // Set the transmission time for TX2.
+  // Reference timestamp is TX1 timestamp.
+  uint32 delay = tsTable[IDX_TS_1][NODE_ID] + tx2DelayDwtTime;
+  dwt_setdelayedtrxtime(delay);
+  delay += 64;
+  updateTable(tsTable, txMsg2, delay, NODE_ID);
 
-  rxTs = dwt_readrxtimestamphi32();
-  convertToStruct(buffer, &msg);
-  updateTable(tsTable, msg, rxTs, NODE_ID);
+  writeTx2(&txMsg2);
+  tx2Sending = true;
+  secondTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+}
+
+/**
+ * @brief Updates the timestamp table with first TX timestamp.
+ * 
+ * @param ts the first TX timestamp value (higher 32 bits).
+ */
+void updateTx1Ts(uint32 ts)
+{
+  updateTable(tsTable, txMsg1, ts, NODE_ID);
+}
+
+void setRxTimeout2(void)
+{
+  // Make sure device is in IDLE before changing RX timeout.
+  dwt_forcetrxoff();
+  dwt_setrxtimeout(rxTimeout2);
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+}
+
+// TODO: Come up with an algo to update RX timeout depending on the the received ID.
+void resetRxTimeout(uint8 id)
+{
+  uint32 timeout;
+
+  if (waitingTx1)
+  {
+    timeout = ((uint16)TX_INTERVAL * (N - id)) - ((uint16)TX_INTERVAL / 2);
+    dwt_forcetrxoff();
+    dwt_setrxtimeout(timeout);
+  }
+  else if (waitingTx2)
+  {
+    timeout = ((uint16)TX_INTERVAL * (N - id)) - ((uint16)TX_INTERVAL / 2);
+    dwt_forcetrxoff();
+    dwt_setrxtimeout(timeout);
+  }
+  else
+  {
+    // Will not reach here.
+  }
+  
 }
 
 /* Protocol functions */
@@ -382,7 +492,7 @@ static void initTimerHandler(void *pContext)
  * 
  * @param pContext General parameter that can be passed into the handler.
  */
-static void sleepTimerHandler(void *pContext)
+static void wakeTimerHandler(void *pContext)
 {
   dwWake();
 }
@@ -392,69 +502,29 @@ static void sleepTimerHandler(void *pContext)
  * 
  * @param pContext General parameter that can be passed into the handler.
  */
-static void wakeTimerHandler(void *pContext)
+static void sleepTimerHandler(void *pContext)
 {
-  if (timeToTx1 == 0)
+  // Node 0 will transmit immediately for other nodes.
+  if (NODE_ID == 0)
   {
-    firstTx(NODE_ID);
-    lowTimerStart(tx2Timer, timeToTx2);
-
-    approxTx2 = calcTx2(timeToTx2);
-    updateTable(tsTable, txMsg2, approxTx2, NODE_ID);
+    masterTx1Rdy = true;
   }
-  else
-  {
-    lowTimerStart(tx1Timer, timeToTx1);
-  }
+
 }
 
 /**
- * @brief Handler function for first transmission timer timeouts.
+ * @brief Handler function for when active period timer timeouts.
  * 
  * @param pContext General parameter that can be passed into the handler.
  */
-static void firstTxHandler(void *pContext)
+static void activeTimerHandler(void *pContext)
 {
-  printf("%d\r\n", counter);
+  // printf("%d\r\n", counter);
   counter = 0;
-  firstTx(NODE_ID);
-  lowTimerStart(tx2Timer, timeToTx2);
-
-  approxTx2 = calcTx2(timeToTx2);
-  updateTable(tsTable, txMsg2, approxTx2, NODE_ID);
-}
-
-/**
- * @brief Handler function for second transmission timer timeouts.
- * 
- * @param pContext General parameter that can be passed into the handler.
- */
-static void secondTxHandler(void *pContext)
-{
-  uint32 tx1 = dwt_readtxtimestamphi32();
-  updateTable(tsTable, txMsg1, tx1, NODE_ID);
-  writeTx2(&txMsg2);
-
-  printf("%d\r\n", counter);
-  counter = 0;
-  secondTx(NODE_ID);
-  lowTimerStart(rxTimer, rxTime);
-}
-
-/**
- * @brief Handler function for reception  timer after second transmission, timeouts.
- * 
- * @param pContext General parameter that can be passed into the handler.
- */
-static void rxTimerHandler(void *pContext)
-{
-  printf("%d\r\n", counter);
-  counter = 0;
-  printTable(tsTable);
-  double dist = calcDist(1);
-  printf("Distance: %lf\r\n", dist);
-  // printTable(tsTable);
   goToSleep(true, sleepPeriod, wakePeriod);
+
+  // printTable(tsTable);
+  // printDists(tsTable, NODE_ID);
 }
 
 /**
@@ -466,19 +536,27 @@ static void initCycleTimings(void)
 {
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
   activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
-  // sleepPeriod = cyclePeriod - activePeriod - (NODE_ID * SLEEP_DIFF); // Staggered sleep times
-  wakePeriod = cyclePeriod - activePeriod;
-  sleepPeriod = wakePeriod * WAKE_INIT_FACTOR;
-  timeToTx1 = TX_INTERVAL * NODE_ID;
-  timeToTx2 = N * TX_INTERVAL;
-  rxTime = (N - NODE_ID) * TX_INTERVAL;
+  sleepPeriod = cyclePeriod - activePeriod;
+  wakePeriod = sleepPeriod * WAKE_INIT_FACTOR;
+  
+  // TODO: Remove this after TzeGuang is done with TX2 ts function.
+  uint64 val = TX_INTERVAL;
+  uint64 conv = 65536;
+  intervalDwtTime = val * conv;
+  tx1DelayedDwtTime = (intervalDwtTime * NODE_ID) >> 8;
+  tx2DelayDwtTime = (intervalDwtTime * N) >> 8;
+
+  // RX timeout values for synchronising TX moments.
+  // The values are minused with half a interval as buffer for computation to transit to TX mode.
+  rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - ((uint16)TX_INTERVAL / 2);
+  rxTimeout2 = ((uint16)TX_INTERVAL * N) - ((uint16)TX_INTERVAL / 2);
+  
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
   printf("wakePeriod: %u\r\n", wakePeriod);
   printf("sleepPeriod: %u\r\n", sleepPeriod);
-  printf("timeToTx1: %u\r\n", timeToTx1);
-  printf("timeToTx2: %u\r\n", timeToTx2);
-  printf("rxTime: %u\r\n", rxTime);
+  printf("rxTimeout1: %u\r\n", rxTimeout1);
+  printf("rxTimeout2: %u\r\n", rxTimeout2);
 }
 
 /**
@@ -495,11 +573,8 @@ static void initListen(void)
 {
   if (NODE_ID == 0)
   {
-    firstTx(NODE_ID);
-    lowTimerStart(tx2Timer, timeToTx2);
-    
-    approxTx2 = calcTx2(timeToTx2); 
-    updateTable(tsTable, txMsg2, approxTx2, NODE_ID);
+    masterTx1Rdy = true;
+    lowTimerStart(activeTimer, activePeriod);
     return;
   }
 
@@ -517,39 +592,42 @@ static void initListen(void)
  * 
  * @param nodeId Identifier of this node.
  */
-static void firstTx(int nodeId)
+
+/**
+ * @brief Transmits the first of the two transmissions.
+
+ * @param mode - if 0 immediate TX (no response expected) => DWT_START_TX_IMMEDIATE
+ *               if 1 delayed TX (no response expected) => DWT_START_TX_DELAYED
+ *               if 2 immediate TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED
+ *               if 3 delayed TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED
+ */
+static TxStatus firstTx(uint8 mode)
 {
   uint8 buf[MSG_LEN];
-
+  
   dwt_forcetrxoff();
   convertToArr(txMsg1, buf);
-
-  txStatus = txMsg(buf, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-  if (txStatus == TX_SUCCESS)
-  {
-    txCounter++;
-    printf("1: %d\r\n", txCounter); // debugging purpose
-  }
+  
+  return txMsg(buf, MSG_LEN, mode);
 }
 
 /**
  * @brief Transmits the second of the two transmissions.
  * 
  * @param nodeId Identifier of this node.
+ * @param mode - if 0 immediate TX (no response expected) => DWT_START_TX_IMMEDIATE
+ *               if 1 delayed TX (no response expected) => DWT_START_TX_DELAYED
+ *               if 2 immediate TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED
+ *               if 3 delayed TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED
  */
-static void secondTx(int nodeId)
+static TxStatus secondTx(uint8 mode)
 {
   uint8 buf[MSG_LEN];
 
   dwt_forcetrxoff();
   convertToArr(txMsg2, buf);
   
-  txStatus = txMsg(buf, MSG_LEN, DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-  if (txStatus == TX_SUCCESS)
-  {
-    txCounter++;
-    printf("2: %d\r\n", txCounter); // debugging purpose
-  }
+  return txMsg(buf, MSG_LEN, mode);
 }
 
 /**
@@ -566,12 +644,10 @@ static void secondTx(int nodeId)
  */
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
 {
-  printf("sleep\r\n"); // debugging purpose
+  printf("sleep\r\n\r\n"); // debugging purpose
   // dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleep);
   lowTimerStart(wakeTimer, wake);
-  // Reset the timestamps table
-  initTable(tsTable);
 }
 
 /**
@@ -586,7 +662,7 @@ static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
  */
 void syncCycle(void)
 {
-  goToSleep(true, cyclePeriod * WAKE_INIT_FACTOR, cyclePeriod);
+  goToSleep(true, sleepPeriod, cyclePeriod);
   lowTimerStop(initTimer);
   printf("sync-ing cycle by sleeping\r\n"); // debugging purpose
   isInitiating = false;
@@ -597,26 +673,39 @@ void syncCycle(void)
  * 
  * @param msg msg_template struct used to determine the location to store the timestamp.
  */
-void updateRx(msg_template *msg)
+void rxHandler(msg_template *msg)
 {
   uint32 ts = dwt_readrxtimestamphi32();
   updateTable(tsTable, *msg, ts, NODE_ID);
+
+  if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
+  {
+    // Make sure device is in IDLE first before changing RX timeout.
+    dwt_forcetrxoff();
+    dwt_setrxtimeout(rxTimeout1);
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
+    lowTimerStart(activeTimer, activePeriod);
+    waitingTx1 = true;
+    masterRx = ts;
+  }
 }
 
 /**
  * @brief Calculates the distance using the timestamp table.
  * 
+ * @param table pointer to the 2D array representing the timestamp table.
  * @param id identifier of the node to calculate the distance with.
  * @return double the calculated distance.
  */
-static double calcDist(uint8 id)
+static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
 {
   double roundTrip1, roundTrip2, replyTrip2, replyTrip1, tof, num, dem;
   uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
   int64 timeOfFlightInUnits;
 
   // Get values to calculate.
-  getFullTs(tsTable, ts, NODE_ID, id);
+  getFullTs(table, ts, NODE_ID, id);
 
   int i;
   for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
@@ -632,10 +721,6 @@ static double calcDist(uint8 id)
   replyTrip1 = (double)(ts[IDX_TS_3] - ts[IDX_TS_2]);
   replyTrip2 = (double)(ts[IDX_TS_5] - ts[IDX_TS_4]);
 
-  // TODO: These timings do not make sense if you calculate the distance by using their difference directly.
-  //       Maybe use previous protocol and see how those timings are like??
-  //       Also, could the turn-around time (aka the interval duration) be too long such that there is
-  //       vast clock drift and hence, bad calculated values?
   printf("roundTrip1 = %lf\r\n", roundTrip1);
   printf("roundTrip2 = %lf\r\n", roundTrip2);
   printf("replyTrip1 = %lf\r\n", replyTrip1);
@@ -647,4 +732,43 @@ static double calcDist(uint8 id)
 
   tof = timeOfFlightInUnits * DWT_TIME_UNITS;
   return tof * SPEED_OF_LIGHT;
+}
+
+/**
+ * @brief Calculate and print all distances to serial output.
+ * 
+ * @param table pointer to the 2D array representing the timestamp table.
+ * @param thisId identifier of the calling node.
+ */
+static void printDists(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
+{
+  int i;
+  double dists[N] = {0};
+
+  // Calculate the distances for each of other nodes.
+  for (i = 0; i < N; i++)
+  {
+    if (i == thisId)
+    {
+      continue;
+    }
+
+    dists[i] = calcDist(table, i);
+  }
+
+  // Print the distances to serial.
+  for (i = 0; i < N; i++)
+  {
+    if (i == thisId)
+    {
+      continue;
+    }
+
+    printf("%0.4lf", dists[i]);
+    if ((i + 1 != N - 1 || thisId != N - 1) && i != N - 1)
+    {
+      printf(",");
+    }
+  }
+  printf(";\r\n"); // Denote end of distances serial output.
 }
