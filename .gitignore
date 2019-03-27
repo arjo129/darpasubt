@@ -10,4 +10,4 @@ install/
 *.d
 *.o
 *.elf
-
+*.pyc
