@@ -15,6 +15,8 @@ extern bool tx2Sending;
 extern bool waitingTx1;
 extern bool waitingTx2;
 
+typedef unsigned long long uint64;
+
 /* Public functions */
 /**
  * @brief Configure an IO pin as a positive edge triggered interrupt source.
@@ -59,21 +61,13 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
     counter++; // debugging purpose
     // Cast the frame to the message structure first
     convertToStruct(buffer, &msg);
-    printf("RX: %d, %d\r\n", msg.id, msg.isFirst);
-    if (msg.isFirst == 1)
-    {
-      printf("first  RX\r\n");
-    }
-    else
-    {
-      printf("second RX\r\n");
-    }
-    
+    // printf("\tRX: %d, %d\r\n", msg.id, (msg.isFirst == 1 ? 1 : 2));
     rxHandler(&msg);
+    resetRxTimeout(msg.id);
   }
   else
   {
-    printf("RX fail\r\n");
+    // printf("\tRX fail\r\n");
   }
   
 
@@ -90,16 +84,15 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
 */
 void rx_to_cb(const dwt_cb_data_t *cb_data)
 {
-  /* TESTING BREAKPOINT LOCATION #2 */
+  dwt_rxreset();
+
   if (waitingTx1)
   {
-    printf("RX timeout 1\r\n");
     waitingTx1 = false;
     configTx1();
   }
   else if (waitingTx2)
   {
-    printf("RX timeout 2\r\n");
     waitingTx2 = false;
     configTx2();
   }
@@ -119,10 +112,24 @@ void rx_to_cb(const dwt_cb_data_t *cb_data)
 void rx_err_cb(const dwt_cb_data_t *cb_data)
 {
   dwt_rxreset();
-  /* TESTING BREAKPOINT LOCATION #3 */
-  // printf("Transmission Error : may receive package from different UWB device\r\n");
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
+
+
+static uint64 get_tx_timestamp_u64(void)
+{
+  uint8 ts_tab[5];
+  uint64 ts = 0;
+  int i;
+  dwt_readtxtimestamp(ts_tab);
+  for (i = 4; i >= 0; i--)
+  {
+    ts <<= 8;
+    ts |= ts_tab[i];
+  }
+  return ts;
+}
+
 
 /**
  * @brief Callback to process TX confirmation events
@@ -141,9 +148,10 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
 
   if (tx1Sending)
   {
-    printf("first  TX\r\n");
+    // printf("TX 1\r\n");
     
-    uint32 ts = dwt_readtxtimestamphi32();
+    uint64 ts64 = get_tx_timestamp_u64();
+    uint32 ts = (uint32)(ts64 >> 8);
     updateTx1Ts(ts);
     setRxTimeout2();
 
@@ -152,7 +160,9 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   }
   else if (tx2Sending)
   {
-    printf("second TX\r\n");
+    // printf("TX 2\r\n");
+    uint64 ts64 = get_tx_timestamp_u64();
+    uint32 ts = (uint32)(ts64 >> 8);
 
     // Make sure device is in IDLE before changing RX timeout.
     dwt_forcetrxoff();

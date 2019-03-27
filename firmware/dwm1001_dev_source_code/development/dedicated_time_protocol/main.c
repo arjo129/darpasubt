@@ -73,6 +73,8 @@ static dwt_config_t config = {
 #define FIRST_TX_IDX 0
 #define SECOND_TX_IDX 1
 
+#define RX_TO_INVALID -1
+
 #ifdef USE_FREERTOS
 
 TaskHandle_t run_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
@@ -97,6 +99,7 @@ static void wakeTimerHandler(void *pContext);
 static void activeTimerHandler(void *pContext);
 static void initCycleTimings(void);
 static void initListen(void);
+static void initRxTo(void);
 static TxStatus firstTx(uint8 mode);
 static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
@@ -118,7 +121,7 @@ uint64 intervalDwtTime;
 uint32 tx2DelayDwtTime;
 uint16 rxTimeout1;
 uint16 rxTimeout2;
-uint32 masterRx;
+uint32 masterRxTs;
 TxStatus txStatus;
 uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
 // States related
@@ -138,6 +141,8 @@ uint32 delayedTx; // Timestamp of delayed TX
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 uint32 tx1DelayedDwtTime;
+int rxPhase1To[N] = {-1};
+int rxPhase2To[N];
 
 /** Default header */
 uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -249,6 +254,9 @@ int main(void)
   // Initalises the messages to be transmitted.
   initTxMsgs(&txMsg1, &txMsg2);
 
+  // Initialises the RX timeout values.
+  initRxTo();
+
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
 
@@ -273,10 +281,6 @@ void runTask (void * pvParameter)
 {
   UNUSED_PARAMETER(pvParameter);
   dwt_setleds(DWT_LEDS_ENABLE);
-
-  uint32 id = NODE_ID;
-  tx1DelayedDwtTime = (intervalDwtTime >> 8) * id;
-  printf("tx1DelayedDwtTime = %u\r\n", tx1DelayedDwtTime);
 
   // Listen for activity in the network
   // initListen();
@@ -316,8 +320,6 @@ void runTask (void * pvParameter)
       {
         tx1Sending = false;
       }
-      
-
       masterTx1Rdy = false;
     }
   }
@@ -406,7 +408,7 @@ void writeTx2(msg_template *msg) {
  */
 void configTx1(void)
 {
-  uint32 delay = masterRx + tx1DelayedDwtTime;
+  uint32 delay = masterRxTs + tx1DelayedDwtTime;
   dwt_setdelayedtrxtime(delay);
   tx1Sending = true;
   firstTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -423,12 +425,19 @@ void configTx2(void)
   // Reference timestamp is TX1 timestamp.
   uint32 delay = tsTable[IDX_TS_1][NODE_ID] + tx2DelayDwtTime;
   dwt_setdelayedtrxtime(delay);
-  delay += 64;
+  delay += ((uint32)(TX_ANT_DLY)) >> 8; // TODO: Replace with Macro
   updateTable(tsTable, txMsg2, delay, NODE_ID);
 
   writeTx2(&txMsg2);
-  tx2Sending = true;
-  secondTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+  txStatus = secondTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
+  if (txStatus == TX_SUCCESS)
+  {
+    tx2Sending = true;
+  }
+  else
+  {
+    tx2Sending = false;
+  }
 }
 
 /**
@@ -456,13 +465,13 @@ void resetRxTimeout(uint8 id)
 
   if (waitingTx1)
   {
-    timeout = ((uint16)TX_INTERVAL * (N - id)) - ((uint16)TX_INTERVAL / 2);
+    timeout = rxPhase1To[id];
     dwt_forcetrxoff();
     dwt_setrxtimeout(timeout);
   }
   else if (waitingTx2)
   {
-    timeout = ((uint16)TX_INTERVAL * (N - id)) - ((uint16)TX_INTERVAL / 2);
+    timeout = rxPhase2To[id];
     dwt_forcetrxoff();
     dwt_setrxtimeout(timeout);
   }
@@ -524,7 +533,8 @@ static void activeTimerHandler(void *pContext)
   goToSleep(true, sleepPeriod, wakePeriod);
 
   // printTable(tsTable);
-  // printDists(tsTable, NODE_ID);
+  printDists(tsTable, NODE_ID);
+  initTable(tsTable);
 }
 
 /**
@@ -543,6 +553,7 @@ static void initCycleTimings(void)
   uint64 val = TX_INTERVAL;
   uint64 conv = 65536;
   intervalDwtTime = val * conv;
+  // TODO: Should not shift by 8 first, in order to preserve as much information as possible.
   tx1DelayedDwtTime = (intervalDwtTime * NODE_ID) >> 8;
   tx2DelayDwtTime = (intervalDwtTime * N) >> 8;
 
@@ -588,10 +599,36 @@ static void initListen(void)
 }
 
 /**
- * @brief Transmits the first of the two transmissions.
+ * @brief Initialises the RX timeout values for each reception phase.
  * 
- * @param nodeId Identifier of this node.
  */
+static void initRxTo(void)
+{
+  int i, j;
+
+  // Initialise the RX timeout values for Phase 1
+  for (i = 0; i < N; i++)
+  {
+    if (i >= NODE_ID)
+    {
+      rxPhase1To[i] = RX_TO_INVALID;
+    }
+    else
+    {
+      rxPhase1To[i] = ((NODE_ID - i) * TX_INTERVAL) - (TX_INTERVAL / 2);
+    }
+  }
+
+  // Initialise the RX timeout values for Phase 2
+  i = (NODE_ID + 1 == N ? 0 : NODE_ID + 1);
+  j = N - 1;
+  while (i != NODE_ID)
+  {
+    rxPhase2To[i] = (j-- * TX_INTERVAL) - (TX_INTERVAL / 2);
+    i = (i + 1 == N ? 0 : i + 1);
+  }
+  rxPhase2To[NODE_ID] = RX_TO_INVALID;
+}
 
 /**
  * @brief Transmits the first of the two transmissions.
@@ -644,7 +681,7 @@ static TxStatus secondTx(uint8 mode)
  */
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
 {
-  printf("sleep\r\n\r\n"); // debugging purpose
+  // printf("sleep\r\n\r\n"); // debugging purpose
   // dwSleep(rxOn);
   lowTimerStart(sleepTimer, sleep);
   lowTimerStart(wakeTimer, wake);
@@ -668,6 +705,20 @@ void syncCycle(void)
   isInitiating = false;
 }
 
+static uint64 get_rx_timestamp_u64(void)
+{
+  uint8 ts_tab[5];
+  uint64 ts = 0;
+  int i;
+  dwt_readrxtimestamp(ts_tab);
+  for (i = 4; i >= 0; i--)
+  {
+    ts <<= 8;
+    ts |= ts_tab[i];
+  }
+  return ts;
+}
+
 /**
  * @brief Updates the timestamps table with reception timestamp.
  * 
@@ -675,7 +726,8 @@ void syncCycle(void)
  */
 void rxHandler(msg_template *msg)
 {
-  uint32 ts = dwt_readrxtimestamphi32();
+  uint64 ts64 = get_rx_timestamp_u64();
+  uint32 ts = (uint32)(ts64 >> 8);
   updateTable(tsTable, *msg, ts, NODE_ID);
 
   if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
@@ -683,11 +735,10 @@ void rxHandler(msg_template *msg)
     // Make sure device is in IDLE first before changing RX timeout.
     dwt_forcetrxoff();
     dwt_setrxtimeout(rxTimeout1);
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
     lowTimerStart(activeTimer, activePeriod);
     waitingTx1 = true;
-    masterRx = ts;
+    masterRxTs = ts;
   }
 }
 
@@ -700,9 +751,9 @@ void rxHandler(msg_template *msg)
  */
 static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
 {
-  double roundTrip1, roundTrip2, replyTrip2, replyTrip1, tof, num, dem;
+  double tof, num, den, timeOfFlightInUnits;
+  uint64 roundTrip1, roundTrip2, replyTrip2, replyTrip1;
   uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
-  int64 timeOfFlightInUnits;
 
   // Get values to calculate.
   getFullTs(table, ts, NODE_ID, id);
@@ -716,19 +767,30 @@ static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
     }
   }
 
-  roundTrip1 = (double)(ts[IDX_TS_4] - ts[IDX_TS_1]);
-  roundTrip2 = (double)(ts[IDX_TS_6] - ts[IDX_TS_3]);
-  replyTrip1 = (double)(ts[IDX_TS_3] - ts[IDX_TS_2]);
-  replyTrip2 = (double)(ts[IDX_TS_5] - ts[IDX_TS_4]);
+  // ISSUE: roundTrip1 should be >replyTrip1
+  // Possibly using the wrong bits of values? (High 32 vs Low 32);
+  // TODO: Test the SS_TWR example by checking the difference in TS1 and TS4. How does it compare to here?
+  // POSSIBILITY: We are using the difference that is HIGHER 32 BITS and not LOWER 32 BITS.
+  // So this could be that this is not the actual decimal representation. In other words,
+  // We should try bit shifting to the LEFT BY 8 so we can get the full 40 bits representation.
 
-  printf("roundTrip1 = %lf\r\n", roundTrip1);
-  printf("roundTrip2 = %lf\r\n", roundTrip2);
-  printf("replyTrip1 = %lf\r\n", replyTrip1);
-  printf("replyTrip2 = %lf\r\n", replyTrip2);
 
-  num = (roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2);
-  dem = (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
-  timeOfFlightInUnits = (int64)(num / dem);
+  roundTrip1 = (ts[IDX_TS_4]) - (ts[IDX_TS_1]);
+  roundTrip2 = (ts[IDX_TS_6]) - (ts[IDX_TS_3]);
+  replyTrip1 = (ts[IDX_TS_3]) - (ts[IDX_TS_2]);
+  replyTrip2 = (ts[IDX_TS_5]) - (ts[IDX_TS_4]);
+
+  roundTrip1 = roundTrip1 << 8;
+  roundTrip2 = roundTrip2 << 8;
+  replyTrip1 = replyTrip1 << 8;
+  replyTrip2 = replyTrip2 << 8;
+
+  // printf("roundTrip1 = %lf\r\n", roundTrip1);
+  // printf("roundTrip2 = %lf\r\n", roundTrip2);
+  // printf("replyTrip1 = %lf\r\n", replyTrip1);
+  // printf("replyTrip2 = %lf\r\n", replyTrip2);
+
+  timeOfFlightInUnits = (double)(roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
 
   tof = timeOfFlightInUnits * DWT_TIME_UNITS;
   return tof * SPEED_OF_LIGHT;
