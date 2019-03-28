@@ -73,7 +73,7 @@ static dwt_config_t config = {
 #define FIRST_TX_IDX 0
 #define SECOND_TX_IDX 1
 
-#define RX_TO_INVALID -1
+#define RX_TO_INVALID 0
 
 #ifdef USE_FREERTOS
 
@@ -120,12 +120,12 @@ uint32 sleepPeriod; // Time duration for actual hardware sleeping
 uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cycle
 uint32 dummyTime = (0x00FFFFFF / 2);
 uint64 intervalDwtTime;
-uint32 tx2DelayDwtTime;
+uint64 tx2DelayDwtTime;
 uint16 rxTimeout1;
 uint16 rxTimeout2;
-uint32 masterRxTs;
+uint64 masterRxTs;
 TxStatus txStatus;
-uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
+uint64 tsTable[NUM_STAMPS_PER_CYCLE][N];
 // States related
 bool isInitiating = false;
 bool tx1Sending = false;
@@ -133,19 +133,18 @@ bool tx2Sending = false;
 bool masterTx1Rdy = false;
 bool waitingTx1 = false;
 bool waitingTx2 = false;
+bool tx2Sent = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
 APP_TIMER_DEF(activeTimer);
 APP_TIMER_DEF(wakeTimer);
-uint32 approxTx2; // Estimated timestamp for second TX
-uint32 timeToTx1; // Duration until first transmission
-uint32 timeToTx2; //  Duration until second transmission
+APP_TIMER_DEF(dummyTimer);
 uint64 var_delay;
 uint64 reg_delay;
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
-uint32 tx1DelayedDwtTime;
+uint64 tx1DelayedDwtTime;
 int rxPhase1To[N] = {-1};
 int rxPhase2To[N];
 
@@ -409,7 +408,7 @@ uint32 calcTx2(uint32 ts) {
  * @param msg the message_template struct that will be transmitted out.
  */
 void writeTx2(msg_template *msg) {
-  uint32 ts[NUM_STAMPS_PER_CYCLE / 2];
+  uint64 ts[NUM_STAMPS_PER_CYCLE / 2];
   int i;
   
   for (i = 0; i < N; i++)
@@ -421,7 +420,7 @@ void writeTx2(msg_template *msg) {
 
     // Retrieve values for each node and copy into data member at predefined slots.
     getHalfTs(tsTable, ts, NODE_ID, i);
-    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE * 4), ts, sizeof(ts));
+    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE * 5), ts, sizeof(ts));
   }
 }
 
@@ -431,7 +430,7 @@ void writeTx2(msg_template *msg) {
  */
 void configTx1(void)
 {
-  uint32 delay = masterRxTs + tx1DelayedDwtTime;
+  uint32 delay = (masterRxTs + tx1DelayedDwtTime) >> 8;
   dwt_setdelayedtrxtime(delay);
   tx1Sending = true;
   firstTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -446,10 +445,11 @@ void configTx2(void)
 {
   // Set the transmission time for TX2.
   // Reference timestamp is TX1 timestamp.
-  uint32 delay = tsTable[IDX_TS_1][NODE_ID] + tx2DelayDwtTime;
-  dwt_setdelayedtrxtime(delay);
-  delay += ((uint32)(TX_ANT_DLY)) >> 8; // TODO: Replace with Macro
-  updateTable(tsTable, txMsg2, delay, NODE_ID);
+  uint64 delay64 = tsTable[IDX_TS_1][NODE_ID] + tx2DelayDwtTime;
+  uint32 delay32 = delay64 >> 8;
+  dwt_setdelayedtrxtime(delay32);
+  delay64 += TX_ANT_DLY;
+  updateTable(tsTable, txMsg2, delay64, NODE_ID);
 
   writeTx2(&txMsg2);
   txStatus = secondTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -468,7 +468,7 @@ void configTx2(void)
  * 
  * @param ts the first TX timestamp value (higher 32 bits).
  */
-void updateTx1Ts(uint32 ts)
+void updateTx1Ts(uint64 ts)
 {
   updateTable(tsTable, txMsg1, ts, NODE_ID);
 }
@@ -541,7 +541,10 @@ static void sleepTimerHandler(void *pContext)
   {
     masterTx1Rdy = true;
   }
-
+  else
+  {
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  }
 }
 
 /**
@@ -551,13 +554,15 @@ static void sleepTimerHandler(void *pContext)
  */
 static void activeTimerHandler(void *pContext)
 {
+  // ISSUE: This handler is getting called early.
   // printf("%d\r\n", counter);
   counter = 0;
   goToSleep(true, sleepPeriod, wakePeriod);
 
-  // printTable(tsTable);
+  printTable(tsTable);
   printDists(tsTable, NODE_ID);
   initTable(tsTable);
+  tx2Sent = false;
 }
 
 /**
@@ -577,17 +582,17 @@ static void initCycleTimings(void)
   uint64 conv = 65536;
   intervalDwtTime = val * conv;
   // TODO: Should not shift by 8 first, in order to preserve as much information as possible.
-  tx1DelayedDwtTime = (intervalDwtTime * NODE_ID) >> 8;
-  tx2DelayDwtTime = (intervalDwtTime * N) >> 8;
+  tx1DelayedDwtTime = intervalDwtTime * NODE_ID;
+  tx2DelayDwtTime = intervalDwtTime * N;
 
   // RX timeout values for synchronising TX moments.
   // The values are minused with half a interval as buffer for computation to transit to TX mode.
   rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - ((uint16)TX_INTERVAL / 2);
   rxTimeout2 = ((uint16)TX_INTERVAL * N) - ((uint16)TX_INTERVAL / 2);
   
-  reg_delay = (4.0 * TX_INTERVAL * 10e-6 * UUS_TO_DWT_TIME);
+  reg_delay = (N * TX_INTERVAL * UUS_TO_DWT_TIME);
   reg_delay = reg_delay >> 8;
-  var_delay = (NODE_ID * TX_INTERVAL * 10e-6 * UUS_TO_DWT_TIME);
+  var_delay = (NODE_ID * TX_INTERVAL * UUS_TO_DWT_TIME);
   var_delay = var_delay >> 8;
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
@@ -753,8 +758,7 @@ static uint64 get_rx_timestamp_u64(void)
  */
 void rxHandler(msg_template *msg)
 {
-  uint64 ts64 = get_rx_timestamp_u64();
-  uint32 ts = (uint32)(ts64 >> 8);
+  uint64 ts = get_rx_timestamp_u64();
   updateTable(tsTable, *msg, ts, NODE_ID);
 
   if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
@@ -776,11 +780,11 @@ void rxHandler(msg_template *msg)
  * @param id identifier of the node to calculate the distance with.
  * @return double the calculated distance.
  */
-static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
+static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
 {
   double tof, num, den, timeOfFlightInUnits;
   uint64 roundTrip1, roundTrip2, replyTrip2, replyTrip1;
-  uint32 ts[NUM_STAMPS_PER_CYCLE] = {0};
+  uint64 ts[NUM_STAMPS_PER_CYCLE] = {0};
 
   // Get values to calculate.
   getFullTs(table, ts, NODE_ID, id);
@@ -802,21 +806,12 @@ static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
   // We should try bit shifting to the LEFT BY 8 so we can get the full 40 bits representation.
 
 
-  roundTrip1 = (ts[IDX_TS_4]) - (ts[IDX_TS_1]);
-  roundTrip2 = (ts[IDX_TS_6]) - (ts[IDX_TS_3]);
-  replyTrip1 = (ts[IDX_TS_3]) - (ts[IDX_TS_2]);
-  replyTrip2 = (ts[IDX_TS_5]) - (ts[IDX_TS_4]);
+  roundTrip1 = ts[IDX_TS_4] - ts[IDX_TS_1];
+  roundTrip2 = ts[IDX_TS_6] - ts[IDX_TS_3];
+  replyTrip1 = ts[IDX_TS_3] - ts[IDX_TS_2];
+  replyTrip2 = ts[IDX_TS_5] - ts[IDX_TS_4];
 
-  roundTrip1 = roundTrip1 << 8;
-  roundTrip2 = roundTrip2 << 8;
-  replyTrip1 = replyTrip1 << 8;
-  replyTrip2 = replyTrip2 << 8;
-
-  // printf("roundTrip1 = %lf\r\n", roundTrip1);
-  // printf("roundTrip2 = %lf\r\n", roundTrip2);
-  // printf("replyTrip1 = %lf\r\n", replyTrip1);
-  // printf("replyTrip2 = %lf\r\n", replyTrip2);
-
+  // TODO: Might overflow
   timeOfFlightInUnits = (double)(roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
 
   tof = timeOfFlightInUnits * DWT_TIME_UNITS;

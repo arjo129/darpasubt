@@ -14,6 +14,7 @@ extern bool tx1Sending;
 extern bool tx2Sending;
 extern bool waitingTx1;
 extern bool waitingTx2;
+extern bool tx2Sent;
 
 typedef unsigned long long uint64;
 
@@ -63,7 +64,15 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
     convertToStruct(buffer, &msg);
     // printf("\tRX: %d, %d\r\n", msg.id, (msg.isFirst == 1 ? 1 : 2));
     rxHandler(&msg);
-    resetRxTimeout(msg.id);
+    if (msg.isFirst == 0)
+    {
+      resetRxTimeout(msg.id);
+    }
+    else
+    {
+      resetRxTimeout(msg.id);
+    }
+    
   }
   else
   {
@@ -151,8 +160,8 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
     // printf("TX 1\r\n");
     
     uint64 ts64 = get_tx_timestamp_u64();
-    uint32 ts = (uint32)(ts64 >> 8);
-    updateTx1Ts(ts);
+    printf("TX1_64 = %x\r\n", ts64);
+    updateTx1Ts(ts64);
     setRxTimeout2();
 
     tx1Sending = false;
@@ -162,7 +171,7 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   {
     // printf("TX 2\r\n");
     uint64 ts64 = get_tx_timestamp_u64();
-    uint32 ts = (uint32)(ts64 >> 8);
+    printf("TX2 = %x\r\n", ts64);
 
     // Make sure device is in IDLE before changing RX timeout.
     dwt_forcetrxoff();
@@ -170,6 +179,7 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
     
     tx2Sending = false;
+    tx2Sent = true;
   }
   else
   {

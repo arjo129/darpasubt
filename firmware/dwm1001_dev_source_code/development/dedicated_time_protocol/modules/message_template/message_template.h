@@ -53,4 +53,4 @@ void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
 void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 thisId, uint8 targetId);
 
 /* Public variables */
-extern uint32 tsTable[NUM_STAMPS_PER_CYCLE][N];
+extern uint64 tsTable[NUM_STAMPS_PER_CYCLE][N];
