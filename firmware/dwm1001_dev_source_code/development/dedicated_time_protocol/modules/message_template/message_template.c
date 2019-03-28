@@ -8,7 +8,7 @@
  * 
  * @param table pointer to the 2D array representing the timestamp table.
  */
-void initTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
+void initTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 {
   int i, j;
 
@@ -69,7 +69,7 @@ void convertToArr(msg_template msg, uint8 *array)
  * @param ts the reception timestamp of the incoming second TX.
  * @param thisId identifier of calling node.
  */
-void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32 ts, uint8 thisId)
+void updateTable(uint64 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint64 ts, uint8 thisId)
 {
   // This message is from own node.
   if (msg.id == thisId)
@@ -137,16 +137,16 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
 
     if (thisId < msg.id)
     {
-      memcpy(&table[IDX_TS_2][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4), sizeof(uint32));
-      memcpy(&table[IDX_TS_3][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 4, sizeof(uint32));
-      memcpy(&table[IDX_TS_6][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 8, sizeof(uint32));
+      memcpy(&table[IDX_TS_2][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4), sizeof(uint64));
+      memcpy(&table[IDX_TS_3][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 4, sizeof(uint64));
+      memcpy(&table[IDX_TS_6][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 8, sizeof(uint64));
     }
     else if (thisId > msg.id)
     {
       table[IDX_TS_6][msg.id] = ts; // Store the reception timestamp
-      memcpy(&table[IDX_TS_1][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4), sizeof(uint32));
-      memcpy(&table[IDX_TS_4][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 4, sizeof(uint32));
-      memcpy(&table[IDX_TS_5][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 8, sizeof(uint32));
+      memcpy(&table[IDX_TS_1][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4), sizeof(uint64));
+      memcpy(&table[IDX_TS_4][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 4, sizeof(uint64));
+      memcpy(&table[IDX_TS_5][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * 4) + 8, sizeof(uint64));
     }
     else
     {
@@ -165,7 +165,7 @@ void updateTable(uint32 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint32
  * @param thisId identifier of calling node.
  * @param targetId identifier of target node.
  */
-void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE], uint8 thisId, uint8 targetId)
+void getFullTs(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint64 ts[NUM_STAMPS_PER_CYCLE], uint8 thisId, uint8 targetId)
 {
   // Invalid call, zero all field to indicate.
   if (thisId == targetId)
@@ -205,7 +205,7 @@ void getFullTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_C
  * @param thisId identifier of calling node.
  * @param targetId identifier of target node.
  */
-void getHalfTs(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint32 ts[NUM_STAMPS_PER_CYCLE/2], uint8 thisId, uint8 targetId)
+void getHalfTs(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint64 ts[NUM_STAMPS_PER_CYCLE/2], uint8 thisId, uint8 targetId)
 {
   if (thisId < targetId)
   {
