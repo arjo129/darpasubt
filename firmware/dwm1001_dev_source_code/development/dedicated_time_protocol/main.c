@@ -93,7 +93,7 @@ uint64 calcTx1(uint64 ts);
 uint64 calcTx2(uint64 ts);
 void writeTx2(msg_template *msg);
 void configTx2(void);
-void updateTx1Ts(uint32 ts);
+void updateTx1Ts(uint64 ts);
 void setRxTimeout2(void);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
@@ -105,8 +105,8 @@ static void initRxTo(void);
 static TxStatus firstTx(uint8 mode);
 static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
-static double calcDist(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
-static void printDists(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
+static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
+static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 
 /* Global variables */
 // Frames related
@@ -329,7 +329,7 @@ void runTask (void * pvParameter)
   }
 }
 
-void printTable(uint32 table[NUM_STAMPS_PER_CYCLE][N])
+void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 {
   int i,j;
   
@@ -584,15 +584,8 @@ static void initCycleTimings(void)
   rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - ((uint16)TX_INTERVAL / 2);
   rxTimeout2 = ((uint16)TX_INTERVAL * N) - ((uint16)TX_INTERVAL / 2);
   
-<<<<<<< HEAD
-  reg_delay = (N * TX_INTERVAL * UUS_TO_DWT_TIME);
-  reg_delay = reg_delay >> 8;
-  var_delay = (NODE_ID * TX_INTERVAL * UUS_TO_DWT_TIME);
-  var_delay = var_delay >> 8;
-=======
   reg_delay = (4.0 * TX_INTERVAL * UUS_TO_DWT_TIME);
   var_delay = (NODE_ID * TX_INTERVAL * UUS_TO_DWT_TIME);
->>>>>>> b821110fa07b082f43d05d6a6c683f3d20f94014
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
   printf("wakePeriod: %u\r\n", wakePeriod);
@@ -823,7 +816,7 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
  * @param table pointer to the 2D array representing the timestamp table.
  * @param thisId identifier of the calling node.
  */
-static void printDists(uint32 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
+static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
 {
   int i;
   double dists[N] = {0};
