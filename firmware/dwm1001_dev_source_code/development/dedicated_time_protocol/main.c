@@ -89,8 +89,8 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
 void rxHandler(msg_template *msg);
 void updateRx(msg_template *msg);
-uint32 calcTx1(uint32 ts);
-uint32 calcTx2(uint32 ts);
+uint64 calcTx1(uint64 ts);
+uint64 calcTx2(uint64 ts);
 void writeTx2(msg_template *msg);
 void configTx2(void);
 void updateTx1Ts(uint32 ts);
@@ -370,17 +370,14 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2)
  * @brief (Synchronisation use) Calculates the tx time from u0 initial transmission.
  * 
  * @param ts the timestamp when u0 message is received.
- * @return uint32 the calculated time.
+ * @return uint64 the calculated time.
  *
  * NOTE: The chip will go into idle mode after writing the 40 bit timestamp
  *       will not able to tx or rx messages during this time.
  */
-uint32 calcTx1(uint32 ts) {
-  // Get current system time (higher 32 bits).
-  // uint32 sys32 = dwt_readsystimestamphi32();
-
+uint64 calcTx1(uint64 ts) {
   // Calculate the approx. time by adding to the system time.
-  uint32 approx = ts + (uint32)var_delay;
+  uint64 approx = ts + var_delay;
   return approx;
 }
 
@@ -388,17 +385,14 @@ uint32 calcTx1(uint32 ts) {
  * @brief Calculates the approximated time for second transmission.
  * 
  * @param ts the timestamp after the first transmission is sent.
- * @return uint32 the calculated time.
+ * @return uint64 the calculated time.
  *
  * NOTE: The chip will go into idle mode after writing the 40 bit timestamp
  *       will not able to tx or rx messages during this time.
  */
-uint32 calcTx2(uint32 ts) {
-  // Get current system time (higher 32 bits).
-  // uint32 sys32 = dwt_readsystimestamphi32();
-
+uint64 calcTx2(uint64 ts) {
   // Calculate the approx. time by adding to the system time.
-  uint32 approx = ts + (uint32)reg_delay;
+  uint64 approx = ts + reg_delay;
   return approx;
 }
 
@@ -590,10 +584,15 @@ static void initCycleTimings(void)
   rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - ((uint16)TX_INTERVAL / 2);
   rxTimeout2 = ((uint16)TX_INTERVAL * N) - ((uint16)TX_INTERVAL / 2);
   
+<<<<<<< HEAD
   reg_delay = (N * TX_INTERVAL * UUS_TO_DWT_TIME);
   reg_delay = reg_delay >> 8;
   var_delay = (NODE_ID * TX_INTERVAL * UUS_TO_DWT_TIME);
   var_delay = var_delay >> 8;
+=======
+  reg_delay = (4.0 * TX_INTERVAL * UUS_TO_DWT_TIME);
+  var_delay = (NODE_ID * TX_INTERVAL * UUS_TO_DWT_TIME);
+>>>>>>> b821110fa07b082f43d05d6a6c683f3d20f94014
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
   printf("wakePeriod: %u\r\n", wakePeriod);
