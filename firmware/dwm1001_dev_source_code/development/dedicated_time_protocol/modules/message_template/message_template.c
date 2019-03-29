@@ -5,7 +5,7 @@
 
 /**
  * @brief Initialises timestamp table.
- * 
+ *
  * @param table pointer to the 2D array representing the timestamp table.
  */
 void initTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
@@ -63,7 +63,7 @@ void convertToArr(msg_template msg, uint8 *array)
 
 /**
  * @brief Updates the timestamps table given the TX/RX message.
- * 
+ *
  * @param table 2D array representing the timestamps table.
  * @param msg structure containing the timestamps.
  * @param ts the reception timestamp of the incoming second TX.
@@ -93,38 +93,38 @@ void updateTable(uint64 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint64
   {
     /*
       Two behaviours here:
-      
+
       All the columns with thisId < msg.id will DEFINITELY have TX1 and TX2
-      timestamps (both of which from thisId) in IDX_TS_1 and IDX_TS_5 
+      timestamps (both of which from thisId) in IDX_TS_1 and IDX_TS_5
       (though we store at IDX_TS_1 and IDX_TS_2 instead for performance and simplicity sake)
       respectively.
 
       In this case, we will only need RX timestamp (stamped when receive from another
       node) at IDX_TS_4.
-      
+
       All columns with thisId > msg.id will DEFINITELY have TX1 timestamp
       (from thisId) in IDX_TS_3 (though we store at IDX_TS_1 instead for performance and
       simplicity sake). And TX2 timestamp is not required for calculation.
-      
+
       In this case, we will only need RX timestamp (stamped when receive from another
       node) at IDX_TS_2 and IDX_TS_6.
 
       Since all states are easily predetermined, we can hardcode the location to
       store the individual timestamps.
-      
+
       NOTE: these will only occur for the first 3 timestamps (All the first TXes).
       For the reception of other node's timestamps from their second TX, we will have
       still determine where to place their timestamps in this node's table. Which is the
       second portion in this function scope.
     */
-   
+
     if (thisId < msg.id)
     {
       table[IDX_TS_4][msg.id] = ts;
     }
     else if (thisId > msg.id)
     {
-      table[IDX_TS_2][msg.id] = ts; 
+      table[IDX_TS_2][msg.id] = ts;
     }
     else
     {
@@ -159,7 +159,7 @@ void updateTable(uint64 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint64
  * @brief Retrieves all the timestamp values stamped with one particular node.
  *
  * @details When @param thisId is equal to @param targetId, zeroed @param ts is returned.
- * 
+ *
  * @param table 2D array representing the timestamps table.
  * @param ts array to contain the retrieved values.
  * @param thisId identifier of calling node.
