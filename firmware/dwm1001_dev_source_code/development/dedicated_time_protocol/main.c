@@ -729,20 +729,6 @@ void syncCycle(void)
   isInitiating = false;
 }
 
-static uint64 get_rx_timestamp_u64(void)
-{
-  uint8 ts_tab[5];
-  uint64 ts = 0;
-  int i;
-  dwt_readrxtimestamp(ts_tab);
-  for (i = 4; i >= 0; i--)
-  {
-    ts <<= 8;
-    ts |= ts_tab[i];
-  }
-  return ts;
-}
-
 /**
  * @brief Updates the timestamps table with reception timestamp.
  * 
@@ -750,7 +736,7 @@ static uint64 get_rx_timestamp_u64(void)
  */
 void rxHandler(msg_template *msg)
 {
-  uint64 ts = get_rx_timestamp_u64();
+  uint64 ts = getRxTimestampU64();
   updateTable(tsTable, *msg, ts, NODE_ID);
 
   if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
