@@ -414,7 +414,7 @@ void writeTx2(msg_template *msg) {
 
     // Retrieve values for each node and copy into data member at predefined slots.
     getHalfTs(tsTable, ts, NODE_ID, i);
-    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE * 5), ts, sizeof(ts));
+    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE * TS_LEN), ts, sizeof(ts));
   }
 }
 
