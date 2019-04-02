@@ -133,7 +133,6 @@ bool tx2Sending = false;
 bool masterTx1Rdy = false;
 bool waitingTx1 = false;
 bool waitingTx2 = false;
-bool tx2Sent = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
@@ -413,8 +412,11 @@ void writeTx2(msg_template *msg) {
     }
 
     // Retrieve values for each node and copy into data member at predefined slots.
+    // TODO: Create a reusable function to copy timestamps into data member.
     getHalfTs(tsTable, ts, NODE_ID, i);
-    memcpy((msg->data) + (i * NUM_STAMPS_PER_NODE * TS_LEN), ts, sizeof(ts));
+    memcpy(msg->data + (i * NUM_STAMPS_PER_NODE * TS_LEN), &ts[IDX_TS_1], TS_LEN);
+    memcpy(msg->data + (i * NUM_STAMPS_PER_NODE * TS_LEN) + TS_LEN, &ts[IDX_TS_2], TS_LEN);
+    memcpy(msg->data + (i * NUM_STAMPS_PER_NODE * TS_LEN) + (TS_LEN * 2), &ts[IDX_TS_3], TS_LEN);
   }
 }
 
@@ -556,7 +558,6 @@ static void activeTimerHandler(void *pContext)
   printTable(tsTable);
   printDists(tsTable, NODE_ID);
   initTable(tsTable);
-  tx2Sent = false;
 }
 
 /**

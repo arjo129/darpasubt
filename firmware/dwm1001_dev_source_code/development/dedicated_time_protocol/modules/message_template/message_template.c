@@ -134,7 +134,7 @@ void updateTable(uint64 table[NUM_STAMPS_PER_CYCLE][N], msg_template msg, uint64
   else
   {
     // This message is the second TX from another node. Handle the timestamps in the payload.
-
+    // TODO: Replace memcpy with copy by shifting. Since memcpy is not exactly the most portable across machines.
     if (thisId < msg.id)
     {
       memcpy(&table[IDX_TS_2][msg.id], msg.data + (thisId * NUM_STAMPS_PER_NODE * TS_LEN), TS_LEN);
