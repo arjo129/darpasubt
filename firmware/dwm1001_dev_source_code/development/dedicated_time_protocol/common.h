@@ -9,5 +9,6 @@
 #define TX_INTERVAL 10000 // In microseconds
 #define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
 #define UUS_TO_DWT_TIME 65536
+#define RX_TX_BUFFER 1000 // Buffer time (us) to transit from RX to TX.
 
 typedef unsigned long long uint64;

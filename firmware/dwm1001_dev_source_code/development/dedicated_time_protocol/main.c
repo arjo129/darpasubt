@@ -574,14 +574,14 @@ static void initCycleTimings(void)
   wakePeriod = sleepPeriod * WAKE_INIT_FACTOR;
   
   // RX timeout values for synchronising TX moments.
-  // The values are minused with half a interval as buffer for computation to transit to TX mode.
-  rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - ((uint16)TX_INTERVAL / 2);
-  rxTimeout2 = ((uint16)TX_INTERVAL * N) - ((uint16)TX_INTERVAL / 2);
+  // The values are deducted with a fixed value to allow transition time from RX to TX for transceiver.
+  rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - (uint16)RX_TX_BUFFER;
+  rxTimeout2 = ((uint16)TX_INTERVAL * (uint16)N) - (uint16)RX_TX_BUFFER;
   
   interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
   regDelay = (N * interval);
   varDelay = (NODE_ID * interval);
-  
+
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
   printf("wakePeriod: %u\r\n", wakePeriod);
