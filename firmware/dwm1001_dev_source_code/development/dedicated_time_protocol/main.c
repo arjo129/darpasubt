@@ -327,6 +327,18 @@ void runTask (void * pvParameter)
   }
 }
 
+void printTs(uint64 val)
+{
+  int i;
+  uint8 ts;
+
+  for (i = 3; i >= 0; i--)
+  {
+    ts = (uint8)(val >> (i * 8));
+    printf("%.2x", ts);
+  }
+}
+
 void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 {
   int i,j;
@@ -336,6 +348,9 @@ void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
   {
     for (j = 0; j < N; j++)
     {
+      printf("|");
+      printTs(table[i][j]);
+      printf("|\t");
       printf("|%010u|\t", table[i][j]);
     }
     printf("\r\n");
