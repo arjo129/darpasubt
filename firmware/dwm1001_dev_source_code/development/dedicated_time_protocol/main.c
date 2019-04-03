@@ -119,7 +119,6 @@ uint32 activePeriod;
 uint32 sleepPeriod; // Time duration for actual hardware sleeping
 uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cycle
 uint32 dummyTime = (0x00FFFFFF / 2);
-uint64 intervalDwtTime;
 uint64 tx2DelayDwtTime;
 uint16 rxTimeout1;
 uint16 rxTimeout2;
@@ -139,8 +138,8 @@ APP_TIMER_DEF(sleepTimer);
 APP_TIMER_DEF(activeTimer);
 APP_TIMER_DEF(wakeTimer);
 APP_TIMER_DEF(dummyTimer);
-uint64 var_delay;
-uint64 reg_delay;
+uint64 varDelay;
+uint64 regDelay;
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 uint64 tx1DelayedDwtTime;
@@ -376,7 +375,7 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2)
  */
 uint64 calcTx1(uint64 ts) {
   // Calculate the approx. time by adding to the system time.
-  uint64 approx = ts + var_delay;
+  uint64 approx = ts + varDelay;
   return approx;
 }
 
@@ -391,7 +390,7 @@ uint64 calcTx1(uint64 ts) {
  */
 uint64 calcTx2(uint64 ts) {
   // Calculate the approx. time by adding to the system time.
-  uint64 approx = ts + reg_delay;
+  uint64 approx = ts + regDelay;
   return approx;
 }
 
@@ -426,7 +425,7 @@ void writeTx2(msg_template *msg) {
  */
 void configTx1(void)
 {
-  uint32 delay = (masterRxTs + tx1DelayedDwtTime) >> 8;
+  uint32 delay = (masterRxTs + varDelay) >> 8;
   dwt_setdelayedtrxtime(delay);
   tx1Sending = true;
   firstTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -441,7 +440,7 @@ void configTx2(void)
 {
   // Set the transmission time for TX2.
   // Reference timestamp is TX1 timestamp.
-  uint64 delay64 = tsTable[IDX_TS_1][NODE_ID] + tx2DelayDwtTime;
+  uint64 delay64 = tsTable[IDX_TS_1][NODE_ID] + regDelay;
   uint32 delay32 = delay64 >> 8;
   dwt_setdelayedtrxtime(delay32);
   delay64 += TX_ANT_DLY;
@@ -567,26 +566,22 @@ static void activeTimerHandler(void *pContext)
  */
 static void initCycleTimings(void)
 {
+  uint64 interval;
+
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
   activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
   sleepPeriod = cyclePeriod - activePeriod;
   wakePeriod = sleepPeriod * WAKE_INIT_FACTOR;
   
-  // TODO: Remove this after TzeGuang is done with TX2 ts function.
-  uint64 val = TX_INTERVAL;
-  uint64 conv = 65536;
-  intervalDwtTime = val * conv;
-  // TODO: Should not shift by 8 first, in order to preserve as much information as possible.
-  tx1DelayedDwtTime = intervalDwtTime * NODE_ID;
-  tx2DelayDwtTime = intervalDwtTime * N;
-
   // RX timeout values for synchronising TX moments.
   // The values are minused with half a interval as buffer for computation to transit to TX mode.
   rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - ((uint16)TX_INTERVAL / 2);
   rxTimeout2 = ((uint16)TX_INTERVAL * N) - ((uint16)TX_INTERVAL / 2);
   
-  reg_delay = (4.0 * TX_INTERVAL * UUS_TO_DWT_TIME);
-  var_delay = (NODE_ID * TX_INTERVAL * UUS_TO_DWT_TIME);
+  interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
+  regDelay = (N * interval);
+  varDelay = (NODE_ID * interval);
+  
   printf("cyclePeriod: %u\r\n", cyclePeriod);
   printf("activePeriod: %u\r\n", activePeriod);
   printf("wakePeriod: %u\r\n", wakePeriod);
