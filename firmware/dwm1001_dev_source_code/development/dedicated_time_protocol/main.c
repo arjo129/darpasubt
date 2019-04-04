@@ -351,7 +351,6 @@ void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
       printf("|");
       printTs(table[i][j]);
       printf("|\t");
-      printf("|%010u|\t", table[i][j]);
     }
     printf("\r\n");
   }
