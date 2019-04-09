@@ -121,7 +121,6 @@ uint32 dummyTime = (0x00FFFFFF / 2);
 uint64 tx2DelayDwtTime;
 uint32 rxTimeout1;
 uint32 rxTimeout2;
-uint64 masterRxTs;
 TxStatus txStatus;
 uint64 tsTable[NUM_STAMPS_PER_CYCLE][N];
 // States related
@@ -424,7 +423,8 @@ void writeTx2(msg_template *msg) {
  */
 void configTx1(void)
 {
-  uint32 delay = (masterRxTs + varDelay) >> 8;
+  uint64 firstRx = tsTable[IDX_TS_2][0]; // Retrieve the first RX timestamp from Node 0.
+  uint32 delay = (firstRx + varDelay) >> 8;
   dwt_setdelayedtrxtime(delay);
   tx1Sending = true;
   firstTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
@@ -702,7 +702,6 @@ void rxHandler(msg_template *msg)
     lowTimerStart(rx1Timer, rxTimeout1);
 
     lowTimerStart(activeTimer, activePeriod);
-    masterRxTs = ts;
   }
 }
 
