@@ -313,7 +313,7 @@ void printTs(uint64 val)
   int i;
   uint8 ts;
 
-  for (i = 3; i >= 0; i--)
+  for (i = 4; i >= 0; i--)
   {
     ts = (uint8)(val >> (i * 8));
     printf("%.2x", ts);
