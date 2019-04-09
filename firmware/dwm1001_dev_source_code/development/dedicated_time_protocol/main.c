@@ -728,20 +728,13 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
     }
   }
 
-  // ISSUE: roundTrip1 should be >replyTrip1
-  // Possibly using the wrong bits of values? (High 32 vs Low 32);
-  // TODO: Test the SS_TWR example by checking the difference in TS1 and TS4. How does it compare to here?
-  // POSSIBILITY: We are using the difference that is HIGHER 32 BITS and not LOWER 32 BITS.
-  // So this could be that this is not the actual decimal representation. In other words,
-  // We should try bit shifting to the LEFT BY 8 so we can get the full 40 bits representation.
-
-
   roundTrip1 = ts[IDX_TS_4] - ts[IDX_TS_1];
   roundTrip2 = ts[IDX_TS_6] - ts[IDX_TS_3];
   replyTrip1 = ts[IDX_TS_3] - ts[IDX_TS_2];
   replyTrip2 = ts[IDX_TS_5] - ts[IDX_TS_4];
 
-  // TODO: Might overflow
+  // TODO: Overflow when the product is too large to be contained in uint64. Affects computer dvalues.
+  // Maybe convert the timestamps to seconds first then compute?
   roundTripP = roundTrip1 * roundTrip2;
   replyTripP = replyTrip1 * replyTrip2;
   // Check if the two device is too close in distance.
