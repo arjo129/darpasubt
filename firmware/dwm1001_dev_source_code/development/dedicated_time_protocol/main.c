@@ -64,13 +64,10 @@ static dwt_config_t config = {
 
 // Ranging related
 #define SPEED_OF_LIGHT 299702547
+#define CLOSE_VAL -2.0 // Return value used when distances calculated are too low.
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
-#define TX_GAP 400 /**< Time interval between transmits, in microseconds */
-// Timestamps related
-#define FIRST_TX_IDX 0
-#define SECOND_TX_IDX 1
 
 #ifdef USE_FREERTOS
 
@@ -716,6 +713,7 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
 {
   double tof, num, den, timeOfFlightInUnits;
   uint64 roundTrip1, roundTrip2, replyTrip2, replyTrip1;
+  uint64 roundTripP, replyTripP;
   uint64 ts[NUM_STAMPS_PER_CYCLE] = {0};
 
   // Get values to calculate.
@@ -744,7 +742,14 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
   replyTrip2 = ts[IDX_TS_5] - ts[IDX_TS_4];
 
   // TODO: Might overflow
-  timeOfFlightInUnits = (double)(roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
+  roundTripP = roundTrip1 * roundTrip2;
+  replyTripP = replyTrip1 * replyTrip2;
+  // Check if the two device is too close in distance.
+  if (roundTripP < replyTripP)
+  {
+    return CLOSE_VAL;
+  }
+  timeOfFlightInUnits = (double)(roundTripP - replyTripP) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
 
   tof = timeOfFlightInUnits * DWT_TIME_UNITS;
   return tof * SPEED_OF_LIGHT;

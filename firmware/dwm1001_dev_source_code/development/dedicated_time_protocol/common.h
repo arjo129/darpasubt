@@ -4,7 +4,7 @@
 #define TX_ANT_DLY 16456
 #define RX_ANT_DLY 16456
 // Ranging related
-#define NODE_ID 2 // Node ID
+#define NODE_ID 1 // Node ID
 #define RANGE_FREQ 40 // Frequency of the cycles
 #define TX_INTERVAL 2000 // In microseconds
 #define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
