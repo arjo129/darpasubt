@@ -4,8 +4,10 @@
 // Frames related
 #define NUM_STAMPS_PER_NODE 3 // Number of timestamps stored that belong to each node
 #define TS_LEN 5
+#define ID_LEN 1 // Length of ID field
+#define F_LEN 1 // Length of isFirst field
 #define DATA_LEN NUM_STAMPS_PER_NODE * N * TS_LEN // Length (bytes) of data in standard message. Each timestamp is 5 bytes.
-#define MSG_LEN HEADER_LEN + DATA_LEN + CRC_LEN // Length (bytes) of the standard message
+#define MSG_LEN HEADER_LEN + ID_LEN + F_LEN + DATA_LEN + CRC_LEN // Length (bytes) of the standard message
 #define NUM_STAMPS_PER_CYCLE 6 // Total number of timestamps needed to compute distance
 #define HEADER_LEN 10
 #define CRC_LEN 2
