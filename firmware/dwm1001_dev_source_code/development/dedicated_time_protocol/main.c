@@ -527,7 +527,7 @@ static void activeTimerHandler(void *pContext)
   counter = 0;
   goToSleep(true, sleepPeriod, wakePeriod);
 
-  printTable(tsTable);
+  // printTable(tsTable);
   printDists(tsTable, NODE_ID);
   initTable(tsTable);
 }

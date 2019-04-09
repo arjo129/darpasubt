@@ -118,7 +118,7 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
     // printf("TX 1\r\n");
     
     uint64 ts64 = getTxTimestampU64();
-    printf("TX1 = %x\r\n", ts64);
+    // printf("TX1 = %x\r\n", ts64);
     updateTx1Ts(ts64);
     setRxTimeout2();
 
@@ -128,7 +128,7 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   {
     // printf("TX 2\r\n");
     uint64 ts64 = getTxTimestampU64();
-    printf("TX2 = %x\r\n", ts64);
+    // printf("TX2 = %x\r\n", ts64);
 
     // Make sure device is in IDLE before changing RX timeout.
     dwt_forcetrxoff();
