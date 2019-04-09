@@ -63,7 +63,6 @@ static dwt_config_t config = {
 /* Macros definitions */
 
 // Ranging related
-#define UUS_TO_DWT_TIME 65536 // Used to convert microseconds to DW1000 register time values.
 #define SPEED_OF_LIGHT 299702547
 
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
@@ -72,8 +71,6 @@ static dwt_config_t config = {
 // Timestamps related
 #define FIRST_TX_IDX 0
 #define SECOND_TX_IDX 1
-
-#define RX_TO_INVALID 0
 
 #ifdef USE_FREERTOS
 
@@ -99,6 +96,8 @@ static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
 static void activeTimerHandler(void *pContext);
+static void rx1Handler(void *pContext);
+static void rx2Handler(void *pContext);
 static void initCycleTimings(void);
 static void initListen(void);
 static void initRxTo(void);
@@ -120,8 +119,8 @@ uint32 sleepPeriod; // Time duration for actual hardware sleeping
 uint32 wakePeriod; // Time duration from the last TX/RX to the start of next cycle
 uint32 dummyTime = (0x00FFFFFF / 2);
 uint64 tx2DelayDwtTime;
-uint16 rxTimeout1;
-uint16 rxTimeout2;
+uint32 rxTimeout1;
+uint32 rxTimeout2;
 uint64 masterRxTs;
 TxStatus txStatus;
 uint64 tsTable[NUM_STAMPS_PER_CYCLE][N];
@@ -130,21 +129,17 @@ bool isInitiating = false;
 bool tx1Sending = false;
 bool tx2Sending = false;
 bool masterTx1Rdy = false;
-bool waitingTx1 = false;
-bool waitingTx2 = false;
 // Timers related
 APP_TIMER_DEF(initTimer);
 APP_TIMER_DEF(sleepTimer);
 APP_TIMER_DEF(activeTimer);
 APP_TIMER_DEF(wakeTimer);
-APP_TIMER_DEF(dummyTimer);
+APP_TIMER_DEF(rx1Timer); // First RX phase timer
+APP_TIMER_DEF(rx2Timer); // Second RX phase timer
 uint64 varDelay;
 uint64 regDelay;
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
-uint64 tx1DelayedDwtTime;
-int rxPhase1To[N] = {-1};
-int rxPhase2To[N];
 
 /** Default header */
 uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -177,9 +172,6 @@ uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0}
     LEDS_INVERT(BSP_LED_1_MASK);
   }
 #endif   // #ifdef USE_FREERTOS
-
-static void dummyHandler(void *pContext) {
-}
 
 int main(void)
 {
@@ -244,8 +236,8 @@ int main(void)
   lowTimerSingleCreate(&sleepTimer, sleepTimerHandler);
   lowTimerSingleCreate(&activeTimer, activeTimerHandler);
   lowTimerSingleCreate(&wakeTimer, wakeTimerHandler);
-  lowTimerRepeatCreate(&dummyTimer, dummyHandler);
-  // lowTimerStart(dummyTimer, dummyTime);
+  lowTimerSingleCreate(&rx1Timer, rx1Handler);
+  lowTimerSingleCreate(&rx2Timer, rx2Handler);
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
@@ -255,9 +247,6 @@ int main(void)
 
   // Initalises the messages to be transmitted.
   initTxMsgs(&txMsg1, &txMsg2);
-
-  // Initialises the RX timeout values.
-  initRxTo();
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -298,11 +287,7 @@ void runTask (void * pvParameter)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
   }
   
-  // TODO: Use RX timeout to time the first and second TX.
-  //       Note: RX timeout will reset to ZERO once a frame is received. 
-  //       So we need to reset the timeout to a desired value each time a
-  //       frame is received. Once the timeout expires, we handle it with
-  //       either TX1 or TX2.
+  // TODO: Use NRF timer instead of rxtimeout timer to time the delay TX.
   
   while(true)
   {
@@ -310,7 +295,7 @@ void runTask (void * pvParameter)
     {
       tx1Sending = true;
 
-      dwt_setrxtimeout(rxTimeout2); // Set BEFORE calling first TX.
+      lowTimerStart(rx2Timer, rxTimeout2);
       txStatus = firstTx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
       lowTimerStart(activeTimer, activePeriod);
 
@@ -485,33 +470,7 @@ void updateTx1Ts(uint64 ts)
 void setRxTimeout2(void)
 {
   // Make sure device is in IDLE before changing RX timeout.
-  dwt_forcetrxoff();
-  dwt_setrxtimeout(rxTimeout2);
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-}
-
-// TODO: Come up with an algo to update RX timeout depending on the the received ID.
-void resetRxTimeout(uint8 id)
-{
-  uint32 timeout;
-
-  if (waitingTx1)
-  {
-    timeout = rxPhase1To[id];
-    dwt_forcetrxoff();
-    dwt_setrxtimeout(timeout);
-  }
-  else if (waitingTx2)
-  {
-    timeout = rxPhase2To[id];
-    dwt_forcetrxoff();
-    dwt_setrxtimeout(timeout);
-  }
-  else
-  {
-    // Will not reach here.
-  }
-  
+  lowTimerStart(rx2Timer, rxTimeout2);
 }
 
 /* Protocol functions */
@@ -552,7 +511,8 @@ static void sleepTimerHandler(void *pContext)
   }
   else
   {
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    // NOTE: Disable the following line if not putting the hardware to sleep.
+    // dwt_rxenable(DWT_START_RX_IMMEDIATE);
   }
 }
 
@@ -563,7 +523,6 @@ static void sleepTimerHandler(void *pContext)
  */
 static void activeTimerHandler(void *pContext)
 {
-  // ISSUE: This handler is getting called early.
   // printf("%d\r\n", counter);
   counter = 0;
   goToSleep(true, sleepPeriod, wakePeriod);
@@ -571,6 +530,26 @@ static void activeTimerHandler(void *pContext)
   printTable(tsTable);
   printDists(tsTable, NODE_ID);
   initTable(tsTable);
+}
+
+/**
+ * @brief Handler function for when the first phase of RX is over.
+ * 
+ * @param pContext General parameter that can be passed into the handler.
+ */
+static void rx1Handler(void *pContext)
+{
+  configTx1();
+}
+
+/**
+ * @brief Handler function for when the second phase of RX is over.
+ * 
+ * @param pContext General parameter than can be passed in the handler.
+ */
+static void rx2Handler(void *pContext)
+{
+  configTx2();
 }
 
 /**
@@ -589,8 +568,8 @@ static void initCycleTimings(void)
   
   // RX timeout values for synchronising TX moments.
   // The values are deducted with a fixed value to allow transition time from RX to TX for transceiver.
-  rxTimeout1 = ((uint16)TX_INTERVAL * (uint16)NODE_ID) - (uint16)RX_TX_BUFFER;
-  rxTimeout2 = ((uint16)TX_INTERVAL * (uint16)N) - (uint16)RX_TX_BUFFER;
+  rxTimeout1 = ((uint32)TX_INTERVAL * (uint32)NODE_ID) - (uint32)RX_TX_BUFFER;
+  rxTimeout2 = ((uint32)TX_INTERVAL * (uint32)N) - (uint32)RX_TX_BUFFER;
   
   interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
   regDelay = (N * interval);
@@ -630,38 +609,6 @@ static void initListen(void)
   lowTimerStart(initTimer, cyclePeriod);
 
   while (isInitiating) {};
-}
-
-/**
- * @brief Initialises the RX timeout values for each reception phase.
- * 
- */
-static void initRxTo(void)
-{
-  int i, j;
-
-  // Initialise the RX timeout values for Phase 1
-  for (i = 0; i < N; i++)
-  {
-    if (i >= NODE_ID)
-    {
-      rxPhase1To[i] = RX_TO_INVALID;
-    }
-    else
-    {
-      rxPhase1To[i] = ((NODE_ID - i) * TX_INTERVAL) - (TX_INTERVAL / 2);
-    }
-  }
-
-  // Initialise the RX timeout values for Phase 2
-  i = (NODE_ID + 1 == N ? 0 : NODE_ID + 1);
-  j = N - 1;
-  while (i != NODE_ID)
-  {
-    rxPhase2To[i] = (j-- * TX_INTERVAL) - (TX_INTERVAL / 2);
-    i = (i + 1 == N ? 0 : i + 1);
-  }
-  rxPhase2To[NODE_ID] = RX_TO_INVALID;
 }
 
 /**
@@ -752,11 +699,9 @@ void rxHandler(msg_template *msg)
   if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
   {
     // Make sure device is in IDLE first before changing RX timeout.
-    dwt_forcetrxoff();
-    dwt_setrxtimeout(rxTimeout1);
+    lowTimerStart(rx1Timer, rxTimeout1);
 
     lowTimerStart(activeTimer, activePeriod);
-    waitingTx1 = true;
     masterRxTs = ts;
   }
 }

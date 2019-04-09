@@ -13,8 +13,6 @@ extern int counter; // debugging purpose
 extern bool isInitiating;
 extern bool tx1Sending;
 extern bool tx2Sending;
-extern bool waitingTx1;
-extern bool waitingTx2;
 
 /* Public functions */
 /**
@@ -62,7 +60,6 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
     convertToStruct(buffer, &msg);
     // printf("\tRX: %d, %d\r\n", msg.id, (msg.isFirst == 1 ? 1 : 2));
     rxHandler(&msg);
-    resetRxTimeout(msg.id);
   }
   else
   {
@@ -84,21 +81,7 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
 void rx_to_cb(const dwt_cb_data_t *cb_data)
 {
   dwt_rxreset();
-
-  if (waitingTx1)
-  {
-    waitingTx1 = false;
-    configTx1();
-  }
-  else if (waitingTx2)
-  {
-    waitingTx2 = false;
-    configTx2();
-  }
-  else
-  {
-    // Will not reach here.
-  }
+  printf("RX timeout\r\n");
 }
 
 /**
@@ -111,6 +94,7 @@ void rx_to_cb(const dwt_cb_data_t *cb_data)
 void rx_err_cb(const dwt_cb_data_t *cb_data)
 {
   dwt_rxreset();
+  printf("RX error\r\n");
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
@@ -139,7 +123,6 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
     setRxTimeout2();
 
     tx1Sending = false;
-    waitingTx2 = true;
   }
   else if (tx2Sending)
   {
