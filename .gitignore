@@ -2,6 +2,7 @@
 **/SES/Output/**
 **/*.emSession
 /firmware/dwm1001_dev_source_code/.vscode/
+/firmware/dwm1001_dev_source_code/scripts/plot-calibration-curve.html
 src/.vscode
 build/
 devel/

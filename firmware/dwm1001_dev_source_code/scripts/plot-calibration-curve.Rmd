@@ -1,0 +1,52 @@
+---
+title: "plot-calibration-curve"
+author: "DARPA SubT n00bs"
+date: "4/10/2019"
+output:
+  html_document:
+  toc: true
+---
+  
+  ```{r, echo=FALSE, message=FALSE}
+library(knitr)
+library(kableExtra)
+library(dplyr)
+
+plot.with.errorbars <- function(x, y, ...) {
+  plot(x, y, ...)
+}
+
+# First col is x-axis
+# Second and third cols are y-axis of two separate graphs
+plotD <- function(d) {
+  distReal <- d[, 1]
+  distPred <- d[, 2]
+  temp <- d[, 3]
+  plot.with.errorbars(distReal, distPred, xlab="Real Distance (m)", ylab="Predicted Distance (m)")
+  plot.with.errorbars(distReal, temp, xlab="Real Distance (m)", ylab="Temperature (C)")
+}
+
+tableD <- function(d, mutations) {
+  if (missing(mutations)) {
+    kable(d) %>%
+      kable_styling("striped", full_width=FALSE, position="left")
+  } else {
+    d <- d %>%
+      mutate(
+        SizeThreads = row.names(.)
+      )
+    d[, ncol(d), drop=FALSE] %>%
+      cbind(d[, 0:(ncol(d)-1)]) %>%
+      #select(Size \ Threads) %>%
+      kable %>%
+      kable_styling("striped", full_width=FALSE, position="left")
+  }
+}
+```
+
+# Calibration curve
+```{r, echo=FALSE, results='asis'}
+d <- read.csv(file='data.csv', check.names=FALSE)
+plotD(d)
+tableD(d)
+```
