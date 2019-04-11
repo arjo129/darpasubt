@@ -9,7 +9,6 @@
 
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
-extern int counter; // debugging purpose
 extern bool isInitiating;
 extern bool tx1Sending;
 extern bool tx2Sending;
@@ -55,7 +54,6 @@ void rx_ok_cb(const dwt_cb_data_t *cb_data)
   // Eg: Read received frame data and print
   rxStatus = rxMsg(buffer);
   if (rxStatus == RX_SUCCESS) {
-    counter++; // debugging purpose
     // Cast the frame to the message structure first
     convertToStruct(buffer, &msg);
     // printf("\tRX: %d, %d\r\n", msg.id, (msg.isFirst == 1 ? 1 : 2));

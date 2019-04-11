@@ -107,6 +107,7 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 static void printTemp(void);
 static void printData(void);
+static void printConfig(void);
 
 /* Global variables */
 // Frames related
@@ -138,7 +139,6 @@ APP_TIMER_DEF(rx1Timer); // First RX phase timer
 APP_TIMER_DEF(rx2Timer); // Second RX phase timer
 uint64 varDelay;
 uint64 regDelay;
-int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
 int readCount = 0;
 
@@ -199,7 +199,6 @@ int main(void)
   
   // Initialization UART
   boUART_Init();
-  printf("Initialising node\r\n");
   
   // Reset DW1000
   reset_DW1000(); 
@@ -249,6 +248,9 @@ int main(void)
   // Initalises the messages to be transmitted.
   initTxMsgs(&txMsg1, &txMsg2);
 
+  // Prints configuration information.
+  printConfig();
+
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
 
@@ -276,8 +278,6 @@ void runTask (void * pvParameter)
 
   // Listen for activity in the network
   // initListen();
-  printf("%d\r\n", counter); // debugging purpose
-  counter = 0;
 
   if (NODE_ID == 0)
   {
@@ -529,8 +529,6 @@ static void sleepTimerHandler(void *pContext)
  */
 static void activeTimerHandler(void *pContext)
 {
-  // printf("%d\r\n", counter);
-  counter = 0;
   goToSleep(true, sleepPeriod, wakePeriod);
 
   // printTable(tsTable);
@@ -580,13 +578,6 @@ static void initCycleTimings(void)
   interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
   regDelay = (N * interval);
   varDelay = (NODE_ID * interval);
-
-  printf("cyclePeriod: %u\r\n", cyclePeriod);
-  printf("activePeriod: %u\r\n", activePeriod);
-  printf("wakePeriod: %u\r\n", wakePeriod);
-  printf("sleepPeriod: %u\r\n", sleepPeriod);
-  printf("rxTimeout1: %u\r\n", rxTimeout1);
-  printf("rxTimeout2: %u\r\n", rxTimeout2);
 }
 
 /**
@@ -817,6 +808,25 @@ static void printData(void)
   {
     printTemp();
   }
-  
+
   printf(";\r\n");
+}
+
+/**
+ * @brief Prints all configuration information.
+ * 
+ */
+static void printConfig(void)
+{
+  printf("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\r\n");
+  printf("  NODES_COUNT : %d\r\n", N);
+  printf("      NODE_ID : %d\r\n", NODE_ID);
+  printf("     RNG_FREQ : %d (Hz)\r\n", RANGE_FREQ);
+  printf(" TRX_INTERVAL : %d (us)\r\n", TX_INTERVAL);
+  printf(" RX_TO_TX_BUF : %d (us)\r\n", RX_TX_BUFFER);
+  printf(" CYCLE_PERIOD : %u (us)\r\n", cyclePeriod);
+  printf(" ACTIV_PERIOD : %u (us)\r\n", activePeriod);
+  printf(" SLEEP_PERIOD : %u (us)\r\n", sleepPeriod);
+  printf("HW_SLP_FACTOR : %.2f\r\n", WAKE_INIT_FACTOR);
+  printf("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\r\n\r\n");
 }
