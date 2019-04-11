@@ -69,6 +69,8 @@ static dwt_config_t config = {
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
 
+#define MAX_COUNT 1200 
+
 #ifdef USE_FREERTOS
 
 TaskHandle_t run_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
@@ -136,6 +138,7 @@ uint64 varDelay;
 uint64 regDelay;
 int counter = 0; // debugging purpose
 int txCounter = 0; // debugging purpose
+int readCount = 0;
 
 /** Default header */
 uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -287,6 +290,10 @@ void runTask (void * pvParameter)
   
   while(true)
   {
+    if (readCount > 1000)
+    {
+      while (1);
+    }
     if (masterTx1Rdy)
     {
       tx1Sending = true;
@@ -758,6 +765,7 @@ static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
 {
   int i;
   double dists[N] = {0};
+  bool fail = false;
 
   // Calculate the distances for each of other nodes.
   for (i = 0; i < N; i++)
@@ -769,20 +777,33 @@ static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
 
     dists[i] = calcDist(table, i);
   }
-
-  // Print the distances to serial.
-  for (i = 0; i < N; i++)
+  
+  if (dists[0] != -1.000 && dists[0] != -2.000)
   {
-    if (i == thisId)
+    readCount++;
+    printf("%d:", readCount);
+
+    // Print the distances to serial.
+    for (i = 0; i < N; i++)
     {
-      continue;
+      if (i == thisId)
+      {
+        continue;
+      }
+
+      printf("%0.4lf", dists[i]);
+      if ((i + 1 != N - 1 || thisId != N - 1) && i != N - 1)
+      {
+        printf(",");
+      }
     }
 
-    printf("%0.4lf", dists[i]);
-    if ((i + 1 != N - 1 || thisId != N - 1) && i != N - 1)
-    {
-      printf(",");
-    }
+    // Print temperatures
+    uint16 value = dwt_readtempvbat(1);
+    value = value >> 8;
+    double temp = 1.13 * value - 113.0;
+    printf(" Temp: %lf", temp);
+    
+    printf(";\r\n"); // Denote end of distances serial output.
   }
-  printf(";\r\n"); // Denote end of distances serial output.
 }
