@@ -106,6 +106,7 @@ static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 static void printTemp(void);
+static void printData(void);
 
 /* Global variables */
 // Frames related
@@ -533,7 +534,7 @@ static void activeTimerHandler(void *pContext)
   goToSleep(true, sleepPeriod, wakePeriod);
 
   // printTable(tsTable);
-  printDists(tsTable, NODE_ID);
+  printData();
   initTable(tsTable);
 }
 
@@ -767,26 +768,20 @@ static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
     dists[i] = calcDist(table, i);
   }
   
-  if (dists[0] != -1.000 && dists[0] != -2.000)
+  // Print the distances to serial.
+  printf("D: ");
+  for (i = 0; i < N; i++)
   {
-    readCount++;
-    printf("%d:", readCount);
-
-    // Print the distances to serial.
-    for (i = 0; i < N; i++)
+    if (i == thisId)
     {
-      if (i == thisId)
-      {
-        continue;
-      }
-
-      printf("%0.4lf", dists[i]);
-      if ((i + 1 != N - 1 || thisId != N - 1) && i != N - 1)
-      {
-        printf(",");
-      }
+      continue;
     }
-    printf(";\r\n"); // Denote end of distances serial output.
+
+    printf("%0.4lf", dists[i]);
+    if ((i + 1 != N - 1 || thisId != N - 1) && i != N - 1)
+    {
+      printf(",");
+    }
   }
 }
 
@@ -799,5 +794,29 @@ static void printTemp(void)
   uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
   value = value >> 8; // Temperature is at the higher 8 bits.
   double temp = 1.13 * value - 113.0; // Formula to get compute real temperature in Celsius.
-  printf("Temp: %lf", temp);  
+  printf("T: %lf", temp);  
+}
+
+/**
+ * @brief Prints the required output to terminal.
+ * 
+ */
+static void printData(void)
+{
+  if (P_DIST == 1)
+  {
+    printDists(tsTable, NODE_ID);
+  }
+
+  if (P_DIST == 1 && P_TEMP == 1)
+  {
+    printf(" ");
+  }
+
+  if (P_TEMP == 1)
+  {
+    printTemp();
+  }
+  
+  printf(";\r\n");
 }
