@@ -105,6 +105,7 @@ static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
+static void printTemp(void);
 
 /* Global variables */
 // Frames related
@@ -718,9 +719,7 @@ void rxHandler(msg_template *msg)
  */
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
 {
-  double tof, num, den, timeOfFlightInUnits;
-  uint64 roundTrip1, roundTrip2, replyTrip2, replyTrip1;
-  uint64 roundTripP, replyTripP;
+  double tof, roundTrip1, roundTrip2, replyTrip2, replyTrip1;
   uint64 ts[NUM_STAMPS_PER_CYCLE] = {0};
 
   // Get values to calculate.
@@ -735,23 +734,13 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
     }
   }
 
-  roundTrip1 = ts[IDX_TS_4] - ts[IDX_TS_1];
-  roundTrip2 = ts[IDX_TS_6] - ts[IDX_TS_3];
-  replyTrip1 = ts[IDX_TS_3] - ts[IDX_TS_2];
-  replyTrip2 = ts[IDX_TS_5] - ts[IDX_TS_4];
+  roundTrip1 = (double)((ts[IDX_TS_4] - ts[IDX_TS_1]) * DWT_TIME_UNITS);
+  roundTrip2 = (double)((ts[IDX_TS_6] - ts[IDX_TS_3]) * DWT_TIME_UNITS);
+  replyTrip1 = (double)((ts[IDX_TS_3] - ts[IDX_TS_2]) * DWT_TIME_UNITS);
+  replyTrip2 = (double)((ts[IDX_TS_5] - ts[IDX_TS_4]) * DWT_TIME_UNITS);
 
-  // TODO: Overflow when the product is too large to be contained in uint64. Affects computer dvalues.
-  // Maybe convert the timestamps to seconds first then compute?
-  roundTripP = roundTrip1 * roundTrip2;
-  replyTripP = replyTrip1 * replyTrip2;
-  // Check if the two device is too close in distance.
-  if (roundTripP < replyTripP)
-  {
-    return CLOSE_VAL;
-  }
-  timeOfFlightInUnits = (double)(roundTripP - replyTripP) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
+  tof = (roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
 
-  tof = timeOfFlightInUnits * DWT_TIME_UNITS;
   return tof * SPEED_OF_LIGHT;
 }
 
@@ -797,13 +786,18 @@ static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
         printf(",");
       }
     }
-
-    // Print temperatures
-    uint16 value = dwt_readtempvbat(1);
-    value = value >> 8;
-    double temp = 1.13 * value - 113.0;
-    printf(" Temp: %lf", temp);
-    
     printf(";\r\n"); // Denote end of distances serial output.
   }
+}
+
+/**
+ * @brief Reads and prints the temperature of the intergrated chip (DWM1000). 
+ * 
+ */
+static void printTemp(void)
+{
+  uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
+  value = value >> 8; // Temperature is at the higher 8 bits.
+  double temp = 1.13 * value - 113.0; // Formula to get compute real temperature in Celsius.
+  printf("Temp: %lf", temp);  
 }
