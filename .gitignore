@@ -2,6 +2,8 @@
 **/SES/Output/**
 **/*.emSession
 /firmware/dwm1001_dev_source_code/.vscode/
+# RF related
+/firmware/RF_transceiver/.vscode
 src/.vscode
 build/
 devel/
