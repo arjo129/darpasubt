@@ -2,6 +2,7 @@
 #include "common.h"
 #include "client.h"
 #include "transceiver.h"
+#include "writer.h"
 
 /**
  * @brief Setup function to configure as client operation.
@@ -29,6 +30,7 @@ void clientSetup(RH_RF95 *client)
   Serial.print("Setting Frequency: ");
   Serial.println(CLIENT_FREQ);
   client->setFrequency(CLIENT_FREQ);
+  client->setThisAddress(ADDRESS);
 }
 
 /**
@@ -38,17 +40,22 @@ void clientSetup(RH_RF95 *client)
  */
 void clientLoop(RH_RF95 *client)
 {
-  uint8_t toSend[MAX_DATA_LEN] = "Requesting coordinates";
+  uint8_t toSend[MAX_DATA_LEN];
+  uint8_t origin;
+
+  writeMsg(client, toSend, ADDRESS, 0, "Requesting coordinates"); // Send to node with address '0'.
   sendData(client, toSend);
   
   // Wait for acknowledgement from server
   uint8_t buf[MAX_DATA_LEN];
   bool ack;
 
-  ack = waitData(client, buf, CL_WAIT_TIME);
+  ack = waitData(client, buf, CL_WAIT_TIME, &origin);
   if (ack)
   {
-    Serial.print("Acknowledge: ");
+    Serial.print("Acknowledge from ");
+    Serial.print(origin);
+    Serial.print(": ");
     Serial.println((char*)buf);
   }
   

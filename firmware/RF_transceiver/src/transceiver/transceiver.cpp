@@ -39,10 +39,11 @@ bool sendData(RH_RF95 *radioDriver, uint8_t data[MAX_DATA_LEN])
  * @param radioDriver the instance of the radio driver in operation.
  * @param buf buffer array to store the received data.
  * @param timeout time duration to wait for data. Set to 0 if immediate receive is required.
+ * @param source the origin address of the received message.
  * @return true if message is found and data is received.
  * @return false if no message is found or unable to receive data.
  */
-bool waitData(RH_RF95 *radioDriver, uint8_t buf[MAX_DATA_LEN], uint16_t timeout)
+bool waitData(RH_RF95 *radioDriver, uint8_t buf[MAX_DATA_LEN], uint16_t timeout, uint8_t *source)
 {
   bool result;
   uint8_t len = MAX_DATA_LEN;
@@ -59,6 +60,7 @@ bool waitData(RH_RF95 *radioDriver, uint8_t buf[MAX_DATA_LEN], uint16_t timeout)
 
   // Retrieve the message.
   result = radioDriver->recv(buf, &len);
+  *source = radioDriver->headerFrom();
   if(!result)
   {
     Serial.println("Message found but receive failed.");

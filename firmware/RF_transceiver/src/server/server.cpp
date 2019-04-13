@@ -2,6 +2,7 @@
 #include "common.h"
 #include "server.h"
 #include "transceiver.h"
+#include "writer.h"
 
 /**
  * @brief Setup function to configure as server operation.
@@ -31,6 +32,7 @@ void serverSetup(RH_RF95 *server)
   Serial.print("Setting Frequency: ");
   Serial.println(SERVER_FREQ);
   server->setFrequency(SERVER_FREQ);
+  server->setThisAddress(ADDRESS);
 }
 
 /**
@@ -41,6 +43,7 @@ void serverSetup(RH_RF95 *server)
 void serverReceive(RH_RF95 *server)
 {
   uint8_t buf[MAX_DATA_LEN];
+  uint8_t origin;
   bool recv;
   
   // Check if there are data in the reception buffer.
@@ -49,16 +52,19 @@ void serverReceive(RH_RF95 *server)
     return;
   }
 
-  recv = waitData(server, buf, 0); // set timeout to continuously find messages
+  recv = waitData(server, buf, 0, &origin); // set timeout to continuously find messages
   if (recv)
   {
     digitalWrite(LED_PIN, HIGH);
     
-    Serial.print("Request: ");
+    Serial.print("Request from ");
+    Serial.print(origin);
+    Serial.print(": ");
     Serial.println((char*)buf);
     
     // Send acknowledgement
-    uint8_t toSend[MAX_DATA_LEN] = "Message acknowledged";
+    uint8_t toSend[MAX_DATA_LEN];
+    writeMsg(server, toSend, ADDRESS, 1, "Message acknowledged"); // Send to node with address '1'.
     sendData(server, toSend);
     
     digitalWrite(LED_PIN, LOW);
