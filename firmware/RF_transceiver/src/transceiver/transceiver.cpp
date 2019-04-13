@@ -5,16 +5,17 @@
  * @brief Transmits given data.
  * 
  * @param radioDriver the instance of the radio driver in operation.
- * @param data the data to be sent out.
+ * @param data pointer to the data to be sent out.
+ * @param dataLen length of the data in bytes.
  * @return true if transmission successful.
  * @return false if transmission failed.
  */
-bool sendData(RH_RF95 *radioDriver, uint8_t data[MAX_DATA_LEN])
+bool sendData(RH_RF95 *radioDriver, uint8_t *data, uint8_t dataLen)
 {
   bool result;
 
   Serial.println("Sending message.");
-  result = radioDriver->send(data, MAX_DATA_LEN);
+  result = radioDriver->send(data, dataLen);
 
   if (result)
   {
@@ -38,15 +39,15 @@ bool sendData(RH_RF95 *radioDriver, uint8_t data[MAX_DATA_LEN])
  * 
  * @param radioDriver the instance of the radio driver in operation.
  * @param buf buffer array to store the received data.
+ * @param bufLen length of the buffer array in bytes.
  * @param timeout time duration to wait for data. Set to 0 if immediate receive is required.
  * @param source the origin address of the received message.
  * @return true if message is found and data is received.
  * @return false if no message is found or unable to receive data.
  */
-bool waitData(RH_RF95 *radioDriver, uint8_t buf[MAX_DATA_LEN], uint16_t timeout, uint8_t *source)
+bool waitData(RH_RF95 *radioDriver, uint8_t *buf, uint8_t bufLen, uint16_t timeout, uint8_t *source)
 {
   bool result;
-  uint8_t len = MAX_DATA_LEN;
 
   // Listen for messages for the timeout duration.
   if (timeout > 0)
@@ -59,7 +60,7 @@ bool waitData(RH_RF95 *radioDriver, uint8_t buf[MAX_DATA_LEN], uint16_t timeout,
   }
 
   // Retrieve the message.
-  result = radioDriver->recv(buf, &len);
+  result = radioDriver->recv(buf, &bufLen);
   *source = radioDriver->headerFrom();
   if(!result)
   {

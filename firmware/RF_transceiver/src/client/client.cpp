@@ -43,14 +43,14 @@ void clientLoop(RH_RF95 *client)
   uint8_t toSend[MAX_DATA_LEN];
   uint8_t origin;
 
-  writeMsg(client, toSend, ADDRESS, 0, "Requesting coordinates"); // Send to node with address '0'.
-  sendData(client, toSend);
+  writeMsg(client, toSend, MAX_DATA_LEN, ADDRESS, 0, "Requesting coordinates"); // Send to node with address '0'.
+  sendData(client, toSend, MAX_DATA_LEN);
   
   // Wait for acknowledgement from server
   uint8_t buf[MAX_DATA_LEN];
   bool ack;
 
-  ack = waitData(client, buf, CL_WAIT_TIME, &origin);
+  ack = waitData(client, buf, MAX_DATA_LEN, CL_WAIT_TIME, &origin);
   if (ack)
   {
     Serial.print("Acknowledge from ");

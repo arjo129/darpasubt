@@ -52,7 +52,7 @@ void serverReceive(RH_RF95 *server)
     return;
   }
 
-  recv = waitData(server, buf, 0, &origin); // set timeout to continuously find messages
+  recv = waitData(server, buf, MAX_DATA_LEN, 0, &origin); // set timeout to continuously find messages
   if (recv)
   {
     digitalWrite(LED_PIN, HIGH);
@@ -64,8 +64,8 @@ void serverReceive(RH_RF95 *server)
     
     // Send acknowledgement
     uint8_t toSend[MAX_DATA_LEN];
-    writeMsg(server, toSend, ADDRESS, 1, "Message acknowledged"); // Send to node with address '1'.
-    sendData(server, toSend);
+    writeMsg(server, toSend, MAX_DATA_LEN, ADDRESS, 1, "Message acknowledged"); // Send to node with address '1'.
+    sendData(server, toSend, MAX_DATA_LEN);
     
     digitalWrite(LED_PIN, LOW);
   }
