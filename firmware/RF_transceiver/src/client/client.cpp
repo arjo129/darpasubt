@@ -5,40 +5,61 @@
 #include "writer.h"
 
 /**
- * @brief Setup function to configure as client operation.
+ * @brief Construct a new Client:: Client object
  * 
- * @param client the instance of the radio driver in operation.
+ * @param address unique identifier for this Client.
+ * @param receivePin pin on Arduino to receive UART from module.
+ * @param transmitPin pin on Arduino to transmit UART to module.
+ * @param frequency operation frequency of the module.
  */
-void clientSetup(RH_RF95 *client)
+Client::Client (uint8_t address, uint8_t receivePin, uint8_t transmitPin, float frequency)
 {
-  Serial.println("RF98 CLIENT Setup");
+  this->address = address;
+  this->frequency = frequency;
 
+  // Initialise the instance of the radio driver.
+  softSerial = new SoftwareSerial(receivePin, transmitPin);
+  client = new RH_RF95(*softSerial);
+}
+
+/**
+ * @brief Initialises the client instance.
+ * 
+ * @return true if successful.
+ * @return false if failed.
+ */
+bool Client::init(void)
+{
+  Serial.println("Initialising RF98 CLIENT");
   if (!client->init())
   {
-    Serial.println("Client setup failed, please restart.");
-    while(1);
+    return false;
   }
 
-  // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
-
-  // The default transmitter power is 13dBm, using PA_BOOST.
-  // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
-  // you can set transmitter powers from 5 to 23 dBm:
-  //client->setTxPower(13, false);
-
-  Serial.println("Setup success.");
   Serial.print("Setting Frequency: ");
-  Serial.println(CLIENT_FREQ);
-  client->setFrequency(CLIENT_FREQ);
-  client->setThisAddress(ADDRESS);
+  Serial.println(frequency);
+  client->setFrequency(frequency);
+  client->setThisAddress(address);
+  Serial.println("Initialisation success.");
+
+  return true;
+}
+
+/**
+ * @brief Gets the address of the client.
+ * 
+ * @return uint8_t the address of the client.
+ */
+uint8_t Client::getAddress(void)
+{
+  return address;
 }
 
 /**
  * @brief Loop function that is to be ran in the main loop function.
  * 
- * @param client the instance of the radio driver in operation.
  */
-void clientLoop(RH_RF95 *client)
+void Client::loop(void)
 {
   uint8_t toSend[MAX_DATA_LEN];
   uint8_t origin;

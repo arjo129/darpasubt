@@ -4,9 +4,8 @@
 #include "client.h"
 #include "server.h"
 
-// Singleton instance of the radio driver
-SoftwareSerial ss(PIN_TX, PIN_RX);
-RH_RF95 radioDriver(ss);
+Server *server;
+Client *client;
 
 void setup() 
 {
@@ -14,11 +13,14 @@ void setup()
   
   if (OP_MODE == 1)
   {
-    clientSetup(&radioDriver);
+    client = new Client(ADDRESS, PIN_TX, PIN_RX, CLIENT_FREQ);
+    client->init();
   }
   else
   {
-    serverSetup(&radioDriver);
+    server = new Server(ADDRESS, PIN_TX, PIN_RX, SERVER_FREQ);
+    server->init();
+
   }
 }
 
@@ -26,10 +28,10 @@ void loop()
 {
    if (OP_MODE == 1)
    {
-     clientLoop(&radioDriver);
+     client->loop();
    } 
    else
    {
-    serverReceive(&radioDriver);
+    server->receive();
    }
 }

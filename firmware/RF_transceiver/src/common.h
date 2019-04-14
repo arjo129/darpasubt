@@ -1,6 +1,6 @@
 // Node related
-#define OP_MODE 0 // Switch between operation mode. '0' for server, '1' for client.
-#define ADDRESS 0 // Unique identifier for this node (0 to 255 is allowed).
+#define OP_MODE 1 // Switch between operation mode. '0' for server, '1' for client.
+#define ADDRESS 1 // Unique identifier for this node (0 to 255 is allowed).
 
 // General config
 #define BAUD_RATE 115200
