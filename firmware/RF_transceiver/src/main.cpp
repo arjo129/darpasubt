@@ -20,7 +20,6 @@ void setup()
   {
     server = new Server(ADDRESS, PIN_TX, PIN_RX, SERVER_FREQ);
     server->init();
-
   }
 }
 
