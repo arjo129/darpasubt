@@ -141,6 +141,7 @@ uint64 varDelay;
 uint64 regDelay;
 int txCounter = 0; // debugging purpose
 int readCount = 0;
+bool waitingUser = true;
 
 /** Default header */
 uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -266,6 +267,20 @@ int main(void)
   #endif
 }
 
+// To be called by runTask
+void waitUser ()
+{
+  waitingUser = true;
+}
+
+// To be called by UART.c
+void runUser ()
+{
+  waitingUser = false;
+  readCount = 0;
+  printf("AGAIN\r\n");
+}
+
 /**
  * @brief Node entry function.
  * 
@@ -289,14 +304,15 @@ void runTask (void * pvParameter)
   }
   
   // TODO: Use NRF timer instead of rxtimeout timer to time the delay TX.
-  
+  printf("Press any key to start. After 1000 measurements, press any key \
+      again. Indicate a new set of 1000 measurements with \"AGAIN\".\r\n");
   while(true)
   {
-    if (readCount > 1000)
+    if (readCount >= 1000)
     {
-      while (1);
+      waitUser();
     }
-    if (masterTx1Rdy)
+    if (!waitingUser && masterTx1Rdy)
     {
       tx1Sending = true;
 
@@ -760,7 +776,8 @@ static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
   }
   
   // Print the distances to serial.
-  printf("D: ");
+  readCount++;
+  printf("%d D: ", readCount);
   for (i = 0; i < N; i++)
   {
     if (i == thisId)

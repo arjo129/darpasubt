@@ -22,6 +22,7 @@
 
 #define NO_PARITY	false
 #define MSG_END_CHAR ';'
+extern void runUser();
 
 // UART initialisation structure
 const app_uart_comm_params_t comm_params =
@@ -86,12 +87,15 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
       char byte;
 
       boUART_getc(&byte);
+      // TODO uncomment for debugging
+      // printf("%c\r\n", byte);
 
       if (byte == MSG_END_CHAR) {
         memset(dataString, 0, sizeof dataString);
         inputDataIndex = 0;
       } else {
         dataString[inputDataIndex++] = byte;
+        runUser();
       }
     }
 }
