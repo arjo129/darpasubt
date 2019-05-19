@@ -1,0 +1,41 @@
+<launch>
+
+  <include file="$(find darpa_bot_b)/launch/movement.launch"/>
+
+  <rosparam param="ticks_meter">4040</rosparam>
+
+  <node pkg="differential_drive" type="diff_tf.py" name="diff_tf" output="screen">
+    <rosparam param="base_width">0.16</rosparam>
+  </node>
+
+  <node pkg="differential_drive" type="pid_velocity.py" name="lpid_velocity">
+    <remap from="wheel" to="lwheel"/>
+    <remap from="motor_cmd" to="lmotor_cmd"/>
+    <remap from="wheel_vtarget" to="lwheel_vtarget"/>
+    <remap from="wheel_vel" to="lwheel_vel"/>
+    <rosparam param="Kp">150</rosparam>
+    <rosparam param="Ki">60</rosparam>
+    <rosparam param="Kd">20</rosparam>
+    <rosparam param="out_min">-250</rosparam>
+    <rosparam param="out_max">250</rosparam>
+    <rosparam param="rolling_pts">10</rosparam>
+  </node>
+
+  <node pkg="differential_drive" type="pid_velocity.py" name="rpid_velocity">
+    <remap from="wheel" to="rwheel"/>
+    <remap from="motor_cmd" to="rmotor_cmd"/>
+    <remap from="wheel_vtarget" to="rwheel_vtarget"/>
+    <remap from="wheel_vel" to="rwheel_vel"/>
+    <rosparam param="Kp">150</rosparam>
+    <rosparam param="Ki">60</rosparam>
+    <rosparam param="Kd">20</rosparam>
+    <rosparam param="out_min">-250</rosparam>
+    <rosparam param="out_max">250</rosparam>
+    <rosparam param="rolling_pts">10</rosparam>
+  </node>
+
+  <node pkg="differential_drive" type="twist_to_motors.py" name="twist_to_motors" output="screen">
+    <rosparam param="base_width">0.16</rosparam>
+  </node>
+  
+</launch>
