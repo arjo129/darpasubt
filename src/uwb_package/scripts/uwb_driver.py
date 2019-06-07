@@ -10,7 +10,7 @@ def serialReader(ser):
     pub = rospy.Publisher('uwb_tlm', UWB, queue_size=1)
 
     rospy.init_node('uwb_tlm_node', anonymous=True)
-    rate = rospy.Rate(10) # 10hz
+    #rate = rospy.Rate(30) # 10hz
 
     while not rospy.is_shutdown():
         line = ser.readline()   # read a '\n' terminated line
@@ -19,16 +19,18 @@ def serialReader(ser):
 
         if (len(result) >= 3):
             message = UWB()
+            print(result)
             try:
-                message.a = float(result[0])
+                message.a = float(result[0][3:])
                 message.b = float(result[1])
-                message.c = float(result[2])
+                message.c = float(result[2][0:6])
 
+                print(message)
                 pub.publish(message)
             except:
                 rospy.loginfo("Could not convert message to 3 floats")
 
-        rate.sleep()
+        #rate.sleep()
 
 if __name__ == '__main__':
     with serial.Serial('/dev/ttyACM0', 115200, timeout=1) as ser:

@@ -3,16 +3,23 @@ import rospy
 import numpy as np
 import tf
 from visualization_msgs.msg import Marker, MarkerArray
+from generic_msgs.msg import UWB
 
 class BeaconTriangulator:
     """
     Visuallize the UWB beacons in 3D Space.
     """
     def __init__(self):
-        self.uwb_positions = [[0,0,0], [1,0,0], [0,1,0]] #Position of the beacons
+        self.uwb_positions = [[0,0,0], [7.31,0,0], [3.46, 7.06, 0]] #Position of the beacons
         self.pub = rospy.Publisher('/uwb_least_squares', MarkerArray, queue_size=1)
+        self.sub = rospy.Subscriber('/uwb_tlm', UWB, self.tlm_cb)
         self.uwb_distance = [1,1.4,0]
         self.markers = []
+
+    def tlm_cb(self,msg):
+        #position = (msg.a,msg.b,msg.c)
+        self.uwb_distance = [msg.a, msg.b, msg.c]
+
 
     def draw_sphere(self, alpha=1.0, position=(0,0,0), color=(0,0,0), scale=1, label="base_link"):
         """
