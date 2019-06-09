@@ -47,18 +47,9 @@ cache:
 language: generic
 matrix:
   include:
-  - name: "Trusty indigo"
-    dist: trusty
-    env: ROS_DISTRO=indigo
-  - name: "Trusty jade"
-    dist: trusty
-    env: ROS_DISTRO=jade
   - name: "Xenial kinetic"
     dist: xenial
     env: ROS_DISTRO=kinetic
-  - name: "Bionic melodic"
-    dist: xenial
-    env: ROS_DISTRO=melodic
 
 
 # Configuration variables. All variables are global now, but this can be used to
@@ -78,30 +69,27 @@ env:
 
 # Install system dependencies, namely a very barebones ROS setup.
 before_install:
-  - sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
+  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' 
   - sudo apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116
-  - sudo apt-get update -qq
-  - sudo apt-get install dpkg
-  - sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool ros-$ROS_DISTRO-ros-base
-  - sudo apt-get install -y ros-melodic-octomap ros-melodic-octomap-ros ros-melodic-octomap-msgs  
+  - sudo apt-get update
+  - sudo apt-get install -y ros-kinetic-desktop-full dpkg
+  - sudo apt-get install -y ros-kinetic-octomap ros-kinetic-octomap-ros ros-kinetic-octomap-msgs  
   - source /opt/ros/$ROS_DISTRO/setup.bash
   # Prepare rosdep to install dependencies.
-  - sudo rosdep init
-  - rosdep update
 
 # Create a catkin workspace with the package under integration.
-install:
-  - mkdir -p ~/catkin_ws/src
-  - cd ~/catkin_ws/src
-  - catkin_init_workspace
+#install:
+#  - mkdir -p ~/catkin_ws/src
+#  - cd ~/catkin_ws/src
+#  - catkin_init_workspace
   # Create the devel/setup.bash (run catkin_make with an empty workspace) and
   # source it to set the path variables.
-  - cd ~/catkin_ws
-  - catkin_make
-  - source devel/setup.bash
+  #  - cd ~/catkin_ws
+  #  - catkin_make
+  # source devel/setup.bash
   # Add the package under integration to the workspace using a symlink.
-  - cd ~/catkin_ws/src
-  - ln -s $CI_SOURCE_PATH .
+  # cd ~/catkin_ws/src
+  # ln -s $CI_SOURCE_PATH .
 
 # Install all dependencies, using wstool first and rosdep second.
 # wstool looks for a ROSINSTALL_FILE defined in the environment variables.
@@ -125,7 +113,7 @@ install:
 # non-zero when a test fails (which notifies Travis the build failed).
 script:
   - source /opt/ros/$ROS_DISTRO/setup.bash
-  - catkin_make $( [ -f $CATKIN_OPTIONS ] && cat $CATKIN_OPTIONS )
+  - catkin_make -DCATKIN_BLACKLIST_PACKAGES="subt_gazebo;"
   # Run the tests, ensuring the path is set correctly.
   - source devel/setup.bash
   - catkin_make run_tests && catkin_test_results
