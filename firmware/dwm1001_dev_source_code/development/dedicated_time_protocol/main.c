@@ -42,6 +42,7 @@
 #include "message_transceiver.h"
 #include "message_template.h"
 #include "common.h"
+#include "printer.h"
 
 //-----------------dw1000----------------------------
 
@@ -104,10 +105,7 @@ static TxStatus firstTx(uint8 mode);
 static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
-static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
-static void printTemp(void);
-static void printData(void);
-static void printConfig(void);
+static void printOutput(uint64 (*table)[4], uint8 thisId);
 
 /* Global variables */
 // Frames related
@@ -250,7 +248,17 @@ int main(void)
   initTxMsgs(&txMsg1, &txMsg2);
 
   // Prints configuration information.
-  printConfig();
+  printConfig(
+    N,
+    NODE_ID,
+    RANGE_FREQ,
+    TX_INTERVAL,
+    RX_TX_BUFFER,
+    cyclePeriod,
+    activePeriod,
+    sleepPeriod,
+    WAKE_INIT_FACTOR
+    );
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -548,7 +556,7 @@ static void activeTimerHandler(void *pContext)
   goToSleep(true, sleepPeriod, wakePeriod);
 
   // printTable(tsTable);
-  printData();
+  printOutput(tsTable, NODE_ID);
   initTable(tsTable);
 }
 
@@ -753,19 +761,17 @@ static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
 }
 
 /**
- * @brief Calculate and print all distances to serial output.
+ * @brief Prints all required output data.
  * 
  * @param table pointer to the 2D array representing the timestamp table.
  * @param thisId identifier of the calling node.
  */
-static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
+static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
 {
-  int i;
+  // Calculate the distances for each of other nodes.
   double dists[N] = {0};
   bool fail = false;
-
-  // Calculate the distances for each of other nodes.
-  for (i = 0; i < N; i++)
+  for (int i = 0; i < N; i++)
   {
     if (i == thisId)
     {
@@ -774,76 +780,11 @@ static void printDists(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
 
     dists[i] = calcDist(table, i);
   }
-  
-  // Print the distances to serial.
-  readCount++;
-  printf("%d D: ", readCount);
-  for (i = 0; i < N; i++)
-  {
-    if (i == thisId)
-    {
-      continue;
-    }
 
-    printf("%0.4lf", dists[i]);
-    if ((i + 1 != N - 1 || thisId != N - 1) && i != N - 1)
-    {
-      printf(",");
-    }
-  }
-}
-
-/**
- * @brief Reads and prints the temperature of the intergrated chip (DWM1000). 
- * 
- */
-static void printTemp(void)
-{
+  // Retrieve temperature from register.
   uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
   value = value >> 8; // Temperature is at the higher 8 bits.
-  double temp = 1.13 * value - 113.0; // Formula to get compute real temperature in Celsius.
-  printf("T: %lf", temp);  
-}
+  double temp = 1.13 * value - 113.0; // Formula to get real temperature in Celsius. See user manual.
 
-/**
- * @brief Prints the required output to terminal.
- * 
- */
-static void printData(void)
-{
-  if (P_DIST == 1)
-  {
-    printDists(tsTable, NODE_ID);
-  }
-
-  if (P_DIST == 1 && P_TEMP == 1)
-  {
-    printf(" ");
-  }
-
-  if (P_TEMP == 1)
-  {
-    printTemp();
-  }
-
-  printf(";\r\n");
-}
-
-/**
- * @brief Prints all configuration information.
- * 
- */
-static void printConfig(void)
-{
-  printf("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\r\n");
-  printf("  NODES_COUNT : %d\r\n", N);
-  printf("      NODE_ID : %d\r\n", NODE_ID);
-  printf("     RNG_FREQ : %d (Hz)\r\n", RANGE_FREQ);
-  printf(" TRX_INTERVAL : %d (us)\r\n", TX_INTERVAL);
-  printf(" RX_TO_TX_BUF : %d (us)\r\n", RX_TX_BUFFER);
-  printf(" CYCLE_PERIOD : %u (us)\r\n", cyclePeriod);
-  printf(" ACTIV_PERIOD : %u (us)\r\n", activePeriod);
-  printf(" SLEEP_PERIOD : %u (us)\r\n", sleepPeriod);
-  printf("HW_SLP_FACTOR : %.2f\r\n", WAKE_INIT_FACTOR);
-  printf("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\r\n\r\n");
+  printData(dists, temp, thisId);
 }

@@ -41,7 +41,7 @@ static void printTemp(double temp)
  * @param temp temperature value to print.
  * @param thisId identifier of the calling node.
  */
-static void printData(double dists[N], double temp, uint8 thisId)
+void printData(double dists[N], double temp, uint8 thisId)
 {
   if (P_DIST == 1)
   {
@@ -74,7 +74,7 @@ static void printData(double dists[N], double temp, uint8 thisId)
  * @param sleepPeriod time period of the sleep duration of each cycle.
  * @param wakeInitFact time difference factor between hardware waking and beginning of cycle.
  */
-static void printConfig(
+void printConfig(
   uint8 nodeCount, 
   uint8 thisId, 
   uint16 rngFreq, 
