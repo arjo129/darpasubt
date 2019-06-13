@@ -1,0 +1,6 @@
+<launch>
+
+	<node pkg="teleop_twist_keyboard" name="teleop" type="teleop_twist_keyboard.py" output="screen" launch-prefix="gnome-terminal -e">
+	</node>
+
+</launch>
