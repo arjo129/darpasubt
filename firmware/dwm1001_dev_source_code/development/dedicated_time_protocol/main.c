@@ -105,7 +105,7 @@ static TxStatus firstTx(uint8 mode);
 static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
-static void printOutput(uint64 (*table)[4], uint8 thisId);
+static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 
 /* Global variables */
 // Frames related
@@ -225,6 +225,7 @@ int main(void)
   // Enable wanted interrupts (TX confirmation, RX good frames, RX timeouts and RX errors).
   dwt_setinterrupt(DWT_INT_TFRS | DWT_INT_RFCG | DWT_INT_RFTO | DWT_INT_RXPTO | DWT_INT_RPHE | DWT_INT_RFCE | DWT_INT_RFSL | DWT_INT_SFDT, 1);
 
+  // TODO: Read OTP antenna delay values and use those calibrated values instead, for improved accuracy.
   // Apply default antenna delay value
   dwt_setrxantennadelay(RX_ANT_DLY);
   dwt_settxantennadelay(TX_ANT_DLY);
@@ -781,6 +782,7 @@ static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
     dists[i] = calcDist(table, i);
   }
 
+  // ISSUE: Not printing data correctly after calling these functions.
   // Retrieve temperature from register.
   uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
   value = value >> 8; // Temperature is at the higher 8 bits.
