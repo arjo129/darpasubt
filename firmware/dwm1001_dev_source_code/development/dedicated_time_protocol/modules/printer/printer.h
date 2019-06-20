@@ -1,5 +1,6 @@
 #include "deca_types.h"
 #include "common.h"
+#include "stdio.h"
 
 static void printDists(double dists[N], uint8 thisId);
 static void printTemp(double temp);

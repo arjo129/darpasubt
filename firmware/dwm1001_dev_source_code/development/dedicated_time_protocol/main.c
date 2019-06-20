@@ -779,7 +779,6 @@ static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
     dists[i] = calcDist(table, i);
   }
 
-  // ISSUE: Not printing data correctly after calling these functions.
   // Retrieve temperature from register.
   uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
   value = value >> 8; // Temperature is at the higher 8 bits.
