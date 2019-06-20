@@ -1,8 +1,5 @@
 /* Macros definitions */
 #define N 4 /**< Number of nodes */
-// Antenna delays
-#define TX_ANT_DLY 16456
-#define RX_ANT_DLY 16456
 // Print enables (set to 1 to print)
 #define P_DIST 1
 #define P_TEMP 1

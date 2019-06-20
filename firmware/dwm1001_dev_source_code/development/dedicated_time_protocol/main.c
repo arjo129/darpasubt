@@ -35,14 +35,7 @@
 #include "deca_regs.h"
 #include "deca_device_api.h"
 #include "nrf_drv_gpiote.h"
-#include "UART.h"
-#include "int_handler.h"
-#include "low_timer.h"
-#include "timestamper.h"
-#include "message_transceiver.h"
-#include "message_template.h"
-#include "common.h"
-#include "printer.h"
+#include "main.h"
 
 //-----------------dw1000----------------------------
 
@@ -106,6 +99,7 @@ static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
+static uint16 getAntDly(uint8 prf);
 
 /* Global variables */
 // Frames related
@@ -113,6 +107,7 @@ static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 // (first 10 bytes and last 2 bytes) to follow, check the dw1000 manual.
 msg_template txMsg1;
 msg_template txMsg2;
+uint16 antDelay; // Once set, must NEVER be changed.
 uint32 cyclePeriod;
 uint32 activePeriod;
 uint32 sleepPeriod; // Time duration for actual hardware sleeping
@@ -204,6 +199,7 @@ int main(void)
 
   // Set SPI clock to 2MHz
   port_set_dw1000_slowrate();			
+
   
   // Init the DW1000
   if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
@@ -211,6 +207,12 @@ int main(void)
     //Init of DW1000 Failed
     while (1) {};
   }
+
+  // We need to read antenna delay in OTP memory with slow SPI clock.
+  // We set it and NEVER change it, as it will be used for all future timestamping purpose.
+  antDelay = getAntDly(DWT_PRF_64M);
+  dwt_settxantennadelay(antDelay);
+  dwt_setrxantennadelay(antDelay);
 
   // Set SPI clock to 8MHz
   port_set_dw1000_fastrate();
@@ -224,11 +226,6 @@ int main(void)
 
   // Enable wanted interrupts (TX confirmation, RX good frames, RX timeouts and RX errors).
   dwt_setinterrupt(DWT_INT_TFRS | DWT_INT_RFCG | DWT_INT_RFTO | DWT_INT_RXPTO | DWT_INT_RPHE | DWT_INT_RFCE | DWT_INT_RFSL | DWT_INT_SFDT, 1);
-
-  // TODO: Read OTP antenna delay values and use those calibrated values instead, for improved accuracy.
-  // Apply default antenna delay value
-  dwt_setrxantennadelay(RX_ANT_DLY);
-  dwt_settxantennadelay(TX_ANT_DLY);
 
   // Create the required timers
   lowTimerInit();
@@ -473,7 +470,7 @@ void configTx2(void)
   uint64 delay64 = tsTable[IDX_TS_1][NODE_ID] + regDelay;
   uint32 delay32 = delay64 >> 8;
   dwt_setdelayedtrxtime(delay32);
-  delay64 += TX_ANT_DLY;
+  delay64 += (uint64)antDelay;
   updateTable(tsTable, txMsg2, delay64, NODE_ID);
 
   writeTx2(&txMsg2);
@@ -789,4 +786,26 @@ static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
   double temp = 1.13 * value - 113.0; // Formula to get real temperature in Celsius. See user manual.
 
   printData(dists, temp, thisId);
+}
+
+/**
+ * @brief Retrieves the antenna delay stored in OTP memory.
+ * 
+ * @param prf the PRF used to configure DWM1000.
+ * @return antenna delay from OTP memory.
+*/
+static uint16 getAntDly(uint8 prf)
+{
+  uint32 rawAntDelay;
+  uint16 antDelay = 0;
+  dwt_otpread(OTP_ANT_DLY, &rawAntDelay, 1); // '1' Refers to one 32 bits word.
+  if (prf == DWT_PRF_16M)
+  {
+    antDelay = rawAntDelay & 0x0000FFFF; // PRF 16M Antenna delay is found in the lower 16 bits.
+  }
+  else if (prf == DWT_PRF_64M)
+  {
+    antDelay = rawAntDelay >> 16;
+  }
+  return antDelay;
 }

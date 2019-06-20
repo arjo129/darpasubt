@@ -13,6 +13,7 @@
       arm_target_interface_type="SWD"
       debug_start_from_entry_point_symbol="No"
       debug_target_connection="J-Link"
+      linker_printf_fp_enabled="Float"
       linker_section_placement_file="$(StudioDir)/targets/Cortex_M/flash_placement.xml"
       linker_section_placements_segments="FLASH RX 0x00000000 0x00080000;SRAM RWX 0x20000000 0x00010000"
       project_directory=""
@@ -28,6 +29,8 @@
       c_preprocessor_definitions="BOARD_DW1001_DEV;BSP_SIMPLE;;CONFIG_GPIO_AS_PINRESET;FLOAT_ABI_HARD;NRF52;NRF52832_XXAA;NRF52_PAN_74;SWI_DISABLE0"
       c_user_include_directories="$(PackagesDir)/nRF/CMSIS/Device/Include;$(PackagesDir)/CMSIS_5/CMSIS/Core/Include;../../../nRF5_SDK_14.2.0/components/device;../;../modules/dw_sleeper;../modules/int_handler;../modules/low_timer;../modules/message_template;../modules/message_transceiver;../modules/timestamper;../modules/UART;../modules/printer;../config;../../../nRF5_SDK_14.2.0/components;../../../nRF5_SDK_14.2.0/components/boards;../../../nRF5_SDK_14.2.0/components/drivers_nrf/clock;../../../nRF5_SDK_14.2.0/components/drivers_nrf/common;../../../nRF5_SDK_14.2.0/components/drivers_nrf/delay;../../../nRF5_SDK_14.2.0/components/drivers_nrf/gpiote;../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal;../../../nRF5_SDK_14.2.0/components/drivers_nrf/nrf_soc_nosd;../../../nRF5_SDK_14.2.0/components/drivers_nrf/spi_master;../../../nRF5_SDK_14.2.0/components/drivers_nrf/uart;../../../nRF5_SDK_14.2.0/components/libraries/atomic;../../../nRF5_SDK_14.2.0/components/libraries/balloc;../../../nRF5_SDK_14.2.0/components/libraries/bsp;../../../nRF5_SDK_14.2.0/components/libraries/button;../../../nRF5_SDK_14.2.0/components/libraries/fifo;../../../nRF5_SDK_14.2.0/components/libraries/experimental_log;../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/src;../../../nRF5_SDK_14.2.0/components/libraries/experimental_memobj;../../../nRF5_SDK_14.2.0/components/libraries/experimental_section_vars;../../../nRF5_SDK_14.2.0/components/libraries/scheduler;../../../nRF5_SDK_14.2.0/components/libraries/strerror;../../../nRF5_SDK_14.2.0/components/libraries/timer;../../../nRF5_SDK_14.2.0/components/libraries/util;../../../nRF5_SDK_14.2.0/components/libraries/uart;../../../nRF5_SDK_14.2.0/components/toolchain;../../../deca_driver;../../../deca_driver/port;../../../nRF5_SDK_14.2.0/external/fprintf;../../../nRF5_SDK_14.2.0/external/segger_rtt;../../../nRF5_SDK_14.2.0/external/freertos/;../../../nRF5_SDK_14.2.0/external/freertos/source;../../../nRF5_SDK_14.2.0/external/freertos/config;../../../nRF5_SDK_14.2.0/external/freertos/source/include;../../../nRF5_SDK_14.2.0/external/freertos/portable/ARM/nrf52;../../../nRF5_SDK_14.2.0/external/freertos/portable/CMSIS/nrf52;../../../nRF5_SDK_14.2.0/external/freertos/source/portable;../../../boards;../../.."
       linker_additional_options=""
+      linker_printf_fmt_level="int"
+      linker_printf_fp_enabled="Float"
       linker_section_placement_file="$(ProjectDir)/RTE/flash_placement.xml" />
     <configuration
       Name="External Keil"
@@ -149,4 +152,5 @@
     linker_additional_options=""
     linker_printf_fp_enabled="Float"
     linker_section_placement_file="$(ProjectDir)/RTE/flash_placement.xml" />
+  <configuration Name="Common" linker_printf_fp_enabled="Float" />
 </solution>
