@@ -80,8 +80,6 @@ void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N]);
 void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
 void rxHandler(msg_template *msg);
-uint64 calcTx1(uint64 ts);
-uint64 calcTx2(uint64 ts);
 void updateTx1Ts(uint64 ts);
 void setRxTimeout2(void);
 void runUser(void);
@@ -392,36 +390,6 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2)
   memcpy(tx2->header, header, HEADER_LEN);
   memset(tx2->data, 0, DATA_LEN);
   memset(tx2->crc, 0, CRC_LEN);
-}
-
-/**
- * @brief (Synchronisation use) Calculates the tx time from u0 initial transmission.
- * 
- * @param ts the timestamp when u0 message is received.
- * @return uint64 the calculated time.
- *
- * NOTE: The chip will go into idle mode after writing the 40 bit timestamp
- *       will not able to tx or rx messages during this time.
- */
-uint64 calcTx1(uint64 ts) {
-  // Calculate the approx. time by adding to the system time.
-  uint64 approx = ts + varDelay;
-  return approx;
-}
-
-/**
- * @brief Calculates the approximated time for second transmission.
- * 
- * @param ts the timestamp after the first transmission is sent.
- * @return uint64 the calculated time.
- *
- * NOTE: The chip will go into idle mode after writing the 40 bit timestamp
- *       will not able to tx or rx messages during this time.
- */
-uint64 calcTx2(uint64 ts) {
-  // Calculate the approx. time by adding to the system time.
-  uint64 approx = ts + regDelay;
-  return approx;
 }
 
 /**
