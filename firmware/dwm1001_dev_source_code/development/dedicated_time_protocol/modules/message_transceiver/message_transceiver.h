@@ -26,4 +26,11 @@ bool configTx1(
   uint64 refTs,
   msg_template *txMsg1
   );
+bool configTx2(
+  uint64 tsTable[NUM_STAMPS_PER_CYCLE][N],
+  uint64 txDelay,
+  uint64 refTs,
+  msg_template *txMsg2
+  );
 TxStatus firstTx(msg_template *msg, uint8 mode);
+TxStatus secondTx(msg_template *msg, uint8 mode);

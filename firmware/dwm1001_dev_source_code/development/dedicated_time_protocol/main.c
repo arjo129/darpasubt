@@ -83,7 +83,6 @@ void rxHandler(msg_template *msg);
 void updateRx(msg_template *msg);
 uint64 calcTx1(uint64 ts);
 uint64 calcTx2(uint64 ts);
-void configTx2(void);
 void updateTx1Ts(uint64 ts);
 void setRxTimeout2(void);
 void runUser(void);
@@ -96,7 +95,6 @@ static void rx2Handler(void *pContext);
 static void initCycleTimings(void);
 static void initListen(void);
 static void initRxTo(void);
-static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
@@ -428,33 +426,6 @@ uint64 calcTx2(uint64 ts) {
 }
 
 /**
- * @brief Configure the register parameters for second TX.
- * 
- * @param refTs reference timestamp to transmit the second TX from.
- */
-void configTx2(void)
-{
-  // Set the transmission time for TX2.
-  // Reference timestamp is TX1 timestamp.
-  uint64 delay64 = tsTable[IDX_TS_1][NODE_ID] + regDelay;
-  uint32 delay32 = delay64 >> 8;
-  dwt_setdelayedtrxtime(delay32);
-  delay64 += (uint64)antDelay;
-  updateTable(tsTable, txMsg2, delay64, NODE_ID);
-
-  writeTx2(&txMsg2, tsTable);
-  txStatus = secondTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-  if (txStatus == TX_SUCCESS)
-  {
-    tx2Sending = true;
-  }
-  else
-  {
-    tx2Sending = false;
-  }
-}
-
-/**
  * @brief Updates the timestamp table with first TX timestamp.
  * 
  * @param ts the first TX timestamp value (higher 32 bits).
@@ -535,7 +506,7 @@ static void activeTimerHandler(void *pContext)
 static void rx1Handler(void *pContext)
 {
   uint64 refTs = tsTable[IDX_TS_2][0]; // First RX timestamp from receiving Node 0.
-  tx1Sending = configTx1(tsTable, varDelay, refTs, &txMsg1); // Delete later: pass in Node 0 as ref Timestamp.
+  tx1Sending = configTx1(tsTable, varDelay, refTs, &txMsg1);
 }
 
 /**
@@ -545,7 +516,12 @@ static void rx1Handler(void *pContext)
  */
 static void rx2Handler(void *pContext)
 {
-  configTx2();
+  uint64 refTs = tsTable[IDX_TS_1][NODE_ID];
+  uint64 tx2Ts = refTs + regDelay + (uint64)antDelay;
+
+  updateTable(tsTable, txMsg2, tx2Ts, NODE_ID);
+  writeTx2(&txMsg2, tsTable);
+  tx2Sending = configTx2(tsTable, regDelay, refTs, &txMsg2);
 }
 
 /**
@@ -598,25 +574,6 @@ static void initListen(void)
   lowTimerStart(initTimer, cyclePeriod);
 
   while (isInitiating) {};
-}
-
-/**
- * @brief Transmits the second of the two transmissions.
- * 
- * @param nodeId Identifier of this node.
- * @param mode - if 0 immediate TX (no response expected) => DWT_START_TX_IMMEDIATE
- *               if 1 delayed TX (no response expected) => DWT_START_TX_DELAYED
- *               if 2 immediate TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED
- *               if 3 delayed TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED
- */
-static TxStatus secondTx(uint8 mode)
-{
-  uint8 buf[MSG_LEN];
-
-  dwt_forcetrxoff();
-  convertToArr(txMsg2, buf);
-  
-  return txMsg(buf, MSG_LEN, mode);
 }
 
 /**
