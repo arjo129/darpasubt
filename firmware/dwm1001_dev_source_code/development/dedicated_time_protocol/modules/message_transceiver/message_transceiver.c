@@ -79,40 +79,7 @@ void writeTx2(msg_template *msg, uint64 tsTable[NUM_STAMPS_PER_CYCLE][N]) {
 }
 
 /**
- * @brief Configure the register parameters for first TX.
- * 
- * @param tsTable 2D array containing the timestamps for every other nodes.
- * @param txDelay amount of time (in UWB time) to delay the TX for.
- * @param refTs timestamp to begin the delay from.
- * @param txMsg1 pointer to the message to be transmitted.
- * 
- * @return true if successful TX. 
- * @return false if failed TX.
- */
-bool configTx1(
-  uint64 tsTable[NUM_STAMPS_PER_CYCLE][N],
-  uint64 txDelay,
-  uint64 refTs,
-  msg_template *txMsg1
-  )
-{
-  uint8 mode = DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED;
-  uint32 delay = (refTs + txDelay) >> 8;
-
-  dwt_setdelayedtrxtime(delay);
-
-  if (firstTx(txMsg1, mode) == TX_SUCCESS)
-  {
-    return true;
-  }
-  else
-  {
-    return false;
-  }
-}
-
-/**
- * @brief Configure the register parameters for second TX.
+ * @brief Configure the register parameters for a transmission.
  * 
  * @param tsTable 2D array containing the timestamps for every other nodes.
  * @param txDelay amount of time (in UWB time) to delay the TX for.
@@ -122,11 +89,11 @@ bool configTx1(
  * @return true 
  * @return false 
  */
-bool configTx2(
+bool configTx(
   uint64 tsTable[NUM_STAMPS_PER_CYCLE][N],
   uint64 txDelay,
   uint64 refTs,
-  msg_template *txMsg2
+  msg_template *txMsg
 )
 {
   uint8 mode = DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED;
@@ -134,7 +101,7 @@ bool configTx2(
 
   dwt_setdelayedtrxtime(delay);
 
-  if (secondTx(txMsg2, mode) == TX_SUCCESS)
+  if (convertTx(txMsg, mode) == TX_SUCCESS)
   {
     return true;
   }
@@ -145,26 +112,7 @@ bool configTx2(
 }
 
 /**
- * @brief Transmits the first of the two transmissions.
- *
- * @param msg pointer to the message to be transmitted.
- * @param mode - if 0 immediate TX (no response expected) => DWT_START_TX_IMMEDIATE
- *               if 1 delayed TX (no response expected) => DWT_START_TX_DELAYED
- *               if 2 immediate TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED
- *               if 3 delayed TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED
- */
-TxStatus firstTx(msg_template *msg, uint8 mode)
-{
-  uint8 buf[MSG_LEN];
-  
-  dwt_forcetrxoff();
-  convertToArr(*msg, buf);
-  
-  return txMsg(buf, MSG_LEN, mode);
-}
-
-/**
- * @brief Transmits the second of the two transmissions.
+ * @brief Converts and transmits the given message.
  * 
  * @param msg pointer to the message to be transmitted.
  * @param mode - if 0 immediate TX (no response expected) => DWT_START_TX_IMMEDIATE
@@ -172,7 +120,7 @@ TxStatus firstTx(msg_template *msg, uint8 mode)
  *               if 2 immediate TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED
  *               if 3 delayed TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED
  */
-TxStatus secondTx(msg_template *msg, uint8 mode)
+TxStatus convertTx(msg_template *msg, uint8 mode)
 {
   uint8 buf[MSG_LEN];
 

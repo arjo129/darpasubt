@@ -80,7 +80,6 @@ void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N]);
 void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
 void rxHandler(msg_template *msg);
-void updateRx(msg_template *msg);
 uint64 calcTx1(uint64 ts);
 uint64 calcTx2(uint64 ts);
 void updateTx1Ts(uint64 ts);
@@ -314,7 +313,7 @@ void runTask (void * pvParameter)
       tx1Sending = true;
 
       lowTimerStart(rx2Timer, rxTimeout2);
-      txStatus = firstTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
+      txStatus = convertTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
       lowTimerStart(activeTimer, activePeriod);
 
       if (txStatus == TX_SUCCESS)
@@ -506,7 +505,7 @@ static void activeTimerHandler(void *pContext)
 static void rx1Handler(void *pContext)
 {
   uint64 refTs = tsTable[IDX_TS_2][0]; // First RX timestamp from receiving Node 0.
-  tx1Sending = configTx1(tsTable, varDelay, refTs, &txMsg1);
+  tx1Sending = configTx(tsTable, varDelay, refTs, &txMsg1);
 }
 
 /**
@@ -516,12 +515,12 @@ static void rx1Handler(void *pContext)
  */
 static void rx2Handler(void *pContext)
 {
-  uint64 refTs = tsTable[IDX_TS_1][NODE_ID];
+  uint64 refTs = tsTable[IDX_TS_1][NODE_ID]; // First TX timestamp of this Node.
   uint64 tx2Ts = refTs + regDelay + (uint64)antDelay;
 
   updateTable(tsTable, txMsg2, tx2Ts, NODE_ID);
   writeTx2(&txMsg2, tsTable);
-  tx2Sending = configTx2(tsTable, regDelay, refTs, &txMsg2);
+  tx2Sending = configTx(tsTable, regDelay, refTs, &txMsg2);
 }
 
 /**
