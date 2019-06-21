@@ -75,13 +75,14 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 
 /* Local function prototypes */
 void runTask (void * pvParameter);
+void printTs(uint64 val);
+void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N]);
 void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
 void rxHandler(msg_template *msg);
 void updateRx(msg_template *msg);
 uint64 calcTx1(uint64 ts);
 uint64 calcTx2(uint64 ts);
-void writeTx2(msg_template *msg);
 void configTx2(void);
 void updateTx1Ts(uint64 ts);
 void setRxTimeout2(void);
@@ -95,7 +96,6 @@ static void rx2Handler(void *pContext);
 static void initCycleTimings(void);
 static void initListen(void);
 static void initRxTo(void);
-static TxStatus firstTx(uint8 mode);
 static TxStatus secondTx(uint8 mode);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
@@ -316,7 +316,7 @@ void runTask (void * pvParameter)
       tx1Sending = true;
 
       lowTimerStart(rx2Timer, rxTimeout2);
-      txStatus = firstTx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+      txStatus = firstTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
       lowTimerStart(activeTimer, activePeriod);
 
       if (txStatus == TX_SUCCESS)
@@ -332,6 +332,13 @@ void runTask (void * pvParameter)
   }
 }
 
+/**
+ *@brief Prints a 64bit unsigned timestamp value.
+ *
+ *@details This is for debugging purpose.
+ * 
+ *@param val 
+ */
 void printTs(uint64 val)
 {
   int i;
@@ -344,6 +351,13 @@ void printTs(uint64 val)
   }
 }
 
+/**
+ *@brief Prints the entire timestamps table.
+ *
+ *@details This is for debugging purpose.
+ *
+ *@param table 
+ */
 void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 {
   int i,j;
@@ -414,44 +428,6 @@ uint64 calcTx2(uint64 ts) {
 }
 
 /**
- * @brief Writes the timestamps to be received by other nodes for the second TX.
- * 
- * @param msg the message_template struct that will be transmitted out.
- */
-void writeTx2(msg_template *msg) {
-  uint64 ts[NUM_STAMPS_PER_CYCLE / 2];
-  int i;
-  
-  for (i = 0; i < N; i++)
-  {
-    if (i == NODE_ID)
-    {
-      continue;
-    }
-
-    // Retrieve values for each node and copy into data member at predefined slots.
-    // TODO: Create a reusable function to copy timestamps into data member.
-    getHalfTs(tsTable, ts, NODE_ID, i);
-    memcpy(msg->data + (i * NUM_STAMPS_PER_NODE * TS_LEN), &ts[IDX_TS_1], TS_LEN);
-    memcpy(msg->data + (i * NUM_STAMPS_PER_NODE * TS_LEN) + TS_LEN, &ts[IDX_TS_2], TS_LEN);
-    memcpy(msg->data + (i * NUM_STAMPS_PER_NODE * TS_LEN) + (TS_LEN * 2), &ts[IDX_TS_3], TS_LEN);
-  }
-}
-
-/**
- * @brief Configure the register parameters for first TX.
- * 
- */
-void configTx1(void)
-{
-  uint64 firstRx = tsTable[IDX_TS_2][0]; // Retrieve the first RX timestamp from Node 0.
-  uint32 delay = (firstRx + varDelay) >> 8;
-  dwt_setdelayedtrxtime(delay);
-  tx1Sending = true;
-  firstTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
-}
-
-/**
  * @brief Configure the register parameters for second TX.
  * 
  * @param refTs reference timestamp to transmit the second TX from.
@@ -466,7 +442,7 @@ void configTx2(void)
   delay64 += (uint64)antDelay;
   updateTable(tsTable, txMsg2, delay64, NODE_ID);
 
-  writeTx2(&txMsg2);
+  writeTx2(&txMsg2, tsTable);
   txStatus = secondTx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
   if (txStatus == TX_SUCCESS)
   {
@@ -558,7 +534,8 @@ static void activeTimerHandler(void *pContext)
  */
 static void rx1Handler(void *pContext)
 {
-  configTx1();
+  uint64 refTs = tsTable[IDX_TS_2][0]; // First RX timestamp from receiving Node 0.
+  tx1Sending = configTx1(tsTable, varDelay, refTs, &txMsg1); // Delete later: pass in Node 0 as ref Timestamp.
 }
 
 /**
@@ -621,24 +598,6 @@ static void initListen(void)
   lowTimerStart(initTimer, cyclePeriod);
 
   while (isInitiating) {};
-}
-
-/**
- * @brief Transmits the first of the two transmissions.
-
- * @param mode - if 0 immediate TX (no response expected) => DWT_START_TX_IMMEDIATE
- *               if 1 delayed TX (no response expected) => DWT_START_TX_DELAYED
- *               if 2 immediate TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED
- *               if 3 delayed TX (response expected - so the receiver will be automatically turned on after TX is done) => DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED
- */
-static TxStatus firstTx(uint8 mode)
-{
-  uint8 buf[MSG_LEN];
-  
-  dwt_forcetrxoff();
-  convertToArr(txMsg1, buf);
-  
-  return txMsg(buf, MSG_LEN, mode);
 }
 
 /**

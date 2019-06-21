@@ -1,6 +1,15 @@
 #include "deca_types.h"
-#include "message_transceiver.h"
+
+#ifndef MESSAGE_TEMPLATE_H
+#define MESSAGE_TEMPLATE_H
 #include "message_template.h"
+#endif
+
+#ifndef MESSAGE_TRANSCEIVER_H
+#define MESSAGE_TRANSCEIVER_H
+#include "message_transceiver.h"
+#endif
+
 #include "UART.h"
 #include "int_handler.h"
 #include "low_timer.h"

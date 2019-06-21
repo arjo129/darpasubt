@@ -1,4 +1,20 @@
 #include "deca_device_api.h"
+#include "nrf_drv_gpiote.h"
+#include "nrf_gpiote.h"
+#include "dw1001_dev.h"
+#include "app_error.h"
+#include "deca_device_api.h"
+#include "timestamper.h"
+
+#ifndef MESSAGE_TRANSCEIVER_H
+#define MESSAGE_TRANSCEIVER_H
+#include "message_transceiver.h"
+#endif
+
+#ifndef MESSAGE_TEMPLATE_H
+#define MESSAGE_TEMPLATE_H
+#include "message_template.h"
+#endif
 
 /* Public function prototypes */
 void vInterruptInit (void);
