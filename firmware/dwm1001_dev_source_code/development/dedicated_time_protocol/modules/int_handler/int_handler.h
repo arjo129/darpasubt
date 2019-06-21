@@ -4,7 +4,12 @@
 #include "dw1001_dev.h"
 #include "app_error.h"
 #include "deca_device_api.h"
+#include "main.h"
+
+#ifndef TIMESTAMPER_H
+#define TIMESTAMPER_H
 #include "timestamper.h"
+#endif
 
 #ifndef MESSAGE_TRANSCEIVER_H
 #define MESSAGE_TRANSCEIVER_H

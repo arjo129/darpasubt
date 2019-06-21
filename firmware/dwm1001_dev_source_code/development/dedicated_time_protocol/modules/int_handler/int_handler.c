@@ -2,7 +2,6 @@
 
 /* Local functions prototypes */
 void vInterruptHandler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
-extern bool isInitiating;
 extern bool tx1Sending;
 extern bool tx2Sending;
 
@@ -106,21 +105,11 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
 
   if (tx1Sending)
   {
-    // printf("TX 1\r\n");
-    
-    uint64 ts64 = getTxTimestampU64();
-    // printf("TX1 = %x\r\n", ts64);
-    updateTx1Ts(ts64);
-    setRxTimeout2();
-
+    txUpdate(getTxTimestampU64());
     tx1Sending = false;
   }
   else if (tx2Sending)
   {
-    // printf("TX 2\r\n");
-    uint64 ts64 = getTxTimestampU64();
-    // printf("TX2 = %x\r\n", ts64);
-
     // Make sure device is in IDLE before changing RX timeout.
     dwt_forcetrxoff();
     dwt_setrxtimeout(0);
@@ -132,7 +121,6 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   {
     // Will not reach here.
   }
-  
 }
 
 /* Local functions */

@@ -10,8 +10,12 @@
 #include "message_transceiver.h"
 #endif
 
-#include "UART.h"
+#ifndef INT_HANDLER_H
+#define INT_HANDLER_H
 #include "int_handler.h"
+#endif
+
+#include "UART.h"
 #include "low_timer.h"
 #include "timestamper.h"
 #include "common.h"
@@ -23,3 +27,4 @@ void syncCycle(void);
 void rxHandler(msg_template *msg);
 void updateTx1Ts(uint64 ts);
 void setRxTimeout2(void);
+void txUpdate(uint64 ts);

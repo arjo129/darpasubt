@@ -425,18 +425,13 @@ uint64 calcTx2(uint64 ts) {
 }
 
 /**
- * @brief Updates the timestamp table with first TX timestamp.
+ * @brief Updates first TX timestamp in timestamp table and start timer for second TX.
  * 
- * @param ts the first TX timestamp value (higher 32 bits).
+ * @param ts timestamp of first TX.
  */
-void updateTx1Ts(uint64 ts)
+void txUpdate(uint64 ts)
 {
   updateTable(tsTable, txMsg1, ts, NODE_ID);
-}
-
-void setRxTimeout2(void)
-{
-  // Make sure device is in IDLE before changing RX timeout.
   lowTimerStart(rx2Timer, rxTimeout2);
 }
 
