@@ -21,7 +21,7 @@
 #include "boards.h"
 
 #define NO_PARITY	false
-#define MSG_END_CHAR ';'
+
 extern void runUser();
 
 // UART initialisation structure
@@ -35,10 +35,6 @@ const app_uart_comm_params_t comm_params =
   NO_PARITY,
   NRF_UART_BAUDRATE_115200
 };
-
-static char dataString[UART_RX_BUF_SIZE] = {0}; // +1 for null termination
-
-static int inputDataIndex = 0;
 
 // local functions
 static void vHandleUartInternalErrors (uint32_t u32Error);
@@ -83,18 +79,14 @@ static void vUartErrorHandle(app_uart_evt_t * p_event)
     else if (p_event->evt_type == APP_UART_FIFO_ERROR)
     {
         vHandleUartInternalErrors(p_event->evt_type);
-    } else if (p_event -> evt_type == APP_UART_DATA_READY) {
+    }
+    else if (p_event -> evt_type == APP_UART_DATA_READY)
+    {
       char byte;
-
       boUART_getc(&byte);
-      // TODO uncomment for debugging
-      // printf("%c\r\n", byte);
 
-      if (byte == MSG_END_CHAR) {
-        memset(dataString, 0, sizeof dataString);
-        inputDataIndex = 0;
-      } else {
-        dataString[inputDataIndex++] = byte;
+      if (byte == 'r')
+      {
         runUser();
       }
     }

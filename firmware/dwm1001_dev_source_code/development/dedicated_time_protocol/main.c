@@ -85,6 +85,7 @@ void writeTx2(msg_template *msg);
 void configTx2(void);
 void updateTx1Ts(uint64 ts);
 void setRxTimeout2(void);
+void runUser(void);
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
@@ -100,6 +101,7 @@ static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 static uint16 getAntDly(uint8 prf);
+static void waitUser(void);
 
 /* Global variables */
 // Frames related
@@ -134,7 +136,7 @@ uint64 varDelay;
 uint64 regDelay;
 int txCounter = 0; // debugging purpose
 int readCount = 0;
-bool waitingUser = true;
+bool waitingUser = false;
 
 /** Default header */
 uint8 header[HEADER_LEN] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0};
@@ -245,6 +247,14 @@ int main(void)
   // Initalises the messages to be transmitted.
   initTxMsgs(&txMsg1, &txMsg2);
 
+  // Configure range measurement.
+  if (RNG_MODE == 1)
+  {
+    waitUser();
+    printf("Press any key to start. After 1000 measurements, press any key \
+      again. Indicate a new set of 1000 measurements with \"AGAIN\".\r\n");
+  }
+
   // Prints configuration information.
   printConfig(
     N,
@@ -273,20 +283,6 @@ int main(void)
   #endif
 }
 
-// To be called by runTask
-void waitUser ()
-{
-  waitingUser = true;
-}
-
-// To be called by UART.c
-void runUser ()
-{
-  waitingUser = false;
-  readCount = 0;
-  printf("AGAIN\r\n");
-}
-
 /**
  * @brief Node entry function.
  * 
@@ -309,12 +305,9 @@ void runTask (void * pvParameter)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
   }
   
-  // TODO: Use NRF timer instead of rxtimeout timer to time the delay TX.
-  printf("Press any key to start. After 1000 measurements, press any key \
-      again. Indicate a new set of 1000 measurements with \"AGAIN\".\r\n");
   while(true)
   {
-    if (readCount >= 1000)
+    if (readCount >= RNG_COUNT && (RNG_MODE == 1))
     {
       waitUser();
     }
@@ -807,4 +800,24 @@ static uint16 getAntDly(uint8 prf)
     antDelay = rawAntDelay >> 16;
   }
   return antDelay;
+}
+
+/**
+ * @brief Stops the ranging once the desired measurement count is reached.
+ *
+ */
+void waitUser (void)
+{
+  waitingUser = true;
+}
+
+/**
+ * @brief Resumes the ranging after stopping range measurement.
+ *
+ */
+void runUser (void)
+{
+  waitingUser = false;
+  readCount = 0;
+  printf("Measurements:\r\n");
 }

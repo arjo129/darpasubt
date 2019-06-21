@@ -3,6 +3,9 @@
 // Print enables (set to 1 to print)
 #define P_DIST 1
 #define P_TEMP 1
+// Range measurement mode
+#define RNG_MODE 0 // Set 1 to use measurement mode. Send 'r' through UART to start/reset.
+#define RNG_COUNT 1000 // Number of measurements to make. Limit less than INT MAX.
 // Ranging related
 #define NODE_ID 0 // Node ID
 #define RANGE_FREQ 40 // Frequency of the cycles
