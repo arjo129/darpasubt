@@ -59,44 +59,51 @@ static dwt_config_t config = {
 // Ranging related
 #define SPEED_OF_LIGHT 299702547
 #define CLOSE_VAL -2.0 // Return value used when distances calculated are too low.
-
 #define TASK_DELAY 200           /**< Task delay. Delays a LED0 task for 200 ms */
 #define TIMER_PERIOD 2000          /**< Timer period. LED1 timer will expire after 1000 ms */
-
 #define MAX_COUNT 1200 
 
 #ifdef USE_FREERTOS
-
 TaskHandle_t run_task_handle;   /**< Reference to SS TWR Initiator FreeRTOS task. */
 extern void runTask (void * pvParameter);
 TaskHandle_t led_toggle_task_handle;   /**< Reference to LED0 toggling FreeRTOS task. */
 TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS timer. */
 #endif
 
-/* Local function prototypes */
 void runTask (void * pvParameter);
 void printTs(uint64 val);
 void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N]);
-void initTxMsgs(msg_template *tx1, msg_template *tx2);
 void syncCycle(void);
 void rxHandler(msg_template *msg);
-void updateTx1Ts(uint64 ts);
-void setRxTimeout2(void);
 void runUser(void);
+static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
+static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
+static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
+static void waitUser(void);
+
+/*************************************************************************************************/
+/********************************** INITIALISATION FUNCTIONS *************************************/
+/*************************************************************************************************/
+static void initCycleTimings(void);
+static void initListen(void);
+static void initTxMsgs(msg_template *tx1, msg_template *tx2);
+static uint16 getAntDly(uint8 prf);
+/*************************************************************************************************/
+/******************************** INITIALISATION FUNCTIONS END ***********************************/
+/*************************************************************************************************/
+
+/*************************************************************************************************/
+/*********************************** TIMER HANDLER FUNCTIONS *************************************/
+/*************************************************************************************************/
 static void initTimerHandler(void *pContext);
 static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
 static void activeTimerHandler(void *pContext);
 static void rx1Handler(void *pContext);
 static void rx2Handler(void *pContext);
-static void initCycleTimings(void);
-static void initListen(void);
-static void initRxTo(void);
-static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
-static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
-static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
-static uint16 getAntDly(uint8 prf);
-static void waitUser(void);
+/*************************************************************************************************/
+/********************************* TIMER HANDLER FUNCTIONS END ***********************************/
+/*************************************************************************************************/
 
 /* Global variables */
 // Frames related
@@ -288,9 +295,7 @@ void runTask (void * pvParameter)
   UNUSED_PARAMETER(pvParameter);
   dwt_setleds(DWT_LEDS_ENABLE);
 
-  // Listen for activity in the network
-  // initListen();
-
+  // Begin transmission for master node immediately and receive mode for remaining nodes.
   if (NODE_ID == 0)
   {
     masterTx1Rdy = true;
@@ -300,12 +305,16 @@ void runTask (void * pvParameter)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
   }
   
+  // Application loop.
   while(true)
   {
+    // Pause check for measurement mode.
     if (readCount >= RNG_COUNT && (RNG_MODE == 1))
     {
       waitUser();
     }
+
+    // Master node check if a new cycle of ranging can begin.
     if (!waitingUser && masterTx1Rdy)
     {
       tx1Sending = true;
@@ -332,7 +341,7 @@ void runTask (void * pvParameter)
  *
  *@details This is for debugging purpose.
  * 
- *@param val 
+ *@param val value to be printed.
  */
 void printTs(uint64 val)
 {
@@ -351,7 +360,7 @@ void printTs(uint64 val)
  *
  *@details This is for debugging purpose.
  *
- *@param table 
+ *@param table 2D containing all the timestamps.
  */
 void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 {
@@ -372,12 +381,215 @@ void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 }
 
 /**
+ * @brief Updates first TX timestamp in timestamp table and start timer for second TX.
+ * 
+ * @param ts timestamp of first TX.
+ */
+void txUpdate(uint64 ts)
+{
+  updateTable(tsTable, txMsg1, ts, NODE_ID);
+  lowTimerStart(rx2Timer, rxTimeout2);
+}
+
+/**
+ * @brief Puts DW1000 to sleep.
+ * 
+ * @details Note: \p sleep must be lesser than \p wake. Time is needed for the
+ *          transceivers to initialise before actual reception can take place.
+ *          Hence, there must be adequate time allocated for the transceiver to
+ *          be ready before the next cycle begins.
+ * 
+ * @param rxOn rxOn set to true if the device needs to wake up with receiver on.
+ * @param sleep time duration for actual hardware sleeping
+ * @param wake time duration to the next cycle
+ */
+static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
+{
+  // dwSleep(rxOn); // Commented out for development purpose.
+  lowTimerStart(sleepTimer, sleep);
+  lowTimerStart(wakeTimer, wake);
+}
+
+/**
+ * @brief Syncs this node's cycle with master node by putting the device to sleep
+ *        and wake up at determined time.
+ * 
+ * @details This function should be called immediately once the first TX of the
+ *          master node is heard.
+ *          The sleep timers will ensure this node wakes up at the same time as
+ *          the master node.
+ * 
+ */
+void syncCycle(void)
+{
+  goToSleep(true, sleepPeriod, cyclePeriod);
+  lowTimerStop(initTimer);
+  printf("sync-ing cycle by sleeping\r\n"); // debugging purpose
+  isInitiating = false;
+}
+
+/**
+ * @brief Updates the timestamps table with reception timestamp and begin next phase timers.
+ * 
+ * @param msg msg_template struct used to determine the location to store the timestamp.
+ */
+void rxHandler(msg_template *msg)
+{
+  uint64 ts = getRxTimestampU64();
+  updateTable(tsTable, *msg, ts, NODE_ID);
+
+  if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
+  {
+    lowTimerStart(rx1Timer, rxTimeout1);
+    lowTimerStart(activeTimer, activePeriod);
+  }
+}
+
+/**
+ * @brief Calculates the distance using the timestamp table.
+ * 
+ * @param table pointer to the 2D array representing the timestamp table.
+ * @param id identifier of the node to calculate the distance with.
+ * @return double the calculated distance.
+ */
+static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
+{
+  double tof, roundTrip1, roundTrip2, replyTrip2, replyTrip1;
+  uint64 ts[NUM_STAMPS_PER_CYCLE] = {0};
+
+  // Get values to calculate.
+  getFullTs(table, ts, NODE_ID, id);
+
+  int i;
+  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
+  {
+    if (ts[i] == 0)
+    {
+      return -1;
+    }
+  }
+
+  roundTrip1 = (double)((ts[IDX_TS_4] - ts[IDX_TS_1]) * DWT_TIME_UNITS);
+  roundTrip2 = (double)((ts[IDX_TS_6] - ts[IDX_TS_3]) * DWT_TIME_UNITS);
+  replyTrip1 = (double)((ts[IDX_TS_3] - ts[IDX_TS_2]) * DWT_TIME_UNITS);
+  replyTrip2 = (double)((ts[IDX_TS_5] - ts[IDX_TS_4]) * DWT_TIME_UNITS);
+
+  tof = (roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
+
+  return tof * SPEED_OF_LIGHT;
+}
+
+/**
+ * @brief Prints all required output data.
+ * 
+ * @param table pointer to the 2D array representing the timestamp table.
+ * @param thisId identifier of the calling node.
+ */
+static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
+{
+  // Calculate the distances for each of other nodes.
+  double dists[N] = {0};
+  bool fail = false;
+  for (int i = 0; i < N; i++)
+  {
+    if (i == thisId)
+    {
+      continue;
+    }
+
+    dists[i] = calcDist(table, i);
+  }
+
+  // Retrieve temperature from register.
+  uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
+  value = value >> 8; // Temperature is at the higher 8 bits.
+  double temp = 1.13 * value - 113.0; // Formula to get real temperature in Celsius. See user manual.
+
+  printData(dists, temp, thisId);
+}
+
+/**
+ * @brief Stops the ranging once the desired measurement count is reached.
+ *
+ */
+void waitUser (void)
+{
+  waitingUser = true;
+}
+
+/**
+ * @brief Resumes the ranging after stopping range measurement.
+ *
+ */
+void runUser (void)
+{
+  waitingUser = false;
+  readCount = 0;
+  printf("Measurements:\r\n");
+}
+
+/*************************************************************************************************/
+/********************************** INITIALISATION FUNCTIONS *************************************/
+/*************************************************************************************************/
+/**
+ * @brief Initialises the cycle timings.
+ * 
+ * @details These timings are the cycle, active and sleep periods.
+ */
+static void initCycleTimings(void)
+{
+  uint64 interval;
+
+  cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
+  activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
+  sleepPeriod = cyclePeriod - activePeriod;
+  wakePeriod = sleepPeriod * WAKE_INIT_FACTOR;
+  
+  // RX timeout values for synchronising TX moments.
+  // The values are deducted with a fixed value to allow transition time from RX to TX for transceiver.
+  rxTimeout1 = ((uint32)TX_INTERVAL * (uint32)NODE_ID) - (uint32)RX_TX_BUFFER;
+  rxTimeout2 = ((uint32)TX_INTERVAL * (uint32)N) - (uint32)RX_TX_BUFFER;
+  
+  interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
+  regDelay = (N * interval);
+  varDelay = (NODE_ID * interval);
+}
+
+/**
+ * @brief Listens for activity in the network at initial phase and joins network.
+ * 
+ * @details This function listens for master node's activity in the network and attempts
+ *          to join the network by sync-ing it's cycle with that of master node's. This
+ *          is done with syncCycle() in the RX success interrupt callback function.
+ * 
+ *          If this node is a master node, it joins the network immediately.
+ * 
+ */
+static void initListen(void)
+{
+  if (NODE_ID == 0)
+  {
+    masterTx1Rdy = true;
+    lowTimerStart(activeTimer, activePeriod);
+    return;
+  }
+
+  isInitiating = true;
+
+  // Start listening for one cycle
+  dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  lowTimerStart(initTimer, cyclePeriod);
+
+  while (isInitiating) {};
+}
+
+/**
  * @brief Initialises the TX messages to be used during the cycle.
  * 
  * @param tx1 the first TX message.
  * @param tx2 the second TX message.
  */
-void initTxMsgs(msg_template *tx1, msg_template *tx2)
+static void initTxMsgs(msg_template *tx1, msg_template *tx2)
 {
   tx1->id = NODE_ID;
   tx1->isFirst = 1;
@@ -393,18 +605,33 @@ void initTxMsgs(msg_template *tx1, msg_template *tx2)
 }
 
 /**
- * @brief Updates first TX timestamp in timestamp table and start timer for second TX.
+ * @brief Retrieves the antenna delay stored in OTP memory.
  * 
- * @param ts timestamp of first TX.
- */
-void txUpdate(uint64 ts)
+ * @param prf the PRF used to configure DWM1000.
+ * @return antenna delay from OTP memory.
+*/
+static uint16 getAntDly(uint8 prf)
 {
-  updateTable(tsTable, txMsg1, ts, NODE_ID);
-  lowTimerStart(rx2Timer, rxTimeout2);
+  uint32 rawAntDelay;
+  uint16 antDelay = 0;
+  dwt_otpread(OTP_ANT_DLY, &rawAntDelay, 1); // '1' Refers to one 32 bits word.
+  if (prf == DWT_PRF_16M)
+  {
+    antDelay = rawAntDelay & 0x0000FFFF; // PRF 16M Antenna delay is found in the lower 16 bits.
+  }
+  else if (prf == DWT_PRF_64M)
+  {
+    antDelay = rawAntDelay >> 16;
+  }
+  return antDelay;
 }
+/*************************************************************************************************/
+/******************************** INITIALISATION FUNCTIONS END ***********************************/
+/*************************************************************************************************/
 
-/* Protocol functions */
-
+/*************************************************************************************************/
+/*********************************** TIMER HANDLER FUNCTIONS *************************************/
+/*************************************************************************************************/
 /**
  * @brief Handler function for when the initiating timer timeouts.
  * 
@@ -486,216 +713,6 @@ static void rx2Handler(void *pContext)
   tx2Sending = configTx(tsTable, regDelay, refTs, &txMsg2);
 }
 
-/**
- * @brief Initialises the cycle timings.
- * 
- * @details These timings are the cycle, active and sleep periods.
- */
-static void initCycleTimings(void)
-{
-  uint64 interval;
-
-  cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
-  activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
-  sleepPeriod = cyclePeriod - activePeriod;
-  wakePeriod = sleepPeriod * WAKE_INIT_FACTOR;
-  
-  // RX timeout values for synchronising TX moments.
-  // The values are deducted with a fixed value to allow transition time from RX to TX for transceiver.
-  rxTimeout1 = ((uint32)TX_INTERVAL * (uint32)NODE_ID) - (uint32)RX_TX_BUFFER;
-  rxTimeout2 = ((uint32)TX_INTERVAL * (uint32)N) - (uint32)RX_TX_BUFFER;
-  
-  interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
-  regDelay = (N * interval);
-  varDelay = (NODE_ID * interval);
-}
-
-/**
- * @brief Listens for activity in the network at initial phase and joins network.
- * 
- * @details This function listens for master node's activity in the network and attempts
- *          to join the network by sync-ing it's cycle with that of master node's. This
- *          is done with syncCycle() in the RX success interrupt callback function.
- * 
- *          If this node is a master node, it joins the network immediately.
- * 
- */
-static void initListen(void)
-{
-  if (NODE_ID == 0)
-  {
-    masterTx1Rdy = true;
-    lowTimerStart(activeTimer, activePeriod);
-    return;
-  }
-
-  isInitiating = true;
-
-  // Start listening for one cycle
-  dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  lowTimerStart(initTimer, cyclePeriod);
-
-  while (isInitiating) {};
-}
-
-/**
- * @brief Puts DW1000 to sleep.
- * 
- * @details Note: \p sleep must be lesser than \p wake. Time is needed for the
- *          transceivers to initialise before actual reception can take place.
- *          Hence, there must be adequate time allocated for the transceiver to
- *          be ready before the next cycle begins.
- * 
- * @param rxOn rxOn set to true if the device needs to wake up with receiver on.
- * @param sleep time duration for actual hardware sleeping
- * @param wake time duration to the next cycle
- */
-static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
-{
-  // printf("sleep\r\n\r\n"); // debugging purpose
-  // dwSleep(rxOn);
-  lowTimerStart(sleepTimer, sleep);
-  lowTimerStart(wakeTimer, wake);
-}
-
-/**
- * @brief Syncs this node's cycle with master node by putting the device to sleep
- *        and wake up at determined time.
- * 
- * @details This function should be called immediately once the first TX of the
- *          master node is heard.
- *          The sleep timers will ensure this node wakes up at the same time as
- *          the master node.
- * 
- */
-void syncCycle(void)
-{
-  goToSleep(true, sleepPeriod, cyclePeriod);
-  lowTimerStop(initTimer);
-  printf("sync-ing cycle by sleeping\r\n"); // debugging purpose
-  isInitiating = false;
-}
-
-/**
- * @brief Updates the timestamps table with reception timestamp.
- * 
- * @param msg msg_template struct used to determine the location to store the timestamp.
- */
-void rxHandler(msg_template *msg)
-{
-  uint64 ts = getRxTimestampU64();
-  updateTable(tsTable, *msg, ts, NODE_ID);
-
-  if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
-  {
-    // Make sure device is in IDLE first before changing RX timeout.
-    lowTimerStart(rx1Timer, rxTimeout1);
-
-    lowTimerStart(activeTimer, activePeriod);
-  }
-}
-
-/**
- * @brief Calculates the distance using the timestamp table.
- * 
- * @param table pointer to the 2D array representing the timestamp table.
- * @param id identifier of the node to calculate the distance with.
- * @return double the calculated distance.
- */
-static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id)
-{
-  double tof, roundTrip1, roundTrip2, replyTrip2, replyTrip1;
-  uint64 ts[NUM_STAMPS_PER_CYCLE] = {0};
-
-  // Get values to calculate.
-  getFullTs(table, ts, NODE_ID, id);
-
-  int i;
-  for (i = 0; i < NUM_STAMPS_PER_CYCLE; i++)
-  {
-    if (ts[i] == 0)
-    {
-      return -1;
-    }
-  }
-
-  roundTrip1 = (double)((ts[IDX_TS_4] - ts[IDX_TS_1]) * DWT_TIME_UNITS);
-  roundTrip2 = (double)((ts[IDX_TS_6] - ts[IDX_TS_3]) * DWT_TIME_UNITS);
-  replyTrip1 = (double)((ts[IDX_TS_3] - ts[IDX_TS_2]) * DWT_TIME_UNITS);
-  replyTrip2 = (double)((ts[IDX_TS_5] - ts[IDX_TS_4]) * DWT_TIME_UNITS);
-
-  tof = (roundTrip1 * roundTrip2 - replyTrip1 * replyTrip2) / (roundTrip1 + roundTrip2 + replyTrip1 + replyTrip2);
-
-  return tof * SPEED_OF_LIGHT;
-}
-
-/**
- * @brief Prints all required output data.
- * 
- * @param table pointer to the 2D array representing the timestamp table.
- * @param thisId identifier of the calling node.
- */
-static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
-{
-  // Calculate the distances for each of other nodes.
-  double dists[N] = {0};
-  bool fail = false;
-  for (int i = 0; i < N; i++)
-  {
-    if (i == thisId)
-    {
-      continue;
-    }
-
-    dists[i] = calcDist(table, i);
-  }
-
-  // Retrieve temperature from register.
-  uint16 value = dwt_readtempvbat(1); // Pass in '1' for SPI > 3MHz
-  value = value >> 8; // Temperature is at the higher 8 bits.
-  double temp = 1.13 * value - 113.0; // Formula to get real temperature in Celsius. See user manual.
-
-  printData(dists, temp, thisId);
-}
-
-/**
- * @brief Retrieves the antenna delay stored in OTP memory.
- * 
- * @param prf the PRF used to configure DWM1000.
- * @return antenna delay from OTP memory.
-*/
-static uint16 getAntDly(uint8 prf)
-{
-  uint32 rawAntDelay;
-  uint16 antDelay = 0;
-  dwt_otpread(OTP_ANT_DLY, &rawAntDelay, 1); // '1' Refers to one 32 bits word.
-  if (prf == DWT_PRF_16M)
-  {
-    antDelay = rawAntDelay & 0x0000FFFF; // PRF 16M Antenna delay is found in the lower 16 bits.
-  }
-  else if (prf == DWT_PRF_64M)
-  {
-    antDelay = rawAntDelay >> 16;
-  }
-  return antDelay;
-}
-
-/**
- * @brief Stops the ranging once the desired measurement count is reached.
- *
- */
-void waitUser (void)
-{
-  waitingUser = true;
-}
-
-/**
- * @brief Resumes the ranging after stopping range measurement.
- *
- */
-void runUser (void)
-{
-  waitingUser = false;
-  readCount = 0;
-  printf("Measurements:\r\n");
-}
+/*************************************************************************************************/
+/********************************* TIMER HANDLER FUNCTIONS END ***********************************/
+/*************************************************************************************************/
