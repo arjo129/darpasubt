@@ -1,0 +1,9 @@
+#!/bin/sh
+# Redirect output of batctl to file forever.
+FILE=/batctl.log
+touch $FILE
+chmod +r $FILE
+while true; do
+    batctl o > $FILE
+    sleep 300
+done

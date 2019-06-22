@@ -1,0 +1,10 @@
+#!/bin/sh
+# MAC address to IPv6 link-local address
+# https://ben.akrin.com/?p=1347
+MAC=$1
+FFFE=fffe
+LLPREFIX=fe80::
+MAC=$(( 0x$MAC>>24<<40 | 0x$FFFE<<24 | 0x$MAC&((1<<24)-1) ))
+MAC=$(( $MAC^(1<<57) ))
+MAC_COLONS=$(printf "%016x" $MAC | sed 's/..../&:/g;s/:$//')
+printf "$LLPREFIX%s\n" "$MAC_COLONS"
