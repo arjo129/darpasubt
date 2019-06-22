@@ -1,0 +1,7 @@
+*
+!.gitignore
+!etc/config/alfred
+!etc/config/batman-adv
+!etc/config/firewall
+!etc/config/network
+!etc/config/wireless
