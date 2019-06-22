@@ -1,0 +1,41 @@
+
+config wifi-device 'radio0'
+    option type 'mac80211'
+    option channel '11'
+    option hwmode '11g'
+    option path 'platform/soc/3f300000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1'
+    option htmode 'HT20'
+    option country '00'
+    option legacy_rates '1'
+
+config wifi-iface 'default_radio0'
+    option device 'radio0'
+    option network 'lan'
+    option mode 'ap'
+    option ssid 'openwrt'
+    option encryption 'psk2'
+    option key 'adijoopahk'
+
+# Configure batman-adv
+# https://www.open-mesh.org/projects/batman-adv/wiki/Batman-adv-Openwrt-config#Batman-adv-201300-till-20190-2
+#config wifi-iface 'wmesh'
+#    option device 'radio0'
+#    option ifname 'adhoc0'
+#    option network 'bat0_hardif_wlan'
+#    option mode 'adhoc'
+#    option ssid 'mesh'
+#    option 'mcast_rate' '18000'
+#    option bssid '02:CA:FE:CA:CA:40'
+
+# https://openwrt.org/docs/guide-user/network/wifi/mesh/batman?rev=1555021785
+#config wifi-iface 'mesh0'
+#    option device 'radio0'
+#    option ifname 'mesh0'
+#    option network 'nwi_mesh0'
+#    option mode 'mesh'
+#    option mesh_fwding '0'
+#    option ssid 'openwrt-mesh'
+#    option mesh_id 'openwrt-mesh'
+#    option encryption 'psk2'
+#    option key 'adijoopahk'
+#    option bssid '02:CA:FE:CA:CA:40'

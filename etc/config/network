@@ -1,0 +1,40 @@
+
+config interface 'loopback'
+	option ifname 'lo'
+	option proto 'static'
+	option ipaddr '127.0.0.1'
+	option netmask '255.0.0.0'
+
+config globals 'globals'
+	option ula_prefix 'fd43:df5f:a9fc::/48'
+
+config interface 'lan'
+	option type 'bridge'
+	option ifname 'eth0'
+	option netmask '255.255.255.0'
+	option ip6assign '60'
+	option ipaddr '192.168.1.127'
+    option proto 'static'
+
+# Configure batman-adv
+# https://www.open-mesh.org/projects/batman-adv/wiki/Batman-adv-Openwrt-config#Batman-adv-201300-till-20190-2
+config interface 'bat0_hardif_wlan'
+    option mtu '1532'
+    option proto 'batadv'
+    option mesh 'bat0'
+
+# https://openwrt.org/docs/guide-user/network/wifi/mesh/batman?rev=1555021785
+#config interface 'nwi_mesh0'
+#    option ifname 'mesh0'
+#    option proto 'batadv'
+#    option mesh 'bat0'
+#    option mtu '1532'
+
+#config interface 'vlan1111'
+#    option type 'bridge'
+#    option stp '1'
+#    option ifname 'eth1.1111 bat0.1111'
+#    option proto 'static'
+#    option ipaddr '192.168.11.11'
+#    option netmask '255.255.255.0'
+#    option delegate '0'

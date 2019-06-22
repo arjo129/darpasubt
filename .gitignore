@@ -1,6 +1,8 @@
 *
 !.gitignore
 !README.md
+!etc
+!etc/config
 !etc/config/alfred
 !etc/config/batman-adv
 !etc/config/firewall
