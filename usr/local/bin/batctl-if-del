@@ -1,8 +1,8 @@
 #!/bin/sh
 # Split behavior based on whether /sys/class/net/bat0 exists:
 # - If does not exist, add bat0:
-#     - Set up bat0 layer 2 interface, running on layer 3 $IF.
-#     - Connect bat0 to $BR.
+#   - Set up bat0 layer 2 interface, running on layer 3 $IF.
+#   - Connect bat0 to $BR.
 # - If exists, delete bat0 in the reverse order as adding bat0.
 
 NETDIR="/sys/class/net"
@@ -10,26 +10,26 @@ NETDIR="/sys/class/net"
 : ${BR:=br-lan}
 
 usage() {
-    printf "Usage: [IF=<name-of-if>] ./batctl-if-del\n"
-    exit 1
+  printf "Usage: [IF=<name-of-if>] ./batctl-if-del\n"
+  exit 1
 }
 
 mod_if() {
-    brctl delif $BR bat0
-    printf "Deleted bat0 from bridge %s\n" "$BR"
+  brctl delif $BR bat0
+  printf "Deleted bat0 from bridge %s\n" "$BR"
 }
 
 mod_br() {
-    ip link set bat0 down
-    batctl if del $IF
-    printf "Deleted bat0 from batman-adv\n"
+  ip link set bat0 down
+  batctl if del $IF
+  printf "Deleted bat0 from batman-adv\n"
 }
 
 check_root() {
-    if [ $USER != "root" ]; then
-        printf "You must be root to run this script.\n"
-        usage
-    fi
+  if [ $USER != "root" ]; then
+    printf "You must be root to run this script.\n"
+    usage
+  fi
 }
 
 check_root

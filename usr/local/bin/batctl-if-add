@@ -7,51 +7,51 @@ NETDIR="/sys/class/net"
 : ${BR:=br-lan}
 
 usage() {
-    printf "Usage: [IF=<name-of-if>] ./batctl-if-add\n"
-    exit 1
+  printf "Usage: [IF=<name-of-if>] ./batctl-if-add\n"
+  exit 1
 }
 
 mod_bat0_mac() {
-    IFACE_ADDRESS="$NETDIR/$IF/address"
-    if [ ! -f $IFACE_ADDRESS ]; then
-        printf "$IFACE_ADDRESS not found\n"
-        usage
-    fi
-    read IFACE_MAC_COLONS < $IFACE_ADDRESS
-    printf "MAC of %s: " "$IF"
-    printf "%s\n" "$IFACE_MAC_COLONS"
+  IFACE_ADDRESS="$NETDIR/$IF/address"
+  if [ ! -f $IFACE_ADDRESS ]; then
+    printf "$IFACE_ADDRESS not found\n"
+    usage
+  fi
+  read IFACE_MAC_COLONS < $IFACE_ADDRESS
+  printf "MAC of %s: " "$IF"
+  printf "%s\n" "$IFACE_MAC_COLONS"
 
-    IFACE_MAC=$(echo $IFACE_MAC_COLONS | tr -d ':')
-    BAT0_MAC=$(( 0x$IFACE_MAC + 1 ))
-    BAT0_MAC_COLONS=$(printf "%012x" $BAT0_MAC | sed 's/../&:/g;s/:$//')
-    printf "MAC of bat0: %s\n" "$BAT0_MAC_COLONS"
+  IFACE_MAC=$(echo $IFACE_MAC_COLONS | tr -d ':')
+  BAT0_MAC=$(( 0x$IFACE_MAC + 1 ))
+  BAT0_MAC_COLONS=$(printf "%012x" $BAT0_MAC | sed 's/../&:/g;s/:$//')
+  printf "MAC of bat0: %s\n" "$BAT0_MAC_COLONS"
 }
 
 mod_if() {
-    ip link set $IF down
-    ip link set $IF mtu 1532
-    ip link set $IF up
-    batctl if add $IF
-    printf "Added bat0 to batman-adv\n"
-    ip link set bat0 address $BAT0_MAC_COLONS
-    printf "Set MAC of bat0: %s\n" "$BAT0_MAC_COLONS"
-    BAT0_IP=$(mac-to-ip $BAT0_MAC)
-    ip -6 addr add $BAT0_IP/64 dev bat0
-    ip link set bat0 up
-    printf "Set IP of bat0: %s\n" "$BAT0_IP"
+  ip link set $IF down
+  ip link set $IF mtu 1532
+  ip link set $IF up
+  batctl if add $IF
+  printf "Added bat0 to batman-adv\n"
+  ip link set bat0 address $BAT0_MAC_COLONS
+  printf "Set MAC of bat0: %s\n" "$BAT0_MAC_COLONS"
+  BAT0_IP=$(mac-to-ip $BAT0_MAC)
+  ip -6 addr add $BAT0_IP/64 dev bat0
+  ip link set bat0 up
+  printf "Set IP of bat0: %s\n" "$BAT0_IP"
 }
 
 # Assume $BR already up, and connected to Ethernet for internet access
 mod_br() {
-    brctl addif $BR bat0
-    printf "Added bat0 to bridge %s\n" "$BR"
+  brctl addif $BR bat0
+  printf "Added bat0 to bridge %s\n" "$BR"
 }
 
 check_root() {
-    if [ $USER != "root" ]; then
-        printf "You must be root to run this script.\n"
-        usage
-    fi
+  if [ $USER != "root" ]; then
+    printf "You must be root to run this script.\n"
+    usage
+  fi
 }
 
 check_root

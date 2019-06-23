@@ -4,6 +4,6 @@ FILE=/batctl.log
 touch $FILE
 chmod +r $FILE
 while true; do
-    batctl o > $FILE
-    sleep 300
+  batctl o > $FILE
+  sleep 300
 done
