@@ -1,8 +1,10 @@
 #!/bin/sh
 # Set up bat0 link 2 interface, running on link 3 $IF.
+# Connect bat0 to $BR.
 
 NETDIR="/sys/class/net"
 : ${IF:=wlan0}
+: ${BR:=br-lan}
 
 usage() {
     printf "You must be root to run this script.\n"
@@ -38,6 +40,11 @@ mod_if() {
     printf "IP of bat0: %s\n" "$BAT0_IP"
 }
 
+# Assume $BR already up, and connected to Ethernet for internet access
+mod_br() {
+    brctl addif $BR bat0
+}
+
 check_root() {
     if [ $USER != "root" ]; then
         usage
@@ -47,3 +54,4 @@ check_root() {
 check_root
 mod_bat0_mac
 mod_if
+mod_br
