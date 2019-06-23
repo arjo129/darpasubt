@@ -12,5 +12,6 @@
 !usr/local
 !usr/local/bin
 !usr/local/bin/batctl-if-add
+!usr/local/bin/batctl-if-del
 !usr/local/bin/batctl-log
 !usr/local/bin/mac-to-ip

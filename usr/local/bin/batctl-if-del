@@ -1,0 +1,35 @@
+#!/bin/sh
+# Split behavior based on whether /sys/class/net/bat0 exists:
+# - If does not exist, add bat0:
+#     - Set up bat0 link 2 interface, running on link 3 $IF.
+#     - Connect bat0 to $BR.
+# - If exists, delete bat0 in the reverse order as adding bat0.
+
+NETDIR="/sys/class/net"
+: ${IF:=wlan0}
+: ${BR:=br-lan}
+
+usage() {
+    printf "You must be root to run this script.\n"
+    printf "Usage: [IF=<name-of-if>] ./batctl-if-del\n"
+    exit 1
+}
+
+mod_if() {
+    brctl delif $BR bat0
+}
+
+mod_br() {
+    ip link set bat0 down
+    batctl if del $IF
+}
+
+check_root() {
+    if [ $USER != "root" ]; then
+        usage
+    fi
+}
+
+check_root
+mod_if
+mod_br
