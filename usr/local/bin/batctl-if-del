@@ -1,7 +1,7 @@
 #!/bin/sh
 # Split behavior based on whether /sys/class/net/bat0 exists:
 # - If does not exist, add bat0:
-#     - Set up bat0 link 2 interface, running on link 3 $IF.
+#     - Set up bat0 layer 2 interface, running on layer 3 $IF.
 #     - Connect bat0 to $BR.
 # - If exists, delete bat0 in the reverse order as adding bat0.
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Set up bat0 link 2 interface, running on link 3 $IF.
+# Set up bat0 layer 2 interface, running on layer 3 $IF.
 # Connect bat0 to $BR.
 
 NETDIR="/sys/class/net"
