@@ -1,6 +1,9 @@
 #!/bin/sh
-# Set up bat0 link 2 interface, running on link 3 $IF.
-# Connect bat0 to $BR.
+# Split behavior based on whether /sys/class/net/bat0 exists:
+# - If does not exist, add bat0:
+#     - Set up bat0 link 2 interface, running on link 3 $IF.
+#     - Connect bat0 to $BR.
+# - If exists, delete bat0 in the reverse order as adding bat0.
 
 NETDIR="/sys/class/net"
 : ${IF:=wlan0}
@@ -29,20 +32,33 @@ mod_bat0_mac() {
 }
 
 mod_if() {
-    ip link set $IF down
-    ip link set $IF mtu 1532
-    ip link set $IF up
-    batctl if add $IF
-    ip link set bat0 address $BAT0_MAC_COLONS
-    BAT0_IP=$(mac-to-ip $BAT0_MAC)
-    ip -6 addr add $BAT0_IP/64 dev bat0
-    ip link set bat0 up
-    printf "IP of bat0: %s\n" "$BAT0_IP"
+    if [ -f "$NETDIR/bat0" ]; then
+        brctl delif $BR bat0
+
+    else
+        ip link set $IF down
+        ip link set $IF mtu 1532
+        ip link set $IF up
+        batctl if add $IF
+        ip link set bat0 address $BAT0_MAC_COLONS
+        BAT0_IP=$(mac-to-ip $BAT0_MAC)
+        ip -6 addr add $BAT0_IP/64 dev bat0
+        ip link set bat0 up
+        printf "IP of bat0: %s\n" "$BAT0_IP"
+
+    fi
 }
 
 # Assume $BR already up, and connected to Ethernet for internet access
 mod_br() {
-    brctl addif $BR bat0
+    if [ -f "$NETDIR/bat0" ]; then
+        brctl addif $BR bat0
+
+    else
+        ip link set bat0 down
+        batctl if del $IF
+
+    fi
 }
 
 check_root() {
