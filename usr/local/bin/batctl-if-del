@@ -16,13 +16,13 @@ usage() {
 
 mod_if() {
   brctl delif $BR bat0
-  printf "Deleted bat0 from bridge %s\n" "$BR"
+  brctl show
 }
 
 mod_br() {
   ip link set bat0 down
   batctl if del $IF
-  printf "Deleted bat0 from batman-adv\n"
+  ip addr show
 }
 
 check_root() {
