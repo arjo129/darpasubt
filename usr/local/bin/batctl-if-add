@@ -7,7 +7,7 @@ NETDIR="/sys/class/net"
 : ${BR:=br-lan}
 
 usage() {
-  printf "(EE) Usage: [IF=<name-of-if>] ./batctl-if-add\n"
+  printf "(EE) Usage: [IF=<ifname>] [BR=<brname>] ./batctl-if-add\n"
   exit 1
 }
 
