@@ -1,0 +1,3 @@
+#!/bin/sh
+printf "Markers: (!!) notice, (II) informational, (WW) warning,
+  (EE) error, (NI) not implemented, (??) unknown.\n"

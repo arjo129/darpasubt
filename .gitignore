@@ -15,3 +15,4 @@
 !usr/local/bin/batctl-if-del
 !usr/local/bin/batctl-log
 !usr/local/bin/mac-to-ip
+!usr/local/bin/print-markers
