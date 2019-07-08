@@ -72,29 +72,29 @@ void printData(double dists[N], double temp, uint8 thisId)
  * @param cyclePeriod time period of each cycle.
  * @param activePeriod time period of the active duration of each cycle.
  * @param sleepPeriod time period of the sleep duration of each cycle.
- * @param wakeInitFact time difference factor between hardware waking and beginning of cycle.
+ * @param wakeBuffer time difference factor between hardware waking and beginning of cycle.
  */
 void printConfig(
   uint8 nodeCount, 
   uint8 thisId, 
   uint16 rngFreq, 
-  uint16 txInterval,
-  uint16 rxToTxBuffer,
-  uint16 cyclePeriod,
-  uint16 activePeriod,
-  uint16 sleepPeriod,
-  double wakeInitFact
+  uint32 txInterval,
+  uint32 rxToTxBuffer,
+  uint32 cyclePeriod,
+  uint32 activePeriod,
+  uint32 sleepPeriod,
+  uint32 wakeBuffer
   )
 {
   printf("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\r\n");
-  printf("  NODES_COUNT : %d\r\n", nodeCount);
-  printf("      NODE_ID : %d\r\n", thisId);
-  printf("     RNG_FREQ : %d (Hz)\r\n", rngFreq);
-  printf(" TRX_INTERVAL : %d (us)\r\n", txInterval);
-  printf(" RX_TO_TX_BUF : %d (us)\r\n", rxToTxBuffer);
-  printf(" CYCLE_PERIOD : %u (us)\r\n", cyclePeriod);
-  printf(" ACTIV_PERIOD : %u (us)\r\n", activePeriod);
-  printf(" SLEEP_PERIOD : %u (us)\r\n", sleepPeriod);
-  printf("HW_SLP_FACTOR : %.2f\r\n", wakeInitFact);
+  printf(" NODES_COUNT : %d\r\n", nodeCount);
+  printf("     NODE_ID : %d\r\n", thisId);
+  printf("    RNG_FREQ : %d (Hz)\r\n", rngFreq);
+  printf("TRX_INTERVAL : %d (us)\r\n", txInterval);
+  printf("RX_TO_TX_BUF : %d (us)\r\n", rxToTxBuffer);
+  printf("CYCLE_PERIOD : %u (us)\r\n", cyclePeriod);
+  printf("ACTIV_PERIOD : %u (us)\r\n", activePeriod);
+  printf("SLEEP_PERIOD : %u (us)\r\n", sleepPeriod);
+  printf(" WAKE_BUFFER : %u (us)\r\n", wakeBuffer);
   printf("-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-\r\n\r\n");
 }

@@ -82,6 +82,13 @@ void lowTimerStop(app_timer_id_t timerId)
   APP_ERROR_CHECK(errCode);
 }
 
+void lowTimerStopAll(void)
+{
+  ret_code_t errCode = app_timer_stop_all();
+  APP_ERROR_CHECK(errCode);
+
+}
+
 /* Local functions */
 
 /**

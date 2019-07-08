@@ -7,10 +7,10 @@
 #define RNG_MODE 0 // Set 1 to use measurement mode. Send 'r' through UART to start/reset.
 #define RNG_COUNT 1000 // Number of measurements to make. Limit less than INT MAX.
 // Ranging related
-#define NODE_ID 0 // Node ID
-#define RANGE_FREQ 40 // Frequency of the cycles
-#define TX_INTERVAL 2000 // In microseconds
-#define WAKE_INIT_FACTOR 0.8 // Multiplication factor used to determine actual sleep time.
+#define NODE_ID 3 // Node ID
+#define RANGE_FREQ 20 // Frequency of the cycles
+#define TX_INTERVAL 3000 // In microseconds
+#define WAKE_BUFFER 2000 // Buffer time in microseconds to allow proper transceiver hardware waking.
 #define UUS_TO_DWT_TIME 63897
 #define RX_TX_BUFFER 1800 // Buffer time (us) to transit from RX to TX.
 

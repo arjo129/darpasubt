@@ -9,10 +9,10 @@ void printConfig(
   uint8 nodeCount, 
   uint8 thisId, 
   uint16 rngFreq, 
-  uint16 txInterval,
-  uint16 rxToTxBuffer,
-  uint16 cyclePeriod,
-  uint16 activePeriod,
-  uint16 sleepPeriod,
-  double wakeInitFact
+  uint32 txInterval,
+  uint32 rxToTxBuffer,
+  uint32 cyclePeriod,
+  uint32 activePeriod,
+  uint32 sleepPeriod,
+  uint32 wakeBuffer
   );

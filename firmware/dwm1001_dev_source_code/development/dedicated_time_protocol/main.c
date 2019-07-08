@@ -19,6 +19,7 @@
 #include "nordic_common.h"
 #include "nrf_drv_clock.h"
 #include "nrf_drv_spi.h"
+#include "nrf_drv_rng.h"
 #include "nrf_uart.h"
 #include "app_util_platform.h"
 #include "nrf_gpio.h"
@@ -36,6 +37,7 @@
 #include "deca_device_api.h"
 #include "nrf_drv_gpiote.h"
 #include "main.h"
+#include "app_timer.h"
 
 //-----------------dw1000----------------------------
 
@@ -73,13 +75,13 @@ TimerHandle_t led_toggle_timer_handle;  /**< Reference to LED1 toggling FreeRTOS
 void runTask (void * pvParameter);
 void printTs(uint64 val);
 void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N]);
-void syncCycle(void);
 void rxHandler(msg_template *msg);
 void runUser(void);
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake);
 static double calcDist(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 id);
 static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId);
 static void waitUser(void);
+static uint64 getRandNum(void);
 
 /*************************************************************************************************/
 /********************************** INITIALISATION FUNCTIONS *************************************/
@@ -96,11 +98,11 @@ static uint16 getAntDly(uint8 prf);
 /*********************************** TIMER HANDLER FUNCTIONS *************************************/
 /*************************************************************************************************/
 static void initTimerHandler(void *pContext);
-static void sleepTimerHandler(void *pContext);
 static void wakeTimerHandler(void *pContext);
 static void activeTimerHandler(void *pContext);
-static void rx1Handler(void *pContext);
-static void rx2Handler(void *pContext);
+static void rx1TimeoutHandler(void *pContext);
+static void rx2TimeoutHandler(void *pContext);
+static void cycleHandler(void *pContext);
 /*************************************************************************************************/
 /********************************* TIMER HANDLER FUNCTIONS END ***********************************/
 /*************************************************************************************************/
@@ -126,17 +128,16 @@ uint64 tsTable[NUM_STAMPS_PER_CYCLE][N];
 bool isInitiating = false;
 bool tx1Sending = false;
 bool tx2Sending = false;
-bool masterTx1Rdy = false;
+bool hasSyncErr = false;
 // Timers related
-APP_TIMER_DEF(initTimer);
-APP_TIMER_DEF(sleepTimer);
 APP_TIMER_DEF(activeTimer);
 APP_TIMER_DEF(wakeTimer);
 APP_TIMER_DEF(rx1Timer); // First RX phase timer
 APP_TIMER_DEF(rx2Timer); // Second RX phase timer
+APP_TIMER_DEF(cycleTimer); // Repeat timer to time each cycle period.
 uint64 varDelay;
 uint64 regDelay;
-int txCounter = 0; // debugging purpose
+int syncErrCount = 0; // debugging purpose
 int readCount = 0;
 bool waitingUser = false;
 
@@ -233,12 +234,11 @@ int main(void)
 
   // Create the required timers
   lowTimerInit();
-  lowTimerSingleCreate(&initTimer, initTimerHandler);
-  lowTimerSingleCreate(&sleepTimer, sleepTimerHandler);
   lowTimerSingleCreate(&activeTimer, activeTimerHandler);
   lowTimerSingleCreate(&wakeTimer, wakeTimerHandler);
-  lowTimerSingleCreate(&rx1Timer, rx1Handler);
-  lowTimerSingleCreate(&rx2Timer, rx2Handler);
+  lowTimerSingleCreate(&rx1Timer, rx1TimeoutHandler);
+  lowTimerSingleCreate(&rx2Timer, rx2TimeoutHandler);
+  lowTimerRepeatCreate(&cycleTimer, cycleHandler);
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
   initCycleTimings();
@@ -267,8 +267,11 @@ int main(void)
     cyclePeriod,
     activePeriod,
     sleepPeriod,
-    WAKE_INIT_FACTOR
+    WAKE_BUFFER
     );
+
+  // Initialise the Random Number Generator module.
+  nrf_drv_rng_init(NULL);
 
   //-------------dw1000  ini------end---------------------------	
   // IF WE GET HERE THEN THE LEDS WILL BLINK
@@ -295,43 +298,37 @@ void runTask (void * pvParameter)
   UNUSED_PARAMETER(pvParameter);
   dwt_setleds(DWT_LEDS_ENABLE);
 
-  // Begin transmission for master node immediately and receive mode for remaining nodes.
+  // Begin the tracking of ranging cycles immediately.
   if (NODE_ID == 0)
   {
-    masterTx1Rdy = true;
+    lowTimerStart(cycleTimer, cyclePeriod);
   }
   else
   {
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    initListen();
   }
+  
   
   // Application loop.
   while(true)
   {
     // Pause check for measurement mode.
-    if (readCount >= RNG_COUNT && (RNG_MODE == 1))
+    // if (readCount >= RNG_COUNT && (RNG_MODE == 1))
+    // {
+    //   waitUser();
+    // }
+
+    // Cycle no longer in sync with master node. Take remedial actions.
+    if (hasSyncErr)
     {
-      waitUser();
-    }
+      // Stop cycle timer and reset flags and transreceiver.
+      lowTimerStopAll();
+      dwt_forcetrxoff();
+      dwt_rxreset();
+      hasSyncErr = false;
 
-    // Master node check if a new cycle of ranging can begin.
-    if (!waitingUser && masterTx1Rdy)
-    {
-      tx1Sending = true;
-
-      lowTimerStart(rx2Timer, rxTimeout2);
-      txStatus = convertTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
-      lowTimerStart(activeTimer, activePeriod);
-
-      if (txStatus == TX_SUCCESS)
-      {
-        txCounter++;
-      }
-      else
-      {
-        tx1Sending = false;
-      }
-      masterTx1Rdy = false;
+      // Attempt to look for master node again.
+      initListen();
     }
   }
 }
@@ -388,7 +385,6 @@ void printTable(uint64 table[NUM_STAMPS_PER_CYCLE][N])
 void txUpdate(uint64 ts)
 {
   updateTable(tsTable, txMsg1, ts, NODE_ID);
-  lowTimerStart(rx2Timer, rxTimeout2);
 }
 
 /**
@@ -406,26 +402,7 @@ void txUpdate(uint64 ts)
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
 {
   // dwSleep(rxOn); // Commented out for development purpose.
-  lowTimerStart(sleepTimer, sleep);
   lowTimerStart(wakeTimer, wake);
-}
-
-/**
- * @brief Syncs this node's cycle with master node by putting the device to sleep
- *        and wake up at determined time.
- * 
- * @details This function should be called immediately once the first TX of the
- *          master node is heard.
- *          The sleep timers will ensure this node wakes up at the same time as
- *          the master node.
- * 
- */
-void syncCycle(void)
-{
-  goToSleep(true, sleepPeriod, cyclePeriod);
-  lowTimerStop(initTimer);
-  printf("sync-ing cycle by sleeping\r\n"); // debugging purpose
-  isInitiating = false;
 }
 
 /**
@@ -435,14 +412,19 @@ void syncCycle(void)
  */
 void rxHandler(msg_template *msg)
 {
+  if (isInitiating)
+  {
+    isInitiating = false;
+
+    if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
+    {
+      lowTimerStart(cycleTimer, cyclePeriod);
+    }
+    return;
+  }
+
   uint64 ts = getRxTimestampU64();
   updateTable(tsTable, *msg, ts, NODE_ID);
-
-  if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
-  {
-    lowTimerStart(rx1Timer, rxTimeout1);
-    lowTimerStart(activeTimer, activePeriod);
-  }
 }
 
 /**
@@ -489,7 +471,6 @@ static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
 {
   // Calculate the distances for each of other nodes.
   double dists[N] = {0};
-  bool fail = false;
   for (int i = 0; i < N; i++)
   {
     if (i == thisId)
@@ -498,6 +479,16 @@ static void printOutput(uint64 table[NUM_STAMPS_PER_CYCLE][N], uint8 thisId)
     }
 
     dists[i] = calcDist(table, i);
+
+    // Track the consecutive occurences of value errors with master node.
+    if (dists[i] == -1 && i == 0)
+    {
+      syncErrCount++;
+    }
+    else if (dists[i] != -1 && i == 0)
+    {
+      syncErrCount = 0;
+    }
   }
 
   // Retrieve temperature from register.
@@ -528,6 +519,35 @@ void runUser (void)
   printf("Measurements:\r\n");
 }
 
+/**
+ * @brief Get a random number using the nRF Random Number Generator (RNG) module.
+ * 
+ * @return uint64 randomly generated 64 bit unsigned integer.
+ */
+static uint64 getRandNum(void)
+{
+  uint8 buf[8] = {0};
+  uint8 bytesAvail = 0;
+  uint64 ret = 0;
+  int i;
+
+  // Get the random generated bytes from the module.
+  do
+  {
+    nrf_drv_rng_bytes_available(&bytesAvail);
+  } while (bytesAvail < 8); // Wait until there are enough generated random bytes.
+  
+  // Read and return the random generated number.
+  nrf_drv_rng_rand(buf, 8);
+  for (i = 0; i < 8; i++)
+  {
+    ret |= buf[i];
+    ret <<= 8;
+  }
+
+  return ret;
+}
+
 /*************************************************************************************************/
 /********************************** INITIALISATION FUNCTIONS *************************************/
 /*************************************************************************************************/
@@ -543,7 +563,7 @@ static void initCycleTimings(void)
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
   activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
   sleepPeriod = cyclePeriod - activePeriod;
-  wakePeriod = sleepPeriod * WAKE_INIT_FACTOR;
+  wakePeriod = sleepPeriod - WAKE_BUFFER;
   
   // RX timeout values for synchronising TX moments.
   // The values are deducted with a fixed value to allow transition time from RX to TX for transceiver.
@@ -556,31 +576,22 @@ static void initCycleTimings(void)
 }
 
 /**
- * @brief Listens for activity in the network at initial phase and joins network.
+ * @brief Listens for master node in the network. Once master node is found, this node syncs it's cycle with master.
+ *        This is handled by rxHandler() function.
  * 
- * @details This function listens for master node's activity in the network and attempts
- *          to join the network by sync-ing it's cycle with that of master node's. This
- *          is done with syncCycle() in the RX success interrupt callback function.
- * 
- *          If this node is a master node, it joins the network immediately.
  * 
  */
 static void initListen(void)
 {
-  if (NODE_ID == 0)
-  {
-    masterTx1Rdy = true;
-    lowTimerStart(activeTimer, activePeriod);
-    return;
-  }
-
+  // Wait for random amount of time before enabling RX.
+  uint64 random = getRandNum();
+  uint16 time = (random % 5000) + 10000; // Get a range between 10000 - 15000.
+  nrf_delay_us(time);
+  
   isInitiating = true;
 
   // Start listening for one cycle
   dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  lowTimerStart(initTimer, cyclePeriod);
-
-  while (isInitiating) {};
 }
 
 /**
@@ -633,44 +644,13 @@ static uint16 getAntDly(uint8 prf)
 /*********************************** TIMER HANDLER FUNCTIONS *************************************/
 /*************************************************************************************************/
 /**
- * @brief Handler function for when the initiating timer timeouts.
- * 
- * @param pContext General parameter that can be passed into the handler.
- */
-static void initTimerHandler(void *pContext)
-{
-  lowTimerStart(initTimer, cyclePeriod);
-  printf("silent network\r\n"); // debugging purpose
-  return;
-}
-
-/**
  * @brief Handler function for when the sleeping timer timeouts.
  * 
  * @param pContext General parameter that can be passed into the handler.
  */
 static void wakeTimerHandler(void *pContext)
 {
-  dwWake();
-}
-
-/**
- * @brief Handler function for when the waking timer timeouts.
- * 
- * @param pContext General parameter that can be passed into the handler.
- */
-static void sleepTimerHandler(void *pContext)
-{
-  // Node 0 will transmit immediately for other nodes.
-  if (NODE_ID == 0)
-  {
-    masterTx1Rdy = true;
-  }
-  else
-  {
-    // NOTE: Disable the following line if not putting the hardware to sleep.
-    // dwt_rxenable(DWT_START_RX_IMMEDIATE);
-  }
+  // dwWake();
 }
 
 /**
@@ -692,18 +672,28 @@ static void activeTimerHandler(void *pContext)
  * 
  * @param pContext General parameter that can be passed into the handler.
  */
-static void rx1Handler(void *pContext)
+static void rx1TimeoutHandler(void *pContext)
 {
-  uint64 refTs = tsTable[IDX_TS_2][0]; // First RX timestamp from receiving Node 0.
-  tx1Sending = configTx(tsTable, varDelay, refTs, &txMsg1);
+  // uint64 refTs = tsTable[IDX_TS_2][0]; // First RX timestamp from receiving Node 0.
+  // tx1Sending = configTx(tsTable, varDelay, refTs, &txMsg1);
+  tx1Sending = true;
+  txStatus = convertTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
+  if (txStatus == TX_SUCCESS)
+  {
+   lowTimerStart(rx2Timer, rxTimeout2);
+  }
+  else
+  {
+    tx1Sending = false;
+  }
 }
 
 /**
  * @brief Handler function for when the second phase of RX is over.
  * 
- * @param pContext General parameter than can be passed in the handler.
+ * @param pContext General parameter that can be passed in the handler.
  */
-static void rx2Handler(void *pContext)
+static void rx2TimeoutHandler(void *pContext)
 {
   uint64 refTs = tsTable[IDX_TS_1][NODE_ID]; // First TX timestamp of this Node.
   uint64 tx2Ts = refTs + regDelay + (uint64)antDelay;
@@ -713,6 +703,44 @@ static void rx2Handler(void *pContext)
   tx2Sending = configTx(tsTable, regDelay, refTs, &txMsg2);
 }
 
+/**
+ * @brief Handler function for tracking the start/end of each ranging cycle.
+ * 
+ * @param pContext General parameter that can be passed in the handler.
+ */
+static void cycleHandler(void *pContext)
+{
+  if (NODE_ID == 0)
+  {
+    lowTimerStart(activeTimer, activePeriod); // Begin to track active transceiving.
+    tx1Sending = true;
+
+    txStatus = convertTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
+    if (txStatus == TX_SUCCESS)
+    {
+      lowTimerStart(rx2Timer, rxTimeout2);
+    }
+    else
+    {
+      tx1Sending = false;
+    }
+  }
+  else
+  {
+    // Check for range value errors with master node.
+    if (syncErrCount >= 10)
+    {
+      hasSyncErr = true;
+      syncErrCount = 0;
+    }
+    else
+    {
+      dwt_rxenable(DWT_START_RX_IMMEDIATE);
+      lowTimerStart(activeTimer, activePeriod);
+      lowTimerStart(rx1Timer, rxTimeout1);
+    }
+  }
+}
 /*************************************************************************************************/
 /********************************* TIMER HANDLER FUNCTIONS END ***********************************/
 /*************************************************************************************************/
