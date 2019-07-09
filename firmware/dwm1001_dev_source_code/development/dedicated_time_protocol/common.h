@@ -4,15 +4,15 @@
 #define P_DIST 1
 #define P_TEMP 1
 // Range measurement mode
-#define RNG_MODE 0 // Set 1 to use measurement mode. Send 'r' through UART to start/reset.
+#define RNG_MODE 1 // Set 1 to use measurement mode. Send 'r' through UART to start/reset.
 #define RNG_COUNT 1000 // Number of measurements to make. Limit less than INT MAX.
 // Ranging related
-#define NODE_ID 3 // Node ID
-#define RANGE_FREQ 20 // Frequency of the cycles
-#define TX_INTERVAL 3000 // In microseconds
-#define WAKE_BUFFER 2000 // Buffer time in microseconds to allow proper transceiver hardware waking.
+#define NODE_ID 0 // Node ID
+#define RANGE_FREQ 10 // Frequency of the cycles
+#define TX_INTERVAL 4000 // In microseconds
+#define WAKE_BUFFER 1000 // Buffer time in microseconds to allow proper transceiver hardware waking.
 #define UUS_TO_DWT_TIME 63897
-#define RX_TX_BUFFER 1800 // Buffer time (us) to transit from RX to TX.
+#define RX_TX_BUFFER 3600 // Buffer time (us) to transit from RX to TX.
 
 /*
   Working Configurations (N = 4)

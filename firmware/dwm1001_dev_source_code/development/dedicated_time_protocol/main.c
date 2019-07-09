@@ -103,6 +103,10 @@ static void activeTimerHandler(void *pContext);
 static void rx1TimeoutHandler(void *pContext);
 static void rx2TimeoutHandler(void *pContext);
 static void cycleHandler(void *pContext);
+static void activeInitHandler(void *pContext);
+static void rx1InitHandler(void *pContext);
+static void rx2InitHandler(void *pContext);
+static void wakeInitHandler(void *pContext);
 /*************************************************************************************************/
 /********************************* TIMER HANDLER FUNCTIONS END ***********************************/
 /*************************************************************************************************/
@@ -130,6 +134,10 @@ bool tx1Sending = false;
 bool tx2Sending = false;
 bool hasSyncErr = false;
 // Timers related
+APP_TIMER_DEF(activeInitTimer);
+APP_TIMER_DEF(wakeInitTimer);
+APP_TIMER_DEF(rx1InitTimer); // First RX phase timer
+APP_TIMER_DEF(rx2InitTimer); // Second RX phase timer
 APP_TIMER_DEF(activeTimer);
 APP_TIMER_DEF(wakeTimer);
 APP_TIMER_DEF(rx1Timer); // First RX phase timer
@@ -234,10 +242,14 @@ int main(void)
 
   // Create the required timers
   lowTimerInit();
-  lowTimerSingleCreate(&activeTimer, activeTimerHandler);
-  lowTimerSingleCreate(&wakeTimer, wakeTimerHandler);
-  lowTimerSingleCreate(&rx1Timer, rx1TimeoutHandler);
-  lowTimerSingleCreate(&rx2Timer, rx2TimeoutHandler);
+  lowTimerSingleCreate(&activeInitTimer, activeInitHandler);
+  lowTimerSingleCreate(&wakeInitTimer, wakeInitHandler);
+  lowTimerSingleCreate(&rx1InitTimer, rx1InitHandler);
+  lowTimerSingleCreate(&rx2InitTimer, rx2InitHandler);
+  lowTimerRepeatCreate(&activeTimer, activeTimerHandler);
+  lowTimerRepeatCreate(&wakeTimer, wakeTimerHandler);
+  lowTimerRepeatCreate(&rx1Timer, rx1TimeoutHandler);
+  lowTimerRepeatCreate(&rx2Timer, rx2TimeoutHandler);
   lowTimerRepeatCreate(&cycleTimer, cycleHandler);
 
   // Pre-calculate all the timings in one cycle (ie, cycle, active, sleep period).
@@ -302,6 +314,9 @@ void runTask (void * pvParameter)
   if (NODE_ID == 0)
   {
     lowTimerStart(cycleTimer, cyclePeriod);
+    lowTimerStart(rx2InitTimer, rxTimeout2);
+    lowTimerStart(activeInitTimer, activePeriod); // Begin to track active transceiving.
+    lowTimerStart(wakeInitTimer, wakePeriod);
   }
   else
   {
@@ -402,7 +417,6 @@ void txUpdate(uint64 ts)
 static void goToSleep(bool rxOn, uint32 sleep, uint32 wake)
 {
   // dwSleep(rxOn); // Commented out for development purpose.
-  lowTimerStart(wakeTimer, wake);
 }
 
 /**
@@ -419,6 +433,10 @@ void rxHandler(msg_template *msg)
     if (msg->id == 0 && msg->isFirst == 1 && NODE_ID != 0)
     {
       lowTimerStart(cycleTimer, cyclePeriod);
+      lowTimerStart(rx1InitTimer, rxTimeout1);
+      lowTimerStart(rx2InitTimer, rxTimeout2);
+      lowTimerStart(activeInitTimer, activePeriod);
+      lowTimerStart(wakeInitTimer, wakePeriod);
     }
     return;
   }
@@ -563,15 +581,18 @@ static void initCycleTimings(void)
   cyclePeriod = 1000000 / RANGE_FREQ; // Convert from seconds to microseconds.
   activePeriod = (2 * N * TX_INTERVAL); // Number of intervals in N nodes.
   sleepPeriod = cyclePeriod - activePeriod;
-  wakePeriod = sleepPeriod - WAKE_BUFFER;
+  wakePeriod = cyclePeriod - WAKE_BUFFER;
   
   // RX timeout values for synchronising TX moments.
+  rxTimeout1 = ((uint32)TX_INTERVAL * (uint32)NODE_ID);
+  rxTimeout2 = ((uint32)TX_INTERVAL * (uint32)N) + rxTimeout1;
   // The values are deducted with a fixed value to allow transition time from RX to TX for transceiver.
-  rxTimeout1 = ((uint32)TX_INTERVAL * (uint32)NODE_ID) - (uint32)RX_TX_BUFFER;
-  rxTimeout2 = ((uint32)TX_INTERVAL * (uint32)N) - (uint32)RX_TX_BUFFER;
+  rxTimeout1 -= (uint32)RX_TX_BUFFER;
+  rxTimeout2 -= (uint32)RX_TX_BUFFER;
   
   interval = (uint64)TX_INTERVAL * (uint64)UUS_TO_DWT_TIME; // interval in DWT time units
-  regDelay = (N * interval);
+  uint64 temp = 500; // TODO: We need this to allow TX2 to be configured early enough. However, this will push back the TX2 and potentially mess up with the next node attempting to receive before switching from RX to TX. Investigate.
+  regDelay = (N * interval) + (temp * (uint64)UUS_TO_DWT_TIME);
   varDelay = (NODE_ID * interval);
 }
 
@@ -585,8 +606,8 @@ static void initListen(void)
 {
   // Wait for random amount of time before enabling RX.
   uint64 random = getRandNum();
-  uint16 time = (random % 5000) + 10000; // Get a range between 10000 - 15000.
-  nrf_delay_us(time);
+  uint16 time = (random % 500) + 1000; // Get a range between 10000 - 15000.
+  nrf_delay_ms(time); // Delay in microseconds.
   
   isInitiating = true;
 
@@ -650,7 +671,12 @@ static uint16 getAntDly(uint8 prf)
  */
 static void wakeTimerHandler(void *pContext)
 {
+  // printf("wake\r\n");
   // dwWake();
+  if (NODE_ID != 0)
+  {
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+  }
 }
 
 /**
@@ -660,6 +686,7 @@ static void wakeTimerHandler(void *pContext)
  */
 static void activeTimerHandler(void *pContext)
 {
+  // printf("active\r\n");
   goToSleep(true, sleepPeriod, wakePeriod);
 
   // printTable(tsTable);
@@ -674,13 +701,12 @@ static void activeTimerHandler(void *pContext)
  */
 static void rx1TimeoutHandler(void *pContext)
 {
-  // uint64 refTs = tsTable[IDX_TS_2][0]; // First RX timestamp from receiving Node 0.
-  // tx1Sending = configTx(tsTable, varDelay, refTs, &txMsg1);
+  // printf("rx1\r\n");
   tx1Sending = true;
   txStatus = convertTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
   if (txStatus == TX_SUCCESS)
   {
-   lowTimerStart(rx2Timer, rxTimeout2);
+    // Do nothing.
   }
   else
   {
@@ -695,9 +721,10 @@ static void rx1TimeoutHandler(void *pContext)
  */
 static void rx2TimeoutHandler(void *pContext)
 {
+  // printf("rx2\r\n");
   uint64 refTs = tsTable[IDX_TS_1][NODE_ID]; // First TX timestamp of this Node.
   uint64 tx2Ts = refTs + regDelay + (uint64)antDelay;
-
+  
   updateTable(tsTable, txMsg2, tx2Ts, NODE_ID);
   writeTx2(&txMsg2, tsTable);
   tx2Sending = configTx(tsTable, regDelay, refTs, &txMsg2);
@@ -712,13 +739,11 @@ static void cycleHandler(void *pContext)
 {
   if (NODE_ID == 0)
   {
-    lowTimerStart(activeTimer, activePeriod); // Begin to track active transceiving.
     tx1Sending = true;
 
     txStatus = convertTx(&txMsg1, (DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED));
     if (txStatus == TX_SUCCESS)
     {
-      lowTimerStart(rx2Timer, rxTimeout2);
     }
     else
     {
@@ -735,11 +760,28 @@ static void cycleHandler(void *pContext)
     }
     else
     {
-      dwt_rxenable(DWT_START_RX_IMMEDIATE);
-      lowTimerStart(activeTimer, activePeriod);
-      lowTimerStart(rx1Timer, rxTimeout1);
     }
   }
+}
+
+static void activeInitHandler(void *pContext)
+{
+  lowTimerStart(activeTimer, cyclePeriod);
+}
+
+static void rx1InitHandler(void *pContext)
+{
+  lowTimerStart(rx1Timer, cyclePeriod);
+}
+
+static void rx2InitHandler(void *pContext)
+{
+  lowTimerStart(rx2Timer, cyclePeriod);
+}
+
+static void wakeInitHandler(void *pContext)
+{
+  lowTimerStart(wakeTimer, cyclePeriod);
 }
 /*************************************************************************************************/
 /********************************* TIMER HANDLER FUNCTIONS END ***********************************/

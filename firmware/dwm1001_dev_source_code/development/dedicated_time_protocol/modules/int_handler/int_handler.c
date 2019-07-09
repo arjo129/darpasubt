@@ -111,9 +111,9 @@ void tx_conf_cb(const dwt_cb_data_t *cb_data)
   else if (tx2Sending)
   {
     // Make sure device is in IDLE before changing RX timeout.
-    dwt_forcetrxoff();
-    dwt_setrxtimeout(0);
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    // dwt_forcetrxoff();
+    // dwt_setrxtimeout(0);
+    // dwt_rxenable(DWT_START_RX_IMMEDIATE);
     
     tx2Sending = false;
   }

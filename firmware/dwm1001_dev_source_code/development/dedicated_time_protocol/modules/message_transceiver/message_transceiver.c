@@ -86,8 +86,8 @@ void writeTx2(msg_template *msg, uint64 tsTable[NUM_STAMPS_PER_CYCLE][N]) {
  * @param refTs timestamp to begin the delay from.
  * @param txMsg2 pointer to the message to be transmitted.
  * 
- * @return true 
- * @return false 
+ * @return true if delayed TX will be sent successfully.
+ * @return false if delayed TX will fail.
  */
 bool configTx(
   uint64 tsTable[NUM_STAMPS_PER_CYCLE][N],
