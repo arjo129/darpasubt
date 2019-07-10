@@ -10,8 +10,6 @@
 #define JS_2_X A2
 #define JS_2_Y A3
 #define JS_2_SW 7
-#define JS_VAL_LEN 5 // In bytes
-#define JS_SW_LEN 1 // In bytes
 
 // Transmitter radio driver related.
 #define RF_RX_PIN 5
