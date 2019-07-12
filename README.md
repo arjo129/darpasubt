@@ -1,2 +1,2 @@
-# net/batman
-Configuration and scripts for `batman-adv` and `alfred`.
+# net/batman-doc
+Document all things related to batman.
