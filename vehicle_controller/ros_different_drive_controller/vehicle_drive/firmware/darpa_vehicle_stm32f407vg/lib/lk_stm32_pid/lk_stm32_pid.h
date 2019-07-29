@@ -13,7 +13,7 @@ class PIDControl
 {
   public:
     PIDControl(Motor *motor, Encoder *encoder);
-    void correctPwm(void);
+    int correctPwm(void);
     void setGains(
       double pGain, 
       double iGain, 

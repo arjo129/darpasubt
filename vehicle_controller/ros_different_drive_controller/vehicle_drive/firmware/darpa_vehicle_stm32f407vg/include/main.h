@@ -31,7 +31,10 @@ extern "C" {
 #include "stm32f4xx_hal.h"
 #include "tm_stm32_gpio.h"
 #include "tm_stm32_delay.h"
+#include "tm_stm32_exti.h"
+#include "tm_stm32_rtc.h"
 #include "lk_pwm.h"
+#include "lk_stm32_pid.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */

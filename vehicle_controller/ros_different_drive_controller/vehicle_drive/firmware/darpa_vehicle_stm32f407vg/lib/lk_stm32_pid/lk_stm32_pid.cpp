@@ -39,7 +39,7 @@ PIDControl::PIDControl(Motor *motor, Encoder *encoder) : _motor(motor), _encoder
  * @details This function must be called every deltaTime (in Encoder class).
  * 
  */
-void PIDControl::correctPwm(void)
+int PIDControl::correctPwm(void)
 {
   // Get the scalar speed.
   long speed = _encoder->getSpeed();
@@ -71,6 +71,8 @@ void PIDControl::correctPwm(void)
   // Set pwm.
   _motor->setPwm(pwm);
   prevSpeed = speed;
+
+  return speed;
 }
 
 /**

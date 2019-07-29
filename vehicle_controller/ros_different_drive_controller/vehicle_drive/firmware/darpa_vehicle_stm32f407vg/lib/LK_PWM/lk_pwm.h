@@ -8,6 +8,11 @@
 #ifndef LK_PWM_LK_PWM_H_
 #define LK_PWM_LK_PWM_H_
 
+/* C++ detection */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "stm32f4xx_hal.h"
 
 typedef struct {
@@ -41,5 +46,10 @@ void LK_PWM_Init(
 
 void LK_PWM_SetPwm(LK_PWM_DATA_t* pwmData, uint32_t value);
 void LK_PWM_SetPwmPercent(LK_PWM_DATA_t* pwmData, double percent);
+
+/* C++ detection */
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LK_PWM_LK_PWM_H_ */
