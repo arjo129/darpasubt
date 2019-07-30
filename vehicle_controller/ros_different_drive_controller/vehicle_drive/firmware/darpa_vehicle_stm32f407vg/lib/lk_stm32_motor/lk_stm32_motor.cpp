@@ -27,27 +27,28 @@ Motor::Motor(
   GPIO_TypeDef* pinPwmPort
   ) : _pinDir(pinDir), _pinPwm(pinPwm), _pinDirPort(pinDirPort), _pinPwmPort(pinPwmPort)
 {
-  // Initialises the GPIO to be used for directional and PWM control.
-  TM_GPIO_Init(_pinDirPort, _pinDir, TM_GPIO_Mode_OUT, TM_GPIO_OType_PP, TM_GPIO_PuPd_NOPULL, TM_GPIO_Speed_High);
-  TM_GPIO_SetPinLow(_pinDirPort, _pinDir);
-  TM_GPIO_InitAlternate(_pinPwmPort,  _pinPwm, TM_GPIO_OType_PP, TM_GPIO_PuPd_NOPULL, TM_GPIO_Speed_Low, GPIO_AF2_TIM4);
-  TM_GPIO_SetPinAsAlternate(_pinPwmPort, _pinPwm);
-
   // Initialises the PWM to be used for motor PWM speed control.
   LK_PWM_Init(
       &_pwmHandle,
       &_timHandle,
-      TIM4,
-      TIM_CHANNEL_1,
+      TIM3,
+      TIM_CHANNEL_2,
       0,
       TIM_COUNTERMODE_UP,
       8399,
       TIM_CLOCKDIVISION_DIV1,
       TIM_AUTORELOAD_PRELOAD_DISABLE,
-      TIM_OCMODE_PWM2,
+      TIM_OCMODE_PWM1,
       TIM_OCPOLARITY_LOW,
       TIM_OCFAST_ENABLE
       );
+
+  // Initialises the GPIO to be used for directional and PWM control.
+  TM_GPIO_Init(_pinDirPort, _pinDir, TM_GPIO_Mode_OUT, TM_GPIO_OType_PP, TM_GPIO_PuPd_NOPULL, TM_GPIO_Speed_High);
+  TM_GPIO_SetPinLow(_pinDirPort, _pinDir);
+  TM_GPIO_InitAlternate(_pinPwmPort,  _pinPwm, TM_GPIO_OType_PP, TM_GPIO_PuPd_NOPULL, TM_GPIO_Speed_Low, GPIO_AF2_TIM3);
+  TM_GPIO_SetPinAsAlternate(_pinPwmPort, _pinPwm);
+
   LK_PWM_SetPwmPercent(&_pwmHandle, 0);
 }
 

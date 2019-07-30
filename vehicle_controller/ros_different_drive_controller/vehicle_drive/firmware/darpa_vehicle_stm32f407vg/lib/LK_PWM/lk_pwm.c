@@ -19,8 +19,8 @@
  * @param clockDivision specifies timer clock division to use.
  * @param autoReloadPreload enable or disable timer auto-reload preload..
  * @param ocMode specifies TIM Output Compare and PWM modes to use.
- * @param ocPolarity
- * @param ocFastMode
+ * @param ocPolarity specifies TIM_OCPOLARITY_LOW or TIM_OCPOLARITY_HIGH for low or high polarity.
+ * @param ocFastMode specifies TIM_OCFAST_ENABLE or TIM_OCFAST_DISABLE to set FastMode.
  */
 void LK_PWM_Init(
     LK_PWM_DATA_t* pwmData,
@@ -56,6 +56,9 @@ void LK_PWM_Init(
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = ocPolarity;
   sConfigOC.OCFastMode = ocFastMode;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   HAL_TIM_PWM_ConfigChannel(timHandle, &sConfigOC, channel);
 
   // Save all parameters as a struct.
