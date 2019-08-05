@@ -26,6 +26,11 @@ MOTOR_RESULT_t Motor::setDir(MOTOR_DIR_t dir)
     return MOTOR_FAILURE;
   }
 
+  if (_isInverted)
+  {
+    dir = (dir == MOTOR_DIR_FWD) ? MOTOR_DIR_BWD : MOTOR_DIR_FWD;
+  }
+
   _dir = dir;
 
   if (dir == MOTOR_DIR_FWD)
@@ -117,4 +122,14 @@ MOTOR_RESULT_t Motor::stop(void)
   analogWrite(_pinPwm, 0);
   
   return MOTOR_SUCCESS;
+}
+
+/**
+ * @brief Inverts the direction of the motor. Useful when mounting motors in different orientation.
+ * 
+ * @param inv Boolean value to indicate if direction should invert.
+ */
+void Motor::invertDir(bool inv)
+{
+  _isInverted = inv;
 }

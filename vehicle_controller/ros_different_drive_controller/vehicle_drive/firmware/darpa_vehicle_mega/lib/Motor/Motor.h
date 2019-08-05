@@ -28,7 +28,7 @@ class Motor
     uint8_t getPwm(void);
     MOTOR_RESULT_t start(void);
     MOTOR_RESULT_t stop(void);
-
+    void invertDir(bool inv);
 
   private:
     uint8_t _pinDir; // Direction pin.
@@ -36,6 +36,7 @@ class Motor
     
     MOTOR_DIR_t _dir; // Direction for motor.
     uint8_t _pwm; // PWM value for motor.
+    bool _isInverted; // Determine if direction should be inverted.
 
     bool _isStopped = true; // Flag to check if motor is stopped.
 };

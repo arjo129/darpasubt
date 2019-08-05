@@ -37,6 +37,12 @@
 #define SC_D_P_GAIN 0.00423
 #define SC_D_I_GAIN 0.0008
 #define SC_D_D_GAIN 0.0005
+#define SC_MIN_SPEED 10000
+#define SC_MAX_SPEED 60000
+#define FWD_TREHOLD 501
+#define BWD_TREHOLD 521
+#define L_TREHOLD 521
+#define R_TREHOLD 501
 
 // All Servos related
 #define SERVO_A_PWM_PIN 8
@@ -44,3 +50,7 @@
 #define SERVO_C_PWM_PIN 10
 #define SERVO_D_PWM_PIN 11
 #define SERVO_DEG_OFFSET -5
+
+// All Radios related
+#define RD_RX_PIN 2
+#define RD_TX_PIN 3
