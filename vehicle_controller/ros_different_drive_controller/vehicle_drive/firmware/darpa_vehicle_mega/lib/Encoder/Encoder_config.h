@@ -7,10 +7,9 @@
 #ifndef __ENCODER_CONFIG_H
 #define __ENCODER_CONFIG_H
 
-/* Uncomment the appropriate lines depending on which GPIO ports you used for each encoder pin. */
-// #define ENCODER_USE_PIN_A_PORTB
-// #define ENCODER_USE_PIN_B_PORTB
-// #define ENCODER_USE_PIN_A_PORTD
-// #define ENCODER_USE_PIN_B_PORTD
+/* Uncomment the appropriate lines depending on which board you are using. */
+// #define ENCODER_UNO_ATMEGA328P
+// #define ENCODER_NANO_ATMEGA328
+#define ENCODER_MEGA_ATMEGA2560
 
 #endif

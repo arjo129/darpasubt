@@ -16,64 +16,36 @@
 
 /**
  * @brief Construct a new Encoder:: Encoder object.
- * @details Either one of the two pins (A and B) must be an interrupt pin such that updateCount() can be called during
+ * @details Pin A must be an interrupt pin such that updateCount() can be called during
  * and interrupt service routine.
  * 
- * @param pinA The pin number to read first encoder output.
- * @param pinB The pin number to read second encoder output.
+ * @param pinA The pin number to read first encoder output (must be an interrupt pin).
+ * @param pinB The pin number to read second encoder output (any non interrupt pin).
+ * @param pinAAddrType The GPIO port used to read the pin A value. Must be a value of ENCODER_PIN_ADDR_t enumeration.
+ * @param pinBAddrType The GPIO port used to read the pin B value. Must be a value of ENCODER_PIN_ADDR_t enumeration.
  * @param deltaTime The time interval (in microseconds) to measure/calculate output shaft speed.
  * @param ticksPerRev The number of ticks that will occur within one revolution of output shaft.
  */
-Encoder::Encoder(uint8_t pinA, uint8_t pinB, long deltaTime, int ticksPerRev) : pinA(pinA), pinB(pinB), deltaTime(deltaTime)
+Encoder::Encoder(
+  uint8_t pinA, 
+  uint8_t pinB, 
+  ENCODER_PIN_ADDR_t pinAAddrType, 
+  ENCODER_PIN_ADDR_t pinBAddrType, 
+  long deltaTime, 
+  int ticksPerRev
+  ) : pinA(pinA), pinB(pinB), pinAPortAddr(pinAAddrType), pinBPortAddr(pinBAddrType), deltaTime(deltaTime)
 {
   degPerTick = 360.0 / ticksPerRev;
   pinMode(pinB, INPUT);
-
-#if defined(ENCODER_USE_PIN_A_PORTD) && defined(ENCODER_USE_PIN_B_PORTD)
-
-  // Check if specified pin is valid.
-  if (pinA > 7 || pinB > 7)
-  {
-    Serial.println("Invalid pin number specified for pin A or pin B! Check your pins again.");
-    return;
-  }
-
-  // 8 bits register representation to be used for updateCount().
-  pinAReg = 1 << pinA;
-  pinBReg = 1 << pinB;
   
-#elif defined(ENCODER_USE_PIN_A_PORTD) && defined(ENCODER_USE_PIN_B_PORTB)
+#ifdef ENCODER_MEGA_ATMEGA2560
 
-  // Check if specified pin is valid.
-  if (pinA > 7 || (pinB < 8 && pinB > 13))
-  {
-    Serial.println("Invalid pin number specified for pin A or pin B! Check your pins again.");
-    return;
-  }
-
-  pinAReg = 1 << pinA;
-  // We minus by 8 since PB0 is mapped to physical pin number 8, PB1 mapped to 9, so on and so forth on Uno.
-  pinBReg = 1 << (pinB - 8); 
-
-#elif defined (ENCODER_USE_PIN_A_PORTB) && defined(ENCODER_USE_PIN_B_PORTD)
-  // Check if specified pin is valid.
-  if ((pinA < 8 && pinA > 13) || pinB > 7)
-  {
-    Serial.println("Invalid pin number specified for pin A or pin B! Check your pins again.");
-    return;
-  }
-
-  pinAReg = 1 << (pinA - 8);
-  pinBReg = 1 << pinB;
-
-#else
-  
-  // Serial.println("Unknown GPIO port specified! Check Encoder_config.h for configuration instructions.");
+  // Initialise the port register bit position for both pins.
+  // This is later used to read the pin HIGH/LOW value during updateCount().
+  pinAReg = 1 << checkRegShift(pinA, pinAAddrType);
+  pinBReg = 1 << checkRegShift(pinB, pinBAddrType);
 
 #endif
-
-pinAReg = 1 << 5;
-pinBReg = 1 << 2;
 }
 
 /**
@@ -83,26 +55,8 @@ pinBReg = 1 << 2;
  */
 void Encoder::updateCount(void)
 {
-
-#if defined(ENCODER_USE_PIN_A_PORTD) && defined(ENCODER_USE_PIN_B_PORTD)
-
-  valA = (PIND & pinAReg) > 0;
-  valB = (PIND & pinBReg) > 0;
-  
-#elif defined(ENCODER_USE_PIN_A_PORTD) && defined(ENCODER_USE_PIN_B_PORTB)
-
-  valA = (PIND & pinAReg) > 0;
-  valB = (PINB & pinBReg) > 0;
-
-#elif defined (ENCODER_USE_PIN_A_PORTB) && defined(ENCODER_USE_PIN_B_PORTD)
-
-  valA = (PINB & pinAReg) > 0;
-  valB = (PIND & pinBReg) > 0;
-  
-#endif
-
-  valA = (PINA & pinAReg) > 0;
-  valB = (PINE & pinBReg) > 0;
+  valA = (_SFR_IO8(pinAPortAddr) & pinAReg) > 0;
+  valB = (_SFR_IO8(pinBPortAddr) & pinBReg) > 0;
 
   if (valA == valB)
   {
@@ -164,4 +118,77 @@ int Encoder::getDistance(void)
   totalTicksCount = 0;
 
   return distance;
+}
+
+/**
+ * @brief Utility function to figure out the bit shifting required given the pin and it's port.
+ * 
+ * @param pin The physical pin number.
+ * @param pinPort The GPIO port connected to that pin.
+ * @return uint8_t the number of shift required.
+ */
+uint8_t Encoder::checkRegShift(uint8_t pin, ENCODER_PIN_ADDR_t pinPort)
+{
+  uint8_t shift = 0;
+
+  switch(pinPort)
+  {
+    case ENCODER_PIN_A_ADDR:
+      shift = pin - 22; // Physical pin of PA0 is 22, so we minus that to get register bit position index.
+      break;
+    case ENCODER_PIN_B_ADDR:
+      if (pin >= 50 && pin <= 53)
+      {
+        shift = (pin - 53) * -1; // Physical pin 53 is mapped to PB0 and physical pin 50 is mapped to PB3.
+      }
+      else if (pin >= 10 && pin <= 13)
+      {
+        shift = pin - 6; // Physical pin of PB4 is 10 and phyiscal pin for PB7 is 13.
+      }
+      break;
+    case ENCODER_PIN_C_ADDR:
+      shift = (pin - 37) * -1; // Physical pin for PC0 is 37 and physical pin for PC7 is 30.
+      break;
+    case ENCODER_PIN_D_ADDR:
+      if (pin == 38)
+      {
+        shift = 7; // Physical pin for PD7 is 38.
+      }
+      else if (pin >= 18 && pin <= 21)
+      {
+        shift = (pin - 21) * -1; // PD0 to PD3 is mapped to physical pin 21 to 18 correspondingly.
+      }
+      break;
+    case ENCODER_PIN_E_ADDR:
+      if (pin == 0 || pin == 1)
+      {
+        shift = pin;
+      }
+      else if (pin == 2 || pin == 3)
+      {
+        shift = pin + 2;
+      }
+      else if (pin == 5)
+      {
+        shift = 3;
+      }
+      break;
+    case ENCODER_PIN_F_ADDR:
+      shift = pin - A0; // Note: A0 to A7 is mapped to physical pin number 54 to 61.
+      break;
+    case ENCODER_PIN_G_ADDR:
+      if (pin == 4)
+      {
+        shift = 5;
+      }
+      else if (pin >= 39 && pin <= 41)
+      {
+        shift = (pin - 41) * -1; // PG0 to PG2 is mapped to physical pin 41 to 39 correspondingly.
+      }
+      break;
+    default:
+      break;
+  }
+
+  return shift;
 }
