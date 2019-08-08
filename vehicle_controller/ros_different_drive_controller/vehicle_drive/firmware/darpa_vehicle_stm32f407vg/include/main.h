@@ -33,6 +33,7 @@ extern "C" {
 #include "tm_stm32_delay.h"
 #include "tm_stm32_exti.h"
 #include "tm_stm32_rtc.h"
+#include "tm_stm32_usart.h"
 #include "lk_pwm.h"
 #include "lk_stm32_pid.h"
 
