@@ -10,7 +10,7 @@ Motor::Motor(uint8_t pinDir, uint8_t pinPwm) : _pinDir(pinDir), _pinPwm(pinPwm)
 {
   pinMode(pinDir, OUTPUT);
   pinMode(pinPwm, OUTPUT);
-  
+  _isInverted = false;
 }
 
 /**

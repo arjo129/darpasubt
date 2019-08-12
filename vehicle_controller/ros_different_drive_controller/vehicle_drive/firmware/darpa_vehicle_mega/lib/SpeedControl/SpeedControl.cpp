@@ -105,11 +105,13 @@ void SpeedControl::setSpeed(long speed)
   if (speed < 0)
   {
     motor->setDir(MOTOR_DIR_BWD);
+    motor->start();
     speed *= -1;
   }
   else if (speed > 0)
   {
     motor->setDir(MOTOR_DIR_FWD);
+    motor->start();
   }
   else
   {

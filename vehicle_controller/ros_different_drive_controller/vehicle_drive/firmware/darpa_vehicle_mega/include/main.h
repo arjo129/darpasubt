@@ -1,12 +1,12 @@
 // All Motors related
 #define MOTOR_A_DIR_PIN 26
-#define MOTOR_A_PWM_PIN 4
+#define MOTOR_A_PWM_PIN 11
 #define MOTOR_B_DIR_PIN 27
-#define MOTOR_B_PWM_PIN 5
+#define MOTOR_B_PWM_PIN 12
 #define MOTOR_C_DIR_PIN 28
-#define MOTOR_C_PWM_PIN 6
+#define MOTOR_C_PWM_PIN 13
 #define MOTOR_D_DIR_PIN 29
-#define MOTOR_D_PWM_PIN 7
+#define MOTOR_D_PWM_PIN 10
 #define ENCODER_A_PIN_A 21 // INT0
 #define ENCODER_A_PORT_A ENCODER_PIN_D_ADDR
 #define ENCODER_A_PIN_B 22
@@ -45,10 +45,10 @@
 #define R_TREHOLD 501
 
 // All Servos related
-#define SERVO_A_PWM_PIN 8
-#define SERVO_B_PWM_PIN 9
-#define SERVO_C_PWM_PIN 10
-#define SERVO_D_PWM_PIN 11
+#define SERVO_A_PWM_PIN 6
+#define SERVO_B_PWM_PIN 7
+#define SERVO_C_PWM_PIN 8
+#define SERVO_D_PWM_PIN 46
 #define SERVO_DEG_OFFSET -5
 
 // All Radios related

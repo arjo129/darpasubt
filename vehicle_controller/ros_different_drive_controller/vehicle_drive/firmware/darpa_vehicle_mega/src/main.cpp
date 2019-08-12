@@ -1,13 +1,32 @@
+/** 
+ * Timers 0 to 5 are assigned in the following manner:
+ * Timer 0 - Reserved for Arduino framework
+ * Timer 1 - Motor
+ * Timer 2 - Motor
+ * Timer 3 - Periodic interrupt functions (for PID pwm correction)
+ * Timer 4 - Servo
+ * Timer 5 - Servo
+ * 
+ * Motor A - PWM: Pin 11 Dir: 26
+ * Motor B - PWM: Pin 12 Dir: 27
+ * Motor C - PWM: Pin 13 Dir: 28
+ * Motor D - PWM: Pin 10 Dir: 29
+ * 
+ * Servo A - PWM: Pin 6
+ * Servo B - PWM: Pin 7
+ * Servo C - PWM: Pin 8
+ * Servo D - PWM: Pin 46
+ * 
+ * The pins are assigned this way to avoid conflicts in usage of Timers.
+ * In ServoTimers.h (Servo library), timers 1 and 3 are disabled to prevent conflicts.
+ */
+
 #include <Arduino.h>
 #include <SpeedControl.h>
-#include <TimerOne.h>
 #include <Servo.h>
-#include <RH_RF95.h>
-#include <DataPackage.h>
 #include <main.h>
 
 // All global variables.
-long currSpeed = 0;
 Motor motorA(MOTOR_A_DIR_PIN, MOTOR_A_PWM_PIN);
 Motor motorB(MOTOR_B_DIR_PIN, MOTOR_B_PWM_PIN);
 Motor motorC(MOTOR_C_DIR_PIN, MOTOR_C_PWM_PIN);
@@ -52,14 +71,10 @@ Servo servoA;
 Servo servoB;
 Servo servoC;
 Servo servoD;
-SoftwareSerial ss(2, 3);
-RH_RF95 radioRecv(ss);
-uint8_t bufLen = DataPackage::DATA_LEN;
-uint8_t buf[DataPackage::DATA_LEN];
-DataPackage::Packet packet;
 
 // Function prototypes
 void initMotors(void);
+void initPwmCorrectTimer(uint32_t microseconds);
 void updateA(void);
 void updateB(void);
 void updateC(void);
@@ -72,100 +87,11 @@ void setup() {
   Serial.begin(9600);
 
   initMotors();
-  
-  // Initialise Timer1 to be used for correcting motor pwm.
-  Timer1.initialize(ENCODER_COMM_DELTA_T);
-  Timer1.attachInterrupt(adjust);
-
-  // Initialise radio receiver
-  if (!radioRecv.init())
-  {
-    Serial.println("Radio initialisation failed. Check pins again.");
-  }
-  else
-  {
-    radioRecv.setFrequency(434.0);
-  }
+  delay(1500); // Delay 1.5 seconds to allow servos to move to 0 degree position.
+  initPwmCorrectTimer(ENCODER_COMM_DELTA_T);
 }
 
 void loop() {
-  if (radioRecv.available())
-  {
-    // Read incoming data first.
-    radioRecv.recv(buf, &bufLen);
-    packet = DataPackage::deserialiseData(buf);
-
-    // Forward - Backward control is active
-    if (packet.js1X < FWD_TREHOLD || packet.js1X > BWD_TREHOLD)
-    {
-      // Forward
-      if (packet.js1X < FWD_TREHOLD)
-      {
-        // Left is also active
-        if (packet.js2Y > L_TREHOLD)
-        {
-          // Rotate the front servos
-        }
-        // Right is also active
-        else if (packet.js2Y < R_TREHOLD)
-        {
-          // Rotate the front servos
-        }
-        // Only forward is active
-        else
-        {
-          currSpeed = map(packet.js1X, 0, FWD_TREHOLD - 1, SC_MAX_SPEED, SC_MIN_SPEED);
-          setAllMotorsDir(MOTOR_DIR_FWD);
-          setAllMotorsSpeed(currSpeed);
-          Serial.println("Forward");
-        }
-      }
-      // Backward
-      else if (packet.js1X > BWD_TREHOLD)
-      {
-        // Left is also active
-        if (packet.js2Y > L_TREHOLD)
-        {
-          // Rotate all servos
-        }
-        // Right is also active
-        else if (packet.js2Y < R_TREHOLD)
-        {
-          // Rotate all servos
-        }
-        // Only backward is active
-        else
-        {
-          currSpeed = -1 * map(packet.js1X, BWD_TREHOLD + 1, 1023, SC_MIN_SPEED, SC_MAX_SPEED);
-          setAllMotorsDir(MOTOR_DIR_BWD);
-          setAllMotorsSpeed(currSpeed);
-          Serial.println("Backward");
-        }
-      }      
-    }
-
-
-    // Forward - Backward control is inactive
-    if (packet.js1X >= FWD_TREHOLD && packet.js1X <= BWD_TREHOLD)
-    {
-      // If only left is active
-      if (packet.js2Y > L_TREHOLD)
-      {
-
-      }
-      // If only right is active
-      else if (packet.js2Y < R_TREHOLD)
-      {
-
-      }
-      // No joystick is active
-      else
-      {
-        setAllMotorsSpeed(0);
-        Serial.println("Stop");
-      }
-    }
-  }
 }
 
 /**
@@ -174,21 +100,22 @@ void loop() {
  */
 void initMotors(void)
 {
+  // Intialises all motor components.
   attachInterrupt(digitalPinToInterrupt(ENCODER_A_PIN_A), updateA, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_B_PIN_A), updateB, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_C_PIN_A), updateC, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_D_PIN_A), updateD, CHANGE);
   motorA.setDir(MOTOR_DIR_FWD);
+  motorA.invertDir(true);
   motorA.setPwm(0);
   motorA.start();
   motorB.setDir(MOTOR_DIR_FWD);
   motorB.setPwm(0);
   motorB.start();
-  motorC.invertDir(true);
   motorC.setDir(MOTOR_DIR_FWD);
+  motorC.invertDir(true);
   motorC.setPwm(0);
   motorC.start();
-  motorD.invertDir(true);
   motorD.setDir(MOTOR_DIR_FWD);
   motorD.setPwm(0);
   motorD.start();
@@ -206,6 +133,10 @@ void initMotors(void)
   servoB.attach(SERVO_B_PWM_PIN);
   servoC.attach(SERVO_C_PWM_PIN);
   servoD.attach(SERVO_D_PWM_PIN);
+  servoA.write(0);
+  servoB.write(0);
+  servoC.write(0);
+  servoD.write(0);
 }
 
 /**
@@ -280,4 +211,33 @@ void setAllMotorsDir(MOTOR_DIR_t dir)
   motorB.setDir(dir);
   motorC.setDir(dir);
   motorD.setDir(dir);
+}
+
+/**
+ * @brief Initialises the Timer used to configure for periodic correction of all motors PWM for PID control.
+ * 
+ * @param microseconds The amount of time interval in microseconds to correct the motors' PWM.
+ */
+void initPwmCorrectTimer(uint32_t microseconds)
+{
+  // We use Timer 3 channel A for this periodic interrupt.
+  // Clear registers for proper initialisation.
+  TCCR3A = 0;
+  TCCR3B = 0;
+  TIMSK3 = 0;
+
+  TCCR3B |= (1 << WGM32); // Set CTC mode.
+  TCCR3B |= (1 << CS32); // Set clock prescaler to clk_freq/256.
+  uint32_t count = ((F_CPU / 1000000) * microseconds) / 256; // We are using prescaler of 256.
+  OCR3A = count; // Set the calculated count.
+  TIMSK3 |= (1 << OCIE3A); // Enable channel A.
+}
+
+/**
+ * @brief Interrupt Service Routine function for Timer 3, Channel A.
+ * 
+ */
+ISR(TIMER3_COMPA_vect)
+{
+  adjust();
 }
