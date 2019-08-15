@@ -21,9 +21,6 @@
  * In ServoTimers.h (Servo library), timers 1 and 3 are disabled to prevent conflicts.
  */
 
-#include <Arduino.h>
-#include <SpeedControl.h>
-#include <Servo.h>
 #include <main.h>
 
 // All global variables.
@@ -72,16 +69,33 @@ Servo servoB;
 Servo servoC;
 Servo servoD;
 
+LinearVels_t linear;
+AngularVels_t angular;
+PlatformDimensions_t platform;
+DriveParams_t driveA;
+WheelParams_t wheelA;
+DriveParams_t driveB;
+WheelParams_t wheelB;
+DriveParams_t driveC;
+WheelParams_t wheelC;
+DriveParams_t driveD;
+WheelParams_t wheelD;
+
 // Function prototypes
 void initMotors(void);
 void initPwmCorrectTimer(uint32_t microseconds);
+void initControlParams(void);
+void resetDriveParams(void);
 void updateA(void);
 void updateB(void);
 void updateC(void);
 void updateD(void);
 void adjust(void);
 void setAllMotorsSpeed(long speed);
-void setAllMotorsDir(MOTOR_DIR_t dir);
+void turnServos(void);
+void turnWheels(void);
+uint16_t checkParams(void);
+void handleParamErr(uint16_t err);
 
 void setup() {
   Serial.begin(9600);
@@ -89,9 +103,26 @@ void setup() {
   initMotors();
   delay(1500); // Delay 1.5 seconds to allow servos to move to 0 degree position.
   initPwmCorrectTimer(ENCODER_COMM_DELTA_T);
+  initControlParams();
 }
 
 void loop() {
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+
+  uint16_t res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    turnServos();
+    delay(2000);
+    turnWheels();
+  }
 }
 
 /**
@@ -133,10 +164,10 @@ void initMotors(void)
   servoB.attach(SERVO_B_PWM_PIN);
   servoC.attach(SERVO_C_PWM_PIN);
   servoD.attach(SERVO_D_PWM_PIN);
-  servoA.write(0);
-  servoB.write(0);
-  servoC.write(0);
-  servoD.write(0);
+  servoA.write(90);
+  servoB.write(90);
+  servoC.write(90);
+  servoD.write(90);
 }
 
 /**
@@ -240,4 +271,154 @@ void initPwmCorrectTimer(uint32_t microseconds)
 ISR(TIMER3_COMPA_vect)
 {
   adjust();
+}
+
+/**
+ * @brief Turn all steering servos given their drive params.
+ * 
+ */
+void turnServos(void)
+{
+  servoA.write(driveA.posAngle);
+  servoB.write(driveB.posAngle);
+  servoC.write(driveC.posAngle);
+  servoD.write(driveD.posAngle);
+}
+
+/**
+ * @brief Initialises all parameters for wheels control.
+ * 
+ */
+void initControlParams(void)
+{
+  platform.length = PLATFORM_LENGTH;
+  platform.breadth = PLATFORM_BREADTH;
+  platform.diagonal = sqrt((PLATFORM_LENGTH * PLATFORM_LENGTH) + (PLATFORM_BREADTH * PLATFORM_BREADTH));
+  platform.diagonalHalf = platform.diagonal / 2.0;
+  
+  linear.x = 0;
+  linear.y = 0;
+  linear.z = 0;
+  angular.x = 0;
+  angular.y = 0;
+  angular.z = 0;
+
+  wheelA.wheelPos = WHEEL_POS_TOP_LEFT;
+  wheelA.radius = WHEEL_RADIUS;
+  wheelA.pivotDist = WHEEL_PIVOT_DIST;
+  driveA.speed = 0;
+  driveA.steerAngle = 0;
+  driveA.posAngle = 90;
+  
+  wheelB.wheelPos = WHEEL_POS_TOP_RIGHT;
+  wheelB.radius = WHEEL_RADIUS;
+  wheelB.pivotDist = WHEEL_PIVOT_DIST;
+  driveB.speed = 0;
+  driveB.steerAngle = 0;
+  driveB.posAngle = 90;
+  
+  wheelC.wheelPos = WHEEL_POS_BOTTOM_LEFT;
+  wheelC.radius = WHEEL_RADIUS;
+  wheelC.pivotDist = WHEEL_PIVOT_DIST;
+  driveC.speed = 0;
+  driveC.steerAngle = 0;
+  driveC.posAngle = 90;
+  
+  wheelD.wheelPos = WHEEL_POS_BOTTOM_RIGHT;
+  wheelD.radius = WHEEL_RADIUS;
+  wheelD.pivotDist = WHEEL_PIVOT_DIST;
+  driveD.speed = 0;
+  driveD.steerAngle = 0;
+  driveD.posAngle = 90;
+
+  turnServos();
+}
+
+/**
+ * @brief Rotate all wheels given their drive params.
+ * 
+ */
+void turnWheels(void)
+{
+  scA.setSpeed(driveA.speed);
+  scB.setSpeed(driveB.speed);
+  scC.setSpeed(driveC.speed);
+  scD.setSpeed(driveD.speed);
+}
+
+/**
+ * @brief Check all drive parameters are within limits.
+ * 
+ * @return uint16_t Errors indicated by bit index position. See CHK_PARAM_RES_t enumeration.
+ */
+uint16_t checkParams(void)
+{
+  uint16_t result = PARAM_OK;
+
+  // Check for motors limit.
+  if (abs(driveA.speed) > MOTOR_SPEED_LIMIT ||
+    abs(driveB.speed) > MOTOR_SPEED_LIMIT ||
+    abs(driveC.speed) > MOTOR_SPEED_LIMIT ||
+    abs(driveD.speed) > MOTOR_SPEED_LIMIT)
+  {
+    result |= PARAM_MOTOR_EXCEED;
+  }
+  
+  // Check for servos limit.
+  if (driveB.posAngle < SERVO_B_LOWER_LIMIT ||
+    driveB.posAngle > SERVO_B_UPPER_LIMIT ||
+    driveD.posAngle < SERVO_D_LOWER_LIMIT ||
+    driveD.posAngle > SERVO_D_UPPER_LIMIT ||
+    driveA.posAngle < SERVO_A_LOWER_LIMIT ||
+    driveA.posAngle > SERVO_A_UPPER_LIMIT ||
+    driveC.posAngle < SERVO_C_LOWER_LIMIT ||
+    driveC.posAngle > SERVO_C_UPPER_LIMIT)
+  {
+    result |= PARAM_SERVO_EXCEED;
+  }
+
+  return result;
+}
+
+/**
+ * @brief Handle drive parameters out of limits.
+ * 
+ * @param err Errors indicated by bit index position. See CHK_PARAM_RES_t enumeration.
+ */
+void handleParamErr(uint16_t err)
+{
+  resetDriveParams();
+  turnWheels();
+  turnServos();
+  delay(1500);
+}
+
+/**
+ * @brief Resets drive parameters of all wheels to default state.
+ * 
+ */
+void resetDriveParams(void)
+{
+  linear.x = 0;
+  linear.y = 0;
+  linear.z = 0;
+  angular.x = 0;
+  angular.y = 0;
+  angular.z = 0;
+
+  driveA.speed = 0;
+  driveA.steerAngle = 0;
+  driveA.posAngle = 90;
+  
+  driveB.speed = 0;
+  driveB.steerAngle = 0;
+  driveB.posAngle = 90;
+  
+  driveC.speed = 0;
+  driveC.steerAngle = 0;
+  driveC.posAngle = 90;
+  
+  driveD.speed = 0;
+  driveD.steerAngle = 0;
+  driveD.posAngle = 90;
 }

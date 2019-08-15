@@ -34,6 +34,7 @@ SpeedControl::SpeedControl(Motor *motor, Encoder *encoder) : motor(motor), encod
   iGain = DEF_GAIN;
   dGain = DEF_GAIN;
   iTerm = 0;
+  iLimit = iGain * 25000;
 };
 
 /**
@@ -56,13 +57,13 @@ long SpeedControl::correctPwm(void)
   // Calculate P, I, D values.
   double pTerm = pGain * (double)error;
   iTerm += iGain * (double)error;
+  if (iTerm > iLimit)
+  {
+    iTerm = iLimit;
+  }
   double dTerm = dGain * (speed - prevSpeed); // Uses derivative on measurement. See: http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-derivative-kick/
 
   // Calculate the pwm value to set.
-  // TODO: Fix the problem of motor going max speed when motor turns off for periods of time.
-  // When the motor is off, the correction value will build up due to iTerm. When the motor is turned on again,
-  // the correction will have to steadily decrease to less than 255 before speed can be normal again.
-  // Find a way to detect this and make appropriate adjustments.
   long correction = pTerm + iTerm - dTerm;
   pwm += correction;
   if (pwm > 255)
