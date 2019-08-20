@@ -10,7 +10,7 @@
 #define MOTOR_B_DIR_PIN 27
 #define MOTOR_B_PWM_PIN 12
 #define MOTOR_C_DIR_PIN 28
-#define MOTOR_C_PWM_PIN 13
+#define MOTOR_C_PWM_PIN 9
 #define MOTOR_D_DIR_PIN 29
 #define MOTOR_D_PWM_PIN 10
 
@@ -33,18 +33,30 @@
 #define ENCODER_COMM_DELTA_T 50000
 #define ENCODER_COMM_TICKS_PER_REV 24
 
-#define SC_A_P_GAIN 0.00423
-#define SC_A_I_GAIN 0.0008
-#define SC_A_D_GAIN 0.0005
-#define SC_B_P_GAIN 0.00423
-#define SC_B_I_GAIN 0.0008
-#define SC_B_D_GAIN 0.0005
-#define SC_C_P_GAIN 0.00423
-#define SC_C_I_GAIN 0.0008
-#define SC_C_D_GAIN 0.0005
-#define SC_D_P_GAIN 0.00423
-#define SC_D_I_GAIN 0.0008
-#define SC_D_D_GAIN 0.0005
+// #define SC_A_P_GAIN 0.00423
+#define SC_A_P_GAIN 0.0029
+// #define SC_A_I_GAIN 0.0008
+#define SC_A_I_GAIN 0.0001
+// #define SC_A_D_GAIN 0.0005
+#define SC_A_D_GAIN 0.00025
+// #define SC_B_P_GAIN 0.00423
+#define SC_B_P_GAIN 0.0029
+// #define SC_B_I_GAIN 0.0008
+#define SC_B_I_GAIN 0.0001
+// #define SC_B_D_GAIN 0.0005
+#define SC_B_D_GAIN 0.00025
+// #define SC_C_P_GAIN 0.00423
+#define SC_C_P_GAIN 0.0029
+// #define SC_C_I_GAIN 0.0008
+#define SC_C_I_GAIN 0.0001
+// #define SC_C_D_GAIN 0.0005
+#define SC_C_D_GAIN 0.00025
+// #define SC_D_P_GAIN 0.00423
+#define SC_D_P_GAIN 0.0029
+// #define SC_D_I_GAIN 0.0008
+#define SC_D_I_GAIN 0.0001
+// #define SC_D_D_GAIN 0.0005
+#define SC_D_D_GAIN 0.00025
 #define SC_MIN_SPEED 0
 #define SC_MAX_SPEED 60000
 

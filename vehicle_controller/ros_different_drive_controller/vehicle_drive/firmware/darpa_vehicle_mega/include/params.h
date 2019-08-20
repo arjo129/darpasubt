@@ -1,8 +1,8 @@
 // Platform and wheel dimensions.
-#define PLATFORM_LENGTH 0.3 // Wheel pivot point to wheel pivot point.
-#define PLATFORM_BREADTH 0.4 // Wheel pivot point to wheel pivot point.
-#define WHEEL_RADIUS 0.08
-#define WHEEL_PIVOT_DIST 0.05 // Distance between wheel-ground contact point and pivot point.
+#define PLATFORM_LENGTH 0.38 // Wheel pivot point to wheel pivot point.
+#define PLATFORM_BREADTH 0.36 // Wheel pivot point to wheel pivot point.
+#define WHEEL_RADIUS 0.06
+#define WHEEL_PIVOT_DIST 0.08 // Distance between wheel-ground contact point and pivot point.
 
 // Servos and motor limits.
 #define SERVO_OUTER_LIMIT 20.0

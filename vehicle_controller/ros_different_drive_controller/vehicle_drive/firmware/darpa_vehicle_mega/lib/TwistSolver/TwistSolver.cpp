@@ -33,6 +33,7 @@ void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t
   else
   {
     solvArcTurn(linear, angular, platform, wheel, drive);
+    // TODO: Solve backwards arc movement.
   }
 
   drive->speed = (drive->speed / (2.0 * M_PI)) * 360.0; // Convert to degrees per second.
@@ -86,8 +87,8 @@ static void solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, W
    * If angular.z is negative, body is spot turning to the right.
    * The left wheel must still have driveSpeed of opposite sign.
    */
-  if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT) driveSpeed *= -1;
   drive->speed = driveSpeed;
+  if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT) drive->speed *= -1;
   
   // Compute the steer angle required.
   double steerAngle = atan(platform.length / platform.breadth);

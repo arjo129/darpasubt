@@ -97,22 +97,25 @@ void turnWheels(void);
 uint16_t checkParams(void);
 void handleParamErr(uint16_t err);
 
+uint16_t res;
+
 void setup() {
   Serial.begin(9600);
 
   initMotors();
-  delay(1500); // Delay 1.5 seconds to allow servos to move to 0 degree position.
+  delay(3000); // Delay 1.5 seconds to allow servos to move to 0 degree position.
   initPwmCorrectTimer(ENCODER_COMM_DELTA_T);
   initControlParams();
-}
 
-void loop() {
+  /*
+   * Example to move the platform.
+   */
+  linear.x = 0.5;
   solveTwist(linear, angular, platform, wheelA, &driveA);
   solveTwist(linear, angular, platform, wheelB, &driveB);
   solveTwist(linear, angular, platform, wheelC, &driveC);
   solveTwist(linear, angular, platform, wheelD, &driveD);
-
-  uint16_t res = checkParams();
+  res = checkParams();
   if (res != PARAM_OK)
   {
     handleParamErr(res);
@@ -120,9 +123,226 @@ void loop() {
   else
   {
     turnServos();
-    delay(2000);
+    delay(100);
     turnWheels();
   }
+
+  delay(8000);
+  
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+
+  angular.z = 16.0;
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(6500);
+
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+
+  linear.x = -0.5;
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(8000);
+
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+
+  angular.z = -16.0;
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(6500);
+
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+
+  linear.x = 0.5;
+  angular.z = 1.0;
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(8000);
+  
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+
+  linear.x = 0.5;
+  angular.z = -1.0;
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(8000);
+
+  resetDriveParams();
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    Serial.println(driveA.posAngle);
+    turnServos();
+    delay(100);
+    turnWheels();
+  }
+
+  delay(1000);
+}
+
+void loop() {
+  
 }
 
 /**
@@ -136,17 +356,19 @@ void initMotors(void)
   attachInterrupt(digitalPinToInterrupt(ENCODER_B_PIN_A), updateB, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_C_PIN_A), updateC, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENCODER_D_PIN_A), updateD, CHANGE);
-  motorA.setDir(MOTOR_DIR_FWD);
   motorA.invertDir(true);
+  motorA.setDir(MOTOR_DIR_FWD);
   motorA.setPwm(0);
   motorA.start();
+  motorB.invertDir(true);
   motorB.setDir(MOTOR_DIR_FWD);
   motorB.setPwm(0);
   motorB.start();
-  motorC.setDir(MOTOR_DIR_FWD);
   motorC.invertDir(true);
+  motorC.setDir(MOTOR_DIR_FWD);
   motorC.setPwm(0);
   motorC.start();
+  motorD.invertDir(true);
   motorD.setDir(MOTOR_DIR_FWD);
   motorD.setPwm(0);
   motorD.start();

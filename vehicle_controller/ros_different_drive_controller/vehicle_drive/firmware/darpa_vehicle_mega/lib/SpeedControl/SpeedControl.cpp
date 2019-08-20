@@ -107,7 +107,6 @@ void SpeedControl::setSpeed(long speed)
   {
     motor->setDir(MOTOR_DIR_BWD);
     motor->start();
-    speed *= -1;
   }
   else if (speed > 0)
   {
@@ -119,12 +118,17 @@ void SpeedControl::setSpeed(long speed)
     motor->stop();
     motor->setPwm(0);
   }
-
-  if (speed > 0 && speed < minSpeed){
-    speed = minSpeed;
+  if ((speed > 0 && speed < minSpeed) || (speed < 0 && speed > -minSpeed)) {
+    setPoint = minSpeed;
   }
-
-  setPoint = speed;
+  else if (speed < 0)
+  {
+    setPoint = -speed;
+  }
+  else
+  {
+    setPoint = speed;
+  }
 }
 
 /**
