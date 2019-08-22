@@ -15,6 +15,7 @@ void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t
   if (linear.x == 0 && angular.z == 0)
   {
     drive->steerAngle = 0;
+    drive->posAngle = 90;
     drive->speed = 0;
     return;
   }
@@ -34,6 +35,7 @@ void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t
   {
     solvArcTurn(linear, angular, platform, wheel, drive);
     // TODO: Solve backwards arc movement.
+    // TODO: There are some invalid parameters (such as calculated radius is too low) that if used, leads to undefined behaviour.
   }
 
   drive->speed = (drive->speed / (2.0 * M_PI)) * 360.0; // Convert to degrees per second.

@@ -46,8 +46,6 @@ typedef struct
   double pivotDist;
 } WheelParams_t;
 
-
-
 void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
 static double solvBodyRadius(LinearVels_t linear, AngularVels_t angular);
 static void solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);

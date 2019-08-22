@@ -1,4 +1,8 @@
 #include <Arduino.h>
+#include <ros.h>
+#include <std_msgs/String.h>
+#include <std_msgs/Int32.h>
+#include <geometry_msgs/Twist.h>
 #include <SpeedControl.h>
 #include <Servo.h>
 #include <TwistSolver.h>

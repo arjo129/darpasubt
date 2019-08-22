@@ -23,6 +23,23 @@
 
 #include <main.h>
 
+// Function prototypes
+void initMotors(void);
+void initPwmCorrectTimer(uint32_t microseconds);
+void initControlParams(void);
+void resetDriveParams(void);
+void updateA(void);
+void updateB(void);
+void updateC(void);
+void updateD(void);
+void adjust(void);
+void setAllMotorsSpeed(long speed);
+void turnServos(void);
+void turnWheels(void);
+uint16_t checkParams(void);
+void handleParamErr(uint16_t err);
+void twistCb(const geometry_msgs::Twist& twistMsg);
+
 // All global variables.
 Motor motorA(MOTOR_A_DIR_PIN, MOTOR_A_PWM_PIN);
 Motor motorB(MOTOR_B_DIR_PIN, MOTOR_B_PWM_PIN);
@@ -64,6 +81,10 @@ SpeedControl scA(&motorA, &encoderA);
 SpeedControl scB(&motorB, &encoderB);
 SpeedControl scC(&motorC, &encoderC);
 SpeedControl scD(&motorD, &encoderD);
+int32_t encoderASpd;
+int32_t encoderBSpd;
+int32_t encoderCSpd;
+int32_t encoderDSpd;
 Servo servoA;
 Servo servoB;
 Servo servoC;
@@ -81,268 +102,46 @@ WheelParams_t wheelC;
 DriveParams_t driveD;
 WheelParams_t wheelD;
 
-// Function prototypes
-void initMotors(void);
-void initPwmCorrectTimer(uint32_t microseconds);
-void initControlParams(void);
-void resetDriveParams(void);
-void updateA(void);
-void updateB(void);
-void updateC(void);
-void updateD(void);
-void adjust(void);
-void setAllMotorsSpeed(long speed);
-void turnServos(void);
-void turnWheels(void);
-uint16_t checkParams(void);
-void handleParamErr(uint16_t err);
+ros::NodeHandle nh;
+std_msgs::Int32 encoderAMsg;
+std_msgs::Int32 encoderBMsg;
+std_msgs::Int32 encoderCMsg;
+std_msgs::Int32 encoderDMsg;
+std_msgs::String debugMsg;
+ros::Subscriber<geometry_msgs::Twist> twistSub("twist_cmd", &twistCb);
+ros::Publisher encoderAPub("encoder_A_speed", &encoderAMsg);
+ros::Publisher encoderBPub("encoder_B_speed", &encoderBMsg);
+ros::Publisher encoderCPub("encoder_C_speed", &encoderCMsg);
+ros::Publisher encoderDPub("encoder_D_speed", &encoderDMsg);
+ros::Publisher debugPub("platform_debug", &debugMsg);
 
 uint16_t res;
 
 void setup() {
-  Serial.begin(9600);
+  nh.initNode();
+  nh.advertise(encoderAPub);
+  nh.advertise(encoderBPub);
+  nh.advertise(encoderCPub);
+  nh.advertise(encoderDPub);
+  nh.advertise(debugPub);
+  nh.subscribe(twistSub);
 
   initMotors();
-  delay(3000); // Delay 1.5 seconds to allow servos to move to 0 degree position.
+  delay(3000); // Delay 3 seconds to allow servos to move to 0 degree position.
   initPwmCorrectTimer(ENCODER_COMM_DELTA_T);
   initControlParams();
-
-  /*
-   * Example to move the platform.
-   */
-  linear.x = 0.5;
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(8000);
-  
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
-
-  angular.z = 16.0;
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(6500);
-
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
-
-  linear.x = -0.5;
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(8000);
-
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
-
-  angular.z = -16.0;
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(6500);
-
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
-
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
-
-  linear.x = 0.5;
-  angular.z = 1.0;
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(8000);
-  
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
-
-  linear.x = 0.5;
-  angular.z = -1.0;
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(8000);
-
-  resetDriveParams();
-  res = checkParams();
-  if (res != PARAM_OK)
-  {
-    handleParamErr(res);
-  }
-  else
-  {
-    Serial.println(driveA.posAngle);
-    turnServos();
-    delay(100);
-    turnWheels();
-  }
-
-  delay(1000);
 }
 
 void loop() {
-  
+  encoderAMsg.data = encoderASpd;
+  encoderBMsg.data = encoderBSpd;
+  encoderCMsg.data = encoderCSpd;
+  encoderDMsg.data = encoderDSpd;
+  encoderAPub.publish(&encoderAMsg);
+  encoderBPub.publish(&encoderBMsg);
+  encoderCPub.publish(&encoderCMsg);
+  encoderDPub.publish(&encoderDMsg);
+  nh.spinOnce();
 }
 
 /**
@@ -434,10 +233,10 @@ void updateD(void)
  */
 void adjust(void)
 {
-  scA.correctPwm();
-  scB.correctPwm();
-  scC.correctPwm();
-  scD.correctPwm();
+  encoderASpd = scA.correctPwm();
+  encoderBSpd = scB.correctPwm();
+  encoderCSpd = scC.correctPwm();
+  encoderDSpd = scD.correctPwm();
 }
 
 /**
@@ -643,4 +442,30 @@ void resetDriveParams(void)
   driveD.speed = 0;
   driveD.steerAngle = 0;
   driveD.posAngle = 90;
+}
+
+/**
+ * @brief Callback function for receiving Twist messages and executing them.
+ * 
+ * @param twistMsg Twist message received and to be executed.
+ */
+void twistCb(const geometry_msgs::Twist& twistMsg)
+{
+  linear.x = twistMsg.linear.x;
+  angular.z = twistMsg.angular.z;
+
+  solveTwist(linear, angular, platform, wheelA, &driveA);
+  solveTwist(linear, angular, platform, wheelB, &driveB);
+  solveTwist(linear, angular, platform, wheelC, &driveC);
+  solveTwist(linear, angular, platform, wheelD, &driveD);
+  res = checkParams();
+  if (res != PARAM_OK)
+  {
+    handleParamErr(res);
+  }
+  else
+  {
+    turnServos();
+    turnWheels();
+  }
 }
