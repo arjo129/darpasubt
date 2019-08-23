@@ -37,7 +37,6 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   else
   {
     res = solvArcTurn(linear, angular, platform, wheel, drive);
-    // TODO: Solve backwards arc movement.
   }
 
   drive->speed = (drive->speed / (2.0 * M_PI)) * 360.0; // Convert to degrees per second.
@@ -232,18 +231,48 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
   WheelPosition_t wheelPos = wheel.wheelPos;
   if (angular.z > 0 && (wheelPos == WHEEL_POS_TOP_LEFT || wheelPos == WHEEL_POS_BOTTOM_LEFT))
   {
-    return solvInArcTurn(linear, angular, platform, wheel, drive);
+    if (linear.x > 0)
+    {
+      return solvInArcTurn(linear, angular, platform, wheel, drive);
+    }
+    else
+    {
+      return solvOutArcTurn(linear, angular, platform, wheel, drive);
+    }
   }
   else if (angular.z > 0 && (wheelPos == WHEEL_POS_TOP_RIGHT || wheelPos == WHEEL_POS_BOTTOM_RIGHT))
   {
-    return solvOutArcTurn(linear, angular, platform, wheel, drive);
+    if (linear.x > 0)
+    {
+      return solvOutArcTurn(linear, angular, platform, wheel, drive);
+    }
+    else
+    {
+      return solvInArcTurn(linear, angular, platform, wheel, drive);
+    }
+    
   }
   else if (angular.z < 0 && (wheelPos == WHEEL_POS_TOP_RIGHT || wheelPos == WHEEL_POS_BOTTOM_RIGHT))
   {
-    return solvInArcTurn(linear, angular, platform, wheel, drive);
+    if (linear.x > 0)
+    {
+      return solvInArcTurn(linear, angular, platform, wheel, drive);
+    }
+    else
+    {
+      return solvOutArcTurn(linear, angular, platform, wheel, drive);
+    }
+    
   }
   else
   {
-    return solvOutArcTurn(linear, angular, platform, wheel, drive);
+    if (linear.x > 0)
+    {
+      return solvOutArcTurn(linear, angular, platform, wheel, drive);
+    }
+    else
+    {
+      return solvInArcTurn(linear, angular, platform, wheel, drive);
+    }
   }
 }
