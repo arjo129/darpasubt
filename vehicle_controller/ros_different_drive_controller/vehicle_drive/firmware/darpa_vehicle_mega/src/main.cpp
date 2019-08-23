@@ -408,9 +408,11 @@ uint16_t checkParams(void)
  */
 void handleParamErr(uint16_t err)
 {
-  resetDriveParams();
+  driveA.speed = 0;
+  driveB.speed = 0;
+  driveC.speed = 0;
+  driveD.speed = 0;
   turnWheels();
-  turnServos();
   delay(1500);
 }
 
@@ -454,12 +456,13 @@ void twistCb(const geometry_msgs::Twist& twistMsg)
   linear.x = twistMsg.linear.x;
   angular.z = twistMsg.angular.z;
 
-  solveTwist(linear, angular, platform, wheelA, &driveA);
-  solveTwist(linear, angular, platform, wheelB, &driveB);
-  solveTwist(linear, angular, platform, wheelC, &driveC);
-  solveTwist(linear, angular, platform, wheelD, &driveD);
+  TwistError_t errA, errB, errC, errD;
+  errA = solveTwist(linear, angular, platform, wheelA, &driveA);
+  errB = solveTwist(linear, angular, platform, wheelB, &driveB);
+  errC = solveTwist(linear, angular, platform, wheelC, &driveC);
+  errD = solveTwist(linear, angular, platform, wheelD, &driveD);
   res = checkParams();
-  if (res != PARAM_OK)
+  if (res != PARAM_OK || errA != TWIST_OK || errB != TWIST_OK || errC != TWIST_OK || errD != TWIST_OK)
   {
     handleParamErr(res);
   }

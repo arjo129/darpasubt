@@ -9,15 +9,18 @@
  * @param platform PlatformDimensions_t type representing the body's dimension parameters.
  * @param wheel WheelParams_t type representing the wheel's paramters.
  * @param drive DriveParams_t type representing the computed drive parameters.
+ * return TwistError_t Error enumeration indicating calculation results.
  */
-void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
+TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
+  TwistError_t res;
+
   if (linear.x == 0 && angular.z == 0)
   {
     drive->steerAngle = 0;
     drive->posAngle = 90;
     drive->speed = 0;
-    return;
+    return TWIST_OK;
   }
   // Forward or backward movement only.
   else if (linear.x != 0 && angular.z == 0)
@@ -28,14 +31,13 @@ void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t
   // Turning on the spot.
   else if (linear.x == 0 && angular.z != 0)
   {
-    solvSpotTurn(angular, platform, wheel, drive);
+    res = solvSpotTurn(angular, platform, wheel, drive);
   }
   // Steering movement.
   else
   {
-    solvArcTurn(linear, angular, platform, wheel, drive);
+    res = solvArcTurn(linear, angular, platform, wheel, drive);
     // TODO: Solve backwards arc movement.
-    // TODO: There are some invalid parameters (such as calculated radius is too low) that if used, leads to undefined behaviour.
   }
 
   drive->speed = (drive->speed / (2.0 * M_PI)) * 360.0; // Convert to degrees per second.
@@ -43,6 +45,8 @@ void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t
 
   drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
   drive->posAngle = 90 - drive->steerAngle;
+
+  return res;
 }
 
 /**
@@ -68,14 +72,15 @@ void solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t
  * @param platform PlatformDimensions_t type representing the body's dimension parameters.
  * @param wheel WheelParams_t type representing the wheel's paramters.
  * @param drive DriveParams_t type representing the computed drive parameters.
+ * @return TwistError_t Error enumeration indicating calculation results.
  */
-static void solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
+static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
   if (angular.z == 0)
   {
     drive->steerAngle = 0;
     drive->speed = 0;
-    return;
+    return TWIST_ZERO;
   }
 
   // Compute the rotation speed required.
@@ -99,6 +104,8 @@ static void solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, W
     steerAngle *= -1;
   }
   drive->steerAngle = steerAngle;
+
+  return TWIST_OK;
 }
 
 /**
@@ -109,19 +116,27 @@ static void solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, W
  * @param angular AngularVels_t type representing the body's angular velocity.
  * @param platform PlatformDimensions_t type representing the body's dimension parameters.
  * @param wheel WheelParams_t type representing the wheel's paramters.
- * @param drive DriveParams_t type representing the computed drive parameters.
+ * @param drive DriveParams_t type representing the computed drive parameters. 
+ * @return TwistError_t Error enumeration indicating calculation results.
  */
-static void solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
+static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
   if (angular.z == 0)
   {
     drive->steerAngle = 0;
     drive->speed = 0;
-    return;
+    return TWIST_ZERO;
   }
 
   // Compute the steering angle required.
   double bodyRadius = solvBodyRadius(linear, angular);
+  if (bodyRadius < PLATFORM_RADIUS_LIM)
+  {
+    // Body radius is too low, there is no valid steer angle.
+    drive->steerAngle = 0;
+    drive->speed = 0;
+    return TWIST_EX_LIM;
+  }
   double steerAngle = atan(platform.breadth / ((2.0 * bodyRadius) - platform.length));
   // Arc turn counter clockwise.
   if (angular.z > 0)
@@ -143,6 +158,8 @@ static void solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDi
   double driveSpeed = (angular.z / (2.0 * sin(steerAngle) * wheel.radius)) * (platform.breadth - (wheel.pivotDist * 2.0 * sin(steerAngle)));
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
   drive->speed = driveSpeed;
+
+  return TWIST_OK;
 }
 
 /**
@@ -153,19 +170,27 @@ static void solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDi
  * @param angular AngularVels_t type representing the body's angular velocity.
  * @param platform PlatformDimensions_t type representing the body's dimension parameters.
  * @param wheel WheelParams_t type representing the wheel's paramters.
- * @param drive DriveParams_t type representing the computed drive parameters.
+ * @param drive DriveParams_t type representing the computed drive parameters. 
+ * @return TwistError_t Error enumeration indicating calculation results.
  */
-static void solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
+static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
   if (angular.z == 0)
   {
     drive->steerAngle = 0;
     drive->speed = 0;
-    return;
+    return TWIST_ZERO;
   }
 
   // Compute the steer angle.
   double bodyRadius = solvBodyRadius(linear, angular);
+  if (bodyRadius < PLATFORM_RADIUS_LIM)
+  {
+    // Body radius is too low, there is no valid steer angle.
+    drive->steerAngle = 0;
+    drive->speed = 0;
+    return TWIST_EX_LIM;
+  }
   double steerAngle = M_PI_2 - atan((bodyRadius + (0.5 * platform.length)) / (0.5 * platform.breadth));
   // Arc turn counter clockwise.
   if (angular.z > 0)
@@ -187,6 +212,8 @@ static void solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformD
   double driveSpeed = (angular.z / (2.0 * sin(steerAngle) * wheel.radius)) * (platform.breadth + (wheel.pivotDist * 2.0 * sin(steerAngle)));
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
   drive->speed = driveSpeed;
+
+  return TWIST_OK;
 }
 
 /**
@@ -198,24 +225,25 @@ static void solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformD
  * @param platform PlatformDimensions_t type representing the body's dimension parameters.
  * @param wheel WheelParams_t type representing the wheel's paramters.
  * @param drive DriveParams_t type representing the computed drive parameters. 
+ * @return TwistError_t Error enumeration indicating calculation results.
  */
-static void solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
+static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
   WheelPosition_t wheelPos = wheel.wheelPos;
   if (angular.z > 0 && (wheelPos == WHEEL_POS_TOP_LEFT || wheelPos == WHEEL_POS_BOTTOM_LEFT))
   {
-    solvInArcTurn(linear, angular, platform, wheel, drive);
+    return solvInArcTurn(linear, angular, platform, wheel, drive);
   }
   else if (angular.z > 0 && (wheelPos == WHEEL_POS_TOP_RIGHT || wheelPos == WHEEL_POS_BOTTOM_RIGHT))
   {
-    solvOutArcTurn(linear, angular, platform, wheel, drive);
+    return solvOutArcTurn(linear, angular, platform, wheel, drive);
   }
   else if (angular.z < 0 && (wheelPos == WHEEL_POS_TOP_RIGHT || wheelPos == WHEEL_POS_BOTTOM_RIGHT))
   {
-    solvInArcTurn(linear, angular, platform, wheel, drive);
+    return solvInArcTurn(linear, angular, platform, wheel, drive);
   }
   else
   {
-    solvOutArcTurn(linear, angular, platform, wheel, drive);
+    return solvOutArcTurn(linear, angular, platform, wheel, drive);
   }
 }
