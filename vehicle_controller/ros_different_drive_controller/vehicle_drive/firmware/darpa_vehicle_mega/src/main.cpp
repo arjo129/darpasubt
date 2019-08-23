@@ -82,10 +82,6 @@ SpeedControl scA(&motorA, &encoderA);
 SpeedControl scB(&motorB, &encoderB);
 SpeedControl scC(&motorC, &encoderC);
 SpeedControl scD(&motorD, &encoderD);
-int32_t encoderASpd;
-int32_t encoderBSpd;
-int32_t encoderCSpd;
-int32_t encoderDSpd;
 Servo servoA;
 Servo servoB;
 Servo servoC;
@@ -143,15 +139,11 @@ void loop() {
   }
   
   // Publish all encoder data.
-  encoderAMsg.data = encoderASpd;
-  encoderBMsg.data = encoderBSpd;
-  encoderCMsg.data = encoderCSpd;
-  encoderDMsg.data = encoderDSpd;
   encoderAPub.publish(&encoderAMsg);
   encoderBPub.publish(&encoderBMsg);
   encoderCPub.publish(&encoderCMsg);
   encoderDPub.publish(&encoderDMsg);
-  
+
   nh.spinOnce();
 }
 
@@ -244,10 +236,10 @@ void updateD(void)
  */
 void adjust(void)
 {
-  encoderASpd = scA.correctPwm();
-  encoderBSpd = scB.correctPwm();
-  encoderCSpd = scC.correctPwm();
-  encoderDSpd = scD.correctPwm();
+  encoderAMsg.data = scA.correctPwm();
+  encoderBMsg.data = scB.correctPwm();
+  encoderCMsg.data = scC.correctPwm();
+  encoderDMsg.data = scD.correctPwm();
 }
 
 /**
