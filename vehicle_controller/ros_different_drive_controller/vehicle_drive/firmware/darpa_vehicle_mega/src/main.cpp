@@ -39,6 +39,7 @@ void turnWheels(void);
 uint16_t checkParams(void);
 void handleParamErr(uint16_t err);
 void twistCb(const geometry_msgs::Twist& twistMsg);
+void handleTwist(void);
 
 // All global variables.
 Motor motorA(MOTOR_A_DIR_PIN, MOTOR_A_PWM_PIN);
@@ -116,6 +117,7 @@ ros::Publisher encoderDPub("encoder_D_speed", &encoderDMsg);
 ros::Publisher debugPub("platform_debug", &debugMsg);
 
 uint16_t res;
+bool haveTwist = false;
 
 void setup() {
   nh.initNode();
@@ -133,6 +135,14 @@ void setup() {
 }
 
 void loop() {
+  // Handle any available Twist messages.
+  if (haveTwist)
+  {
+    haveTwist = false;
+    handleTwist();
+  }
+  
+  // Publish all encoder data.
   encoderAMsg.data = encoderASpd;
   encoderBMsg.data = encoderBSpd;
   encoderCMsg.data = encoderCSpd;
@@ -141,6 +151,7 @@ void loop() {
   encoderBPub.publish(&encoderBMsg);
   encoderCPub.publish(&encoderCMsg);
   encoderDPub.publish(&encoderDMsg);
+  
   nh.spinOnce();
 }
 
@@ -447,15 +458,23 @@ void resetDriveParams(void)
 }
 
 /**
- * @brief Callback function for receiving Twist messages and executing them.
+ * @brief Callback function for receiving Twist messages.
  * 
- * @param twistMsg Twist message received and to be executed.
+ * @param twistMsg Twist message received.
  */
 void twistCb(const geometry_msgs::Twist& twistMsg)
 {
+  haveTwist = true;
   linear.x = twistMsg.linear.x;
   angular.z = twistMsg.angular.z;
+}
 
+/**
+ * @brief Executes the parameters received from Twist message.
+ * 
+ */
+void handleTwist(void)
+{
   TwistError_t errA, errB, errC, errD;
   errA = solveTwist(linear, angular, platform, wheelA, &driveA);
   errB = solveTwist(linear, angular, platform, wheelB, &driveB);
