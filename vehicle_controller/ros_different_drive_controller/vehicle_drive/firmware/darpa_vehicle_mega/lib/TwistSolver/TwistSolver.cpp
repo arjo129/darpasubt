@@ -192,7 +192,9 @@ static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, P
     drive->speed = 0;
     return TWIST_EX_LIM;
   }
-  double steerAngle = M_PI_2 - atan((bodyRadius + (0.5 * platform.length)) / (0.5 * platform.breadth));
+  double arcRadius = sqrt((platform.breadthHalf * platform.breadthHalf) + pow(platform.lengthHalf + bodyRadius, 2));
+  
+  double steerAngle = asin(platform.breadthHalf / arcRadius);
   // Arc turn counter clockwise.
   if (angular.z > 0)
   {
@@ -210,7 +212,7 @@ static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, P
   if (angular.z < 0) angular.z *= -1;
   if (steerAngle < 0) steerAngle *= -1;
 
-  double driveSpeed = (angular.z / (2.0 * sin(steerAngle) * wheel.radius)) * (platform.breadth + (wheel.pivotDist * 2.0 * sin(steerAngle)));
+  double driveSpeed = arcRadius * angular.z / wheel.radius;
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
   drive->speed = driveSpeed;
 
