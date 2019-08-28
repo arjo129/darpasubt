@@ -35,7 +35,9 @@ typedef struct
 typedef struct
 {
   double length;
+  double lengthHalf;
   double breadth;
+  double breadthHalf;
   double diagonal;
   double diagonalHalf;
 } PlatformDimensions_t;

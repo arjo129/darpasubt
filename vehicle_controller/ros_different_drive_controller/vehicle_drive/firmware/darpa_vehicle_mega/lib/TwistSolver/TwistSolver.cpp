@@ -83,8 +83,7 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   }
 
   // Compute the rotation speed required.
-  double driveSpeed = platform.diagonalHalf * angular.z;
-  driveSpeed /= wheel.radius; // Get the angular speed of the wheels.
+  double driveSpeed = platform.diagonalHalf * angular.z / wheel.radius;
   /*
    * Depending if angular.z is positive or negative, computed driveSpeed will be the same sign.
    * 
@@ -98,7 +97,7 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT) drive->speed *= -1;
   
   // Compute the steer angle required.
-  double steerAngle = asin((0.5 * platform.breadth) / platform.diagonalHalf);
+  double steerAngle = asin(platform.breadthHalf / platform.diagonalHalf);
   if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT)
   {
     steerAngle *= -1;
@@ -137,9 +136,9 @@ static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, Pl
     drive->speed = 0;
     return TWIST_EX_LIM;
   }
-  double arcRadius = sqrt(pow(bodyRadius - (0.5 * platform.length), 2) + (0.25 * platform.breadth * platform.breadth));
-  
-  double steerAngle = asin((0.5 * platform.breadth) / arcRadius);
+  double arcRadius = sqrt(pow(bodyRadius - platform.lengthHalf, 2) + (platform.breadthHalf * platform.breadthHalf));
+
+  double steerAngle = asin(platform.breadthHalf / arcRadius);
   // Arc turn counter clockwise.
   if (angular.z > 0)
   {
