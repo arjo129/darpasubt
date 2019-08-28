@@ -316,7 +316,9 @@ void turnServos(void)
 void initControlParams(void)
 {
   platform.length = PLATFORM_LENGTH;
+  platform.lengthHalf = PLATFORM_LENGTH * 0.5;
   platform.breadth = PLATFORM_BREADTH;
+  platform.breadthHalf = PLATFORM_BREADTH * 0.5;
   platform.diagonal = sqrt((PLATFORM_LENGTH * PLATFORM_LENGTH) + (PLATFORM_BREADTH * PLATFORM_BREADTH));
   platform.diagonalHalf = platform.diagonal / 2.0;
   
