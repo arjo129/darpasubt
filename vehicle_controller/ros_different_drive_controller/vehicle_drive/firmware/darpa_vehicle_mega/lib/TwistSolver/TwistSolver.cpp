@@ -83,7 +83,8 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   }
 
   // Compute the rotation speed required.
-  double driveSpeed = (platform.diagonalHalf + wheel.pivotDist) * angular.z;
+  double driveSpeed = platform.diagonalHalf * angular.z;
+  driveSpeed /= wheel.radius; // Get the angular speed of the wheels.
   /*
    * Depending if angular.z is positive or negative, computed driveSpeed will be the same sign.
    * 
@@ -97,7 +98,7 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT) drive->speed *= -1;
   
   // Compute the steer angle required.
-  double steerAngle = atan(platform.length / platform.breadth);
+  double steerAngle = asin((0.5 * platform.breadth) / platform.diagonalHalf);
   if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT)
   {
     steerAngle *= -1;
