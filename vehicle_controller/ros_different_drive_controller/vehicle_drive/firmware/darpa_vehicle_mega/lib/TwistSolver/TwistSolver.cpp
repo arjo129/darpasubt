@@ -27,6 +27,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   {
     drive->steerAngle = 0;
     drive->speed = linear.x / wheel.radius;
+    res = TWIST_OK;
   }
   // Turning on the spot.
   else if (linear.x == 0 && angular.z != 0)
@@ -36,6 +37,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   // Steering movement.
   else
   {
+    // TODO: Combine inner outer arc function into one, since they are similar now. Remove pivotDist from struct as well.
     res = solvArcTurn(linear, angular, platform, wheel, drive);
   }
 
@@ -43,7 +45,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   drive->speed *= SHAFT_TO_ENCODER_FACTOR; // We want to get encoder revolution speed.
 
   drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
-  drive->posAngle = 90 - drive->steerAngle;
+  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
 
   return res;
 }
@@ -98,10 +100,7 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   
   // Compute the steer angle required.
   double steerAngle = asin(platform.breadthHalf / platform.diagonalHalf);
-  if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT)
-  {
-    steerAngle *= -1;
-  }
+  if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT) steerAngle *= -1;
   drive->steerAngle = steerAngle;
 
   return TWIST_OK;

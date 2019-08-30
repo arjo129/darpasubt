@@ -53,6 +53,7 @@ typedef struct
 {
   WheelPosition_t wheelPos;
   double radius;
+  double servCalib;
   double pivotDist;
 } WheelParams_t;
 

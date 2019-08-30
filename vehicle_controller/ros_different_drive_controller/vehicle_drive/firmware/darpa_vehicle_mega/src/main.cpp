@@ -331,28 +331,28 @@ void initControlParams(void)
 
   wheelA.wheelPos = WHEEL_POS_TOP_LEFT;
   wheelA.radius = WHEEL_RADIUS;
-  wheelA.pivotDist = WHEEL_PIVOT_DIST;
+  wheelA.servCalib = SERVO_A_CALIB_VAL;
   driveA.speed = 0;
   driveA.steerAngle = 0;
   driveA.posAngle = 90;
   
   wheelB.wheelPos = WHEEL_POS_TOP_RIGHT;
   wheelB.radius = WHEEL_RADIUS;
-  wheelB.pivotDist = WHEEL_PIVOT_DIST;
+  wheelB.servCalib = SERVO_B_CALIB_VAL;
   driveB.speed = 0;
   driveB.steerAngle = 0;
   driveB.posAngle = 90;
   
   wheelC.wheelPos = WHEEL_POS_BOTTOM_LEFT;
   wheelC.radius = WHEEL_RADIUS;
-  wheelC.pivotDist = WHEEL_PIVOT_DIST;
+  wheelC.servCalib = SERVO_C_CALIB_VAL;
   driveC.speed = 0;
   driveC.steerAngle = 0;
   driveC.posAngle = 90;
   
   wheelD.wheelPos = WHEEL_POS_BOTTOM_RIGHT;
   wheelD.radius = WHEEL_RADIUS;
-  wheelD.pivotDist = WHEEL_PIVOT_DIST;
+  wheelD.servCalib = SERVO_D_CALIB_VAL;
   driveD.speed = 0;
   driveD.steerAngle = 0;
   driveD.posAngle = 90;
@@ -391,14 +391,14 @@ uint16_t checkParams(void)
   }
   
   // Check for servos limit.
-  if (driveB.posAngle < SERVO_B_LOWER_LIMIT ||
-    driveB.posAngle > SERVO_B_UPPER_LIMIT ||
-    driveD.posAngle < SERVO_D_LOWER_LIMIT ||
-    driveD.posAngle > SERVO_D_UPPER_LIMIT ||
-    driveA.posAngle < SERVO_A_LOWER_LIMIT ||
-    driveA.posAngle > SERVO_A_UPPER_LIMIT ||
-    driveC.posAngle < SERVO_C_LOWER_LIMIT ||
-    driveC.posAngle > SERVO_C_UPPER_LIMIT)
+  if ((driveB.posAngle - wheelB.servCalib) < SERVO_B_LOWER_LIMIT ||
+    (driveB.posAngle - wheelB.servCalib) > SERVO_B_UPPER_LIMIT ||
+    (driveD.posAngle - wheelD.servCalib) < SERVO_D_LOWER_LIMIT ||
+    (driveD.posAngle - wheelD.servCalib) > SERVO_D_UPPER_LIMIT ||
+    (driveA.posAngle - wheelA.servCalib) < SERVO_A_LOWER_LIMIT ||
+    (driveA.posAngle - wheelA.servCalib) > SERVO_A_UPPER_LIMIT ||
+    (driveC.posAngle - wheelC.servCalib) < SERVO_C_LOWER_LIMIT ||
+    (driveC.posAngle - wheelC.servCalib) > SERVO_C_UPPER_LIMIT)
   {
     result |= PARAM_SERVO_EXCEED;
   }
@@ -483,5 +483,14 @@ void handleTwist(void)
   {
     turnServos();
     turnWheels();
+
+    Serial.println(driveA.speed);
+    Serial.println(driveA.steerAngle);
+    Serial.println(driveB.speed);
+    Serial.println(driveB.steerAngle);
+    Serial.println(driveC.speed);
+    Serial.println(driveC.steerAngle);
+    Serial.println(driveD.speed);
+    Serial.println(driveD.steerAngle);
   }
 }

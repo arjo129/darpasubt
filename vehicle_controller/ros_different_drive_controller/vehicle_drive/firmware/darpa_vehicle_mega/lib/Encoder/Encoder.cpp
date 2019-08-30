@@ -90,7 +90,7 @@ long Encoder::getSpeed(void)
   // Calculate new speed if no overflow.
   if (countDiff < 100000 && countDiff > -100000)
   {
-    double intervals = 1000000.0 / deltaTime;
+    double intervals = 1000000.0 / deltaTime; // TODO: Optimize this division by using inverse deltaTime.
     double ticksPerSec = (double)countDiff * intervals;
     degPerSec = ticksPerSec * degPerTick;
     prevSpeed = degPerSec;
