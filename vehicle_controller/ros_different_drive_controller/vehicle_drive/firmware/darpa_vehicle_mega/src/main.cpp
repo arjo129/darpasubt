@@ -382,10 +382,10 @@ uint16_t checkParams(void)
   uint16_t result = PARAM_OK;
 
   // Check for motors limit.
-  if (abs(driveA.speed) > MOTOR_SPEED_LIMIT ||
-    abs(driveB.speed) > MOTOR_SPEED_LIMIT ||
-    abs(driveC.speed) > MOTOR_SPEED_LIMIT ||
-    abs(driveD.speed) > MOTOR_SPEED_LIMIT)
+  if (fabs(driveA.speed) > MOTOR_SPEED_LIMIT ||
+    fabs(driveB.speed) > MOTOR_SPEED_LIMIT ||
+    fabs(driveC.speed) > MOTOR_SPEED_LIMIT ||
+    fabs(driveD.speed) > MOTOR_SPEED_LIMIT)
   {
     result |= PARAM_MOTOR_EXCEED;
   }

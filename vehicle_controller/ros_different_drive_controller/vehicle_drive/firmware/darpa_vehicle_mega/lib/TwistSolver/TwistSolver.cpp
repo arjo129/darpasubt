@@ -60,7 +60,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
  static double solvBodyRadius(LinearVels_t linear, AngularVels_t angular)
 {
   double turnRadius = linear.x / angular.z;
-  if (turnRadius < 0) turnRadius *= -1;
+  turnRadius = fabs(turnRadius);
 
   return turnRadius;
 }
@@ -152,8 +152,8 @@ static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, Pl
 
   // Compute the rotation speed required.
   // Keep all values positive for easier sign manupulation.
-  if (angular.z < 0) angular.z *= -1;
-  if (steerAngle < 0) steerAngle *= -1;
+  angular.z = fabs(angular.z);
+  steerAngle = fabs(steerAngle);
 
   double driveSpeed = arcRadius * angular.z / wheel.radius;
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
@@ -208,8 +208,8 @@ static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, P
 
   // Compute the rotation speed required.
   // Keep all values positive for easier sign manupulation.
-  if (angular.z < 0) angular.z *= -1;
-  if (steerAngle < 0) steerAngle *= -1;
+  angular.z = fabs(angular.z);
+  steerAngle = fabs(steerAngle);
 
   double driveSpeed = arcRadius * angular.z / wheel.radius;
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
