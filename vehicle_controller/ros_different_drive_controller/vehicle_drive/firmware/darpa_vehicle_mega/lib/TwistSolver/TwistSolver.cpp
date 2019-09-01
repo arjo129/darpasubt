@@ -18,7 +18,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   if (linear.x == 0 && angular.z == 0)
   {
     drive->steerAngle = 0;
-    drive->posAngle = 90;
+    drive->posAngle = 90 + wheel.servCalib;
     drive->speed = 0;
     return TWIST_OK;
   }
@@ -26,6 +26,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   else if (linear.x != 0 && angular.z == 0)
   {
     drive->steerAngle = 0;
+    drive->posAngle = 90 + wheel.servCalib;
     drive->speed = linear.x / wheel.radius;
     res = TWIST_OK;
   }
@@ -141,12 +142,14 @@ static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, Pl
   // Arc turn counter clockwise.
   if (angular.z > 0)
   {
-    if (wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT && linear.x > 0) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_TOP_RIGHT && linear.x < 0) steerAngle *= -1;
   }
   // Arc turn clockwise.
   else if (angular.z < 0)
   {
-    if (wheel.wheelPos == WHEEL_POS_TOP_RIGHT) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_TOP_RIGHT && linear.x > 0) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT && linear.x < 0) steerAngle *= -1;
   }
   drive->steerAngle = steerAngle;
 
@@ -197,12 +200,14 @@ static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, P
   // Arc turn counter clockwise.
   if (angular.z > 0)
   {
-    if (wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT && linear.x > 0) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_TOP_LEFT && linear.x < 0) steerAngle *= -1;
   }
   // Arc turn clockwise.
   else
   {
-    if (wheel.wheelPos == WHEEL_POS_TOP_LEFT) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_TOP_LEFT && linear.x > 0) steerAngle *= -1;
+    if (wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT && linear.x < 0) steerAngle *= -1;
   }
   drive->steerAngle = steerAngle;
 

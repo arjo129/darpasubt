@@ -188,10 +188,10 @@ void initMotors(void)
   servoB.attach(SERVO_B_PWM_PIN);
   servoC.attach(SERVO_C_PWM_PIN);
   servoD.attach(SERVO_D_PWM_PIN);
-  servoA.write(90);
-  servoB.write(90);
-  servoC.write(90);
-  servoD.write(90);
+  servoA.write(90 + SERVO_A_CALIB_VAL);
+  servoB.write(90 + SERVO_B_CALIB_VAL);
+  servoC.write(90 + SERVO_C_CALIB_VAL);
+  servoD.write(90 + SERVO_D_CALIB_VAL);
 }
 
 /**
@@ -334,28 +334,28 @@ void initControlParams(void)
   wheelA.servCalib = SERVO_A_CALIB_VAL;
   driveA.speed = 0;
   driveA.steerAngle = 0;
-  driveA.posAngle = 90;
+  driveA.posAngle = 90 + SERVO_A_CALIB_VAL;
   
   wheelB.wheelPos = WHEEL_POS_TOP_RIGHT;
   wheelB.radius = WHEEL_RADIUS;
   wheelB.servCalib = SERVO_B_CALIB_VAL;
   driveB.speed = 0;
   driveB.steerAngle = 0;
-  driveB.posAngle = 90;
+  driveB.posAngle = 90 + SERVO_B_CALIB_VAL;
   
   wheelC.wheelPos = WHEEL_POS_BOTTOM_LEFT;
   wheelC.radius = WHEEL_RADIUS;
   wheelC.servCalib = SERVO_C_CALIB_VAL;
   driveC.speed = 0;
   driveC.steerAngle = 0;
-  driveC.posAngle = 90;
+  driveC.posAngle = 90 + SERVO_C_CALIB_VAL;
   
   wheelD.wheelPos = WHEEL_POS_BOTTOM_RIGHT;
   wheelD.radius = WHEEL_RADIUS;
   wheelD.servCalib = SERVO_D_CALIB_VAL;
   driveD.speed = 0;
   driveD.steerAngle = 0;
-  driveD.posAngle = 90;
+  driveD.posAngle = 90 + SERVO_D_CALIB_VAL;
 
   turnServos();
 }
@@ -436,19 +436,19 @@ void resetDriveParams(void)
 
   driveA.speed = 0;
   driveA.steerAngle = 0;
-  driveA.posAngle = 90;
+  driveA.posAngle = 90 + wheelA.servCalib;
   
   driveB.speed = 0;
   driveB.steerAngle = 0;
-  driveB.posAngle = 90;
+  driveB.posAngle = 90 + wheelB.servCalib;
   
   driveC.speed = 0;
   driveC.steerAngle = 0;
-  driveC.posAngle = 90;
+  driveC.posAngle = 90 + wheelC.servCalib;
   
   driveD.speed = 0;
   driveD.steerAngle = 0;
-  driveD.posAngle = 90;
+  driveD.posAngle = 90 + wheelD.servCalib;
 }
 
 /**
@@ -483,14 +483,5 @@ void handleTwist(void)
   {
     turnServos();
     turnWheels();
-
-    Serial.println(driveA.speed);
-    Serial.println(driveA.steerAngle);
-    Serial.println(driveB.speed);
-    Serial.println(driveB.steerAngle);
-    Serial.println(driveC.speed);
-    Serial.println(driveC.steerAngle);
-    Serial.println(driveD.speed);
-    Serial.println(driveD.steerAngle);
   }
 }
