@@ -15,7 +15,8 @@ typedef enum
 {
   TWIST_OK, // Returned when calculation or set values are valid.
   TWIST_EX_LIM, // Returned when some limits are exceeded.
-  TWIST_ZERO // Returned when calculated or set values are zeroed.
+  TWIST_ZERO, // Returned when calculated or set values are zeroed.
+  TWIST_UNKNOWN // Returned when unknown velocities combination detected.
 } TwistError_t;
 
 typedef struct 
@@ -63,3 +64,4 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
 static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
 static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
 static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
+static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);

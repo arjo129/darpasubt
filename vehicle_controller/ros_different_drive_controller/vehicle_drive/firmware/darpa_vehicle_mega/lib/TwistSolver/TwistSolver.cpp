@@ -13,9 +13,7 @@
  */
 TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
-  TwistError_t res;
-
-  if (linear.x == 0 && angular.z == 0)
+  if (linear.x == 0 && linear.y == 0 && angular.z == 0)
   {
     drive->steerAngle = 0;
     drive->posAngle = 90 + wheel.servCalib;
@@ -23,32 +21,41 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
     return TWIST_OK;
   }
   // Forward or backward movement only.
-  else if (linear.x != 0 && angular.z == 0)
+  else if (linear.x != 0 && linear.y == 0 && angular.z == 0)
   {
     drive->steerAngle = 0;
     drive->posAngle = 90 + wheel.servCalib;
     drive->speed = linear.x / wheel.radius;
-    res = TWIST_OK;
+    
+    // Convert drive speed to degrees/second for the encoder
+    drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+
+    drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+    drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
+
+    return TWIST_OK;
   }
   // Turning on the spot.
-  else if (linear.x == 0 && angular.z != 0)
+  else if (linear.x == 0 && linear.y == 0 && angular.z != 0)
   {
-    res = solvSpotTurn(angular, platform, wheel, drive);
+    return solvSpotTurn(angular, platform, wheel, drive);
   }
   // Steering movement.
-  else
+  else if (linear.x != 0 && linear.y == 0 && angular.z != 0)
   {
     // TODO: Combine inner outer arc function into one, since they are similar now. Remove pivotDist from struct as well.
-    res = solvArcTurn(linear, angular, platform, wheel, drive);
+    return solvArcTurn(linear, angular, platform, wheel, drive);
+  }
+  else if (linear.x == 0 && linear.y != 0 && angular.z == 0)
+  {
+    return solvStrafe(linear, platform, wheel, drive);
+  }
+  else if (linear.x != 0 && linear.y != 0 && angular.z == 0)
+  {
+    return solvStrafe(linear, platform, wheel, drive);
   }
 
-  drive->speed = (drive->speed / (2.0 * M_PI)) * 360.0; // Convert to degrees per second.
-  drive->speed *= SHAFT_TO_ENCODER_FACTOR; // We want to get encoder revolution speed.
-
-  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
-  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
-
-  return res;
+  return TWIST_UNKNOWN;
 }
 
 /**
@@ -103,6 +110,12 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   double steerAngle = asin(platform.breadthHalf / platform.diagonalHalf);
   if (wheel.wheelPos == WHEEL_POS_TOP_LEFT || wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT) steerAngle *= -1;
   drive->steerAngle = steerAngle;
+
+  // Convert drive speed to degrees/second for the encoder
+  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+
+  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
 
   return TWIST_OK;
 }
@@ -162,6 +175,12 @@ static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, Pl
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
   drive->speed = driveSpeed;
 
+  // Convert drive speed to degrees/second for the encoder
+  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+
+  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
+
   return TWIST_OK;
 }
 
@@ -219,6 +238,12 @@ static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, P
   double driveSpeed = arcRadius * angular.z / wheel.radius;
   if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
   drive->speed = driveSpeed;
+
+  // Convert drive speed to degrees/second for the encoder
+  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+
+  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
 
   return TWIST_OK;
 }
@@ -283,4 +308,47 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
       return solvInArcTurn(linear, angular, platform, wheel, drive);
     }
   }
+}
+
+/**
+ * @brief Determines the drive speed and steer angle for strafing movement.
+ * 
+ * @param linear LinearVels_t type representing the body's linear velocity.
+ * @param platform PlatformDimensions_t type representing the body's dimension parameters.
+ * @param wheel WheelParams_t type representing the wheel's paramters.
+ * @param drive DriveParams_t type representing the computed drive parameters. 
+ * @return TwistError_t Error enumeration indicating calculation results. 
+ */
+static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
+{
+  // Get the steer angle first.
+   // We input a negative linear.y to follow mathematical convention where positive horizontal axis denotes right.
+  double dirAngle = atan2(linear.x, -linear.y);
+  double steerAngle = 0;
+  if (dirAngle >= 0 && dirAngle <= M_PI_2)
+  {
+    steerAngle = -dirAngle;
+  }
+  else if (dirAngle > M_PI_2 && dirAngle <= M_PI)
+  {
+    steerAngle = dirAngle - M_PI_2;
+  }
+  else if (dirAngle < 0 && dirAngle >= -M_PI_2)
+  {
+    steerAngle = -dirAngle;
+  }
+  else
+  {
+    steerAngle = dirAngle + M_PI_2;
+  }
+  drive->steerAngle = (steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
+
+  // Get the drive speed.
+  drive->speed = sqrt((linear.x * linear.x) + (linear.y * linear.y));
+  if (dirAngle < 0) drive->speed *= -1;
+  // Convert drive speed to degrees/second for the encoder
+  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+
+  return TWIST_OK;
 }
