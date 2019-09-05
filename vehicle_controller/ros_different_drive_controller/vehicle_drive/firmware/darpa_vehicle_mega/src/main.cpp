@@ -33,6 +33,7 @@ void updateB(void);
 void updateC(void);
 void updateD(void);
 void adjust(void);
+void pubData(void);
 void setAllMotorsSpeed(long speed);
 void turnServos(void);
 void turnWheels(void);
@@ -104,16 +105,29 @@ std_msgs::Int32 encoderAMsg;
 std_msgs::Int32 encoderBMsg;
 std_msgs::Int32 encoderCMsg;
 std_msgs::Int32 encoderDMsg;
+std_msgs::Int32 wheelAMsg;
+std_msgs::Int32 wheelBMsg;
+std_msgs::Int32 wheelCMsg;
+std_msgs::Int32 wheelDMsg;
 std_msgs::String debugMsg;
 ros::Subscriber<geometry_msgs::Twist> twistSub("twist_cmd", &twistCb);
 ros::Publisher encoderAPub("encoder_A_speed", &encoderAMsg);
 ros::Publisher encoderBPub("encoder_B_speed", &encoderBMsg);
 ros::Publisher encoderCPub("encoder_C_speed", &encoderCMsg);
 ros::Publisher encoderDPub("encoder_D_speed", &encoderDMsg);
+ros::Publisher wheelAPub("wheel_A_angle", &wheelAMsg);
+ros::Publisher wheelBPub("wheel_B_angle", &wheelBMsg);
+ros::Publisher wheelCPub("wheel_C_angle", &wheelCMsg);
+ros::Publisher wheelDPub("wheel_D_angle", &wheelDMsg);
 ros::Publisher debugPub("platform_debug", &debugMsg);
 
 uint16_t res;
 bool haveTwist = false;
+bool needAdjust = false;
+long encoderASpd = 0;
+long encoderBSpd = 0;
+long encoderCSpd = 0;
+long encoderDSpd = 0;
 
 void setup() {
   nh.initNode();
@@ -121,7 +135,11 @@ void setup() {
   nh.advertise(encoderBPub);
   nh.advertise(encoderCPub);
   nh.advertise(encoderDPub);
-  nh.advertise(debugPub);
+  nh.advertise(wheelAPub);
+  nh.advertise(wheelBPub);
+  nh.advertise(wheelCPub);
+  nh.advertise(wheelDPub);
+  // nh.advertise(debugPub);
   nh.subscribe(twistSub);
 
   initMotors();
@@ -137,14 +155,15 @@ void loop() {
     haveTwist = false;
     handleTwist();
   }
-  
-  // Publish all encoder data.
-  encoderAPub.publish(&encoderAMsg);
-  encoderBPub.publish(&encoderBMsg);
-  encoderCPub.publish(&encoderCMsg);
-  encoderDPub.publish(&encoderDMsg);
 
-  nh.spinOnce();
+  // Handle PWM adjustment.
+  if (needAdjust)
+  {
+    needAdjust = false;
+    adjust();
+    pubData();
+    nh.spinOnce();
+  }
 }
 
 /**
@@ -236,10 +255,34 @@ void updateD(void)
  */
 void adjust(void)
 {
-  encoderAMsg.data = scA.correctPwm();
-  encoderBMsg.data = scB.correctPwm();
-  encoderCMsg.data = scC.correctPwm();
-  encoderDMsg.data = scD.correctPwm();
+  encoderASpd = scA.correctPwm();
+  encoderBSpd = scB.correctPwm();
+  encoderCSpd = scC.correctPwm();
+  encoderDSpd = scD.correctPwm();
+}
+
+/**
+ * @brief Publishes all data to rosserial buffer.
+ * 
+ */
+void pubData(void)
+{
+    encoderAMsg.data = encoderASpd;
+    encoderBMsg.data = encoderBSpd;
+    encoderCMsg.data = encoderCSpd;
+    encoderDMsg.data = encoderDSpd;
+    wheelAMsg.data = driveA.steerAngle;
+    wheelBMsg.data = driveB.steerAngle;
+    wheelCMsg.data = driveC.steerAngle;
+    wheelDMsg.data = driveD.steerAngle;
+    encoderAPub.publish(&encoderAMsg);
+    encoderBPub.publish(&encoderBMsg);
+    encoderCPub.publish(&encoderCMsg);
+    encoderDPub.publish(&encoderDMsg);
+    wheelAPub.publish(&wheelAMsg);
+    wheelBPub.publish(&wheelBMsg);
+    wheelCPub.publish(&wheelCMsg);
+    wheelDPub.publish(&wheelDMsg);
 }
 
 /**
@@ -294,7 +337,7 @@ void initPwmCorrectTimer(uint32_t microseconds)
  */
 ISR(TIMER3_COMPA_vect)
 {
-  adjust();
+  needAdjust = true;
 }
 
 /**
@@ -460,6 +503,7 @@ void twistCb(const geometry_msgs::Twist& twistMsg)
 {
   haveTwist = true;
   linear.x = twistMsg.linear.x;
+  linear.y = twistMsg.linear.y;
   angular.z = twistMsg.angular.z;
 }
 
