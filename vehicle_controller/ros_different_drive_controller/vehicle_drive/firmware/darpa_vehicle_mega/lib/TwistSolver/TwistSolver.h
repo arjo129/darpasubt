@@ -55,7 +55,6 @@ typedef struct
   WheelPosition_t wheelPos;
   double radius;
   double servCalib;
-  double pivotDist;
 } WheelParams_t;
 
 TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);

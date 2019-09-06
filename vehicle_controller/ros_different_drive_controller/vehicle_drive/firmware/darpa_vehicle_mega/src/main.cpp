@@ -19,6 +19,10 @@
  * 
  * The pins are assigned this way to avoid conflicts in usage of Timers.
  * In ServoTimers.h (Servo library), timers 1 and 3 are disabled to prevent conflicts.
+ * 
+ * TODO:
+ * - Explore solvInArcTurn and solvOutArcTurn functions, combining them into one.
+ * - Fix PID integral value contributing to speed accumulation.
  */
 
 #include <main.h>

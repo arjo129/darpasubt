@@ -20,8 +20,8 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
     drive->speed = 0;
     return TWIST_OK;
   }
-  // Forward or backward movement only.
-  else if (linear.x != 0 && linear.y == 0 && angular.z == 0)
+  // Strafing movement only.
+  else if (angular.z == 0)
   {
     return solvStrafe(linear, platform, wheel, drive);
   }
@@ -30,19 +30,10 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   {
     return solvSpotTurn(angular, platform, wheel, drive);
   }
-  // Steering movement.
+  // Arc movement.
   else if (linear.x != 0 && linear.y == 0 && angular.z != 0)
   {
-    // TODO: Combine inner outer arc function into one, since they are similar now. Remove pivotDist from struct as well.
     return solvArcTurn(linear, angular, platform, wheel, drive);
-  }
-  else if (linear.x == 0 && linear.y != 0 && angular.z == 0)
-  {
-    return solvStrafe(linear, platform, wheel, drive);
-  }
-  else if (linear.x != 0 && linear.y != 0 && angular.z == 0)
-  {
-    return solvStrafe(linear, platform, wheel, drive);
   }
 
   return TWIST_UNKNOWN;
