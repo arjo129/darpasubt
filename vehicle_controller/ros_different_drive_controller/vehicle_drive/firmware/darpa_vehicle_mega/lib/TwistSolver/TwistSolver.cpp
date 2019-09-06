@@ -23,17 +23,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
   // Forward or backward movement only.
   else if (linear.x != 0 && linear.y == 0 && angular.z == 0)
   {
-    drive->steerAngle = 0;
-    drive->posAngle = 90 + wheel.servCalib;
-    drive->speed = linear.x / wheel.radius;
-    
-    // Convert drive speed to degrees/second for the encoder
-    drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
-
-    drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
-    drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
-
-    return TWIST_OK;
+    return solvStrafe(linear, platform, wheel, drive);
   }
   // Turning on the spot.
   else if (linear.x == 0 && linear.y == 0 && angular.z != 0)
@@ -322,20 +312,12 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
 static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
   // Get the steer angle first.
-   // We input a negative linear.y to follow mathematical convention where positive horizontal axis denotes right.
+  // We use a negative linear.y to follow mathematical convention where positive horizontal axis denotes right.
   double dirAngle = atan2(linear.x, -linear.y);
   double steerAngle = 0;
-  if (dirAngle >= 0 && dirAngle <= M_PI_2)
-  {
-    steerAngle = -dirAngle;
-  }
-  else if (dirAngle > M_PI_2 && dirAngle <= M_PI)
+  if (dirAngle >= 0 && dirAngle <= M_PI)
   {
     steerAngle = dirAngle - M_PI_2;
-  }
-  else if (dirAngle < 0 && dirAngle >= -M_PI_2)
-  {
-    steerAngle = -dirAngle;
   }
   else
   {
@@ -345,7 +327,8 @@ static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platfor
   drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
 
   // Get the drive speed.
-  drive->speed = sqrt((linear.x * linear.x) + (linear.y * linear.y));
+  double speedMs = sqrt((linear.x * linear.x) + (linear.y * linear.y));
+  drive->speed = speedMs / wheel.radius;
   if (dirAngle < 0) drive->speed *= -1;
   // Convert drive speed to degrees/second for the encoder
   drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
