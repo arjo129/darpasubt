@@ -50,9 +50,14 @@ class Encoder
     volatile long ticksCount = 0; // Keep track of ticks passed.
     volatile long oldTicksCount = 0;
     volatile long newTicksCount = 0;
-    long totalTicksCount = 0; // Running count of ticks for distance tracking.
+    volatile long countDiff = 0;
+    volatile long totalTicksCount = 0; // Running count of ticks for distance tracking.
     long deltaTime = 0; // Time interval for calling crucial functions.
+    double intervals = 0; // Number of times getSpeed() would have been called in 1 second.
 
+    volatile double ticksPerSec = 0;
+    volatile double degPerSec = 0;
     double degPerTick = 0; // To compute speed.
-    double prevSpeed = 0;
+
+    volatile int distance = 0; // Distance travlled in degrees of rotation.
 };

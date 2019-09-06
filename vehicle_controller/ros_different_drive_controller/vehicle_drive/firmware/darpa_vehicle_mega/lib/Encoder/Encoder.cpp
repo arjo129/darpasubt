@@ -35,6 +35,7 @@ Encoder::Encoder(
   int ticksPerRev
   ) : pinA(pinA), pinB(pinB), pinAPortAddr(pinAAddrType), pinBPortAddr(pinBAddrType), deltaTime(deltaTime)
 {
+  intervals = 1000000.0 / deltaTime;
   degPerTick = 360.0 / ticksPerRev;
   pinMode(pinB, INPUT);
   
@@ -80,40 +81,36 @@ long Encoder::getSpeed(void)
   newTicksCount = ticksCount;
 
   // Calculate the ticks passed since last call of this function.
-  int countDiff = newTicksCount - oldTicksCount;
+  countDiff = newTicksCount - oldTicksCount;
 
   // Add to total count of ticks.
   totalTicksCount += countDiff;
 
-  long degPerSec;
   // Check if ticksCount has overflowed.
   // Calculate new speed if no overflow.
   if (countDiff < 100000 && countDiff > -100000)
   {
-    double intervals = 1000000.0 / deltaTime; // TODO: Optimize this division by using inverse deltaTime.
-    double ticksPerSec = (double)countDiff * intervals;
+    ticksPerSec = countDiff * intervals;
     degPerSec = ticksPerSec * degPerTick;
-    prevSpeed = degPerSec;
   }
   // Use the previous speed if overflow occurs.
   else
   {
-    degPerSec = prevSpeed;
+    // Do nothing since degPerSec does not need to change.
   }
   
   return degPerSec;
 }
 
 /**
- * @brief Calculates and returns the distance traveled in degrees per second (degPerSec) since the last call of this
- * function.
+ * @brief Calculates and returns the distance traveled in degrees since the last call of this function.
  * @details This function must be called regularly such that totalTicksCount would not overflow.
  * 
- * @return int The distance in degrees per second.
+ * @return int The distance in degrees.
  */
 int Encoder::getDistance(void)
 {
-  int distance = totalTicksCount * degPerTick;
+  distance = totalTicksCount * degPerTick;
 
   totalTicksCount = 0;
 
