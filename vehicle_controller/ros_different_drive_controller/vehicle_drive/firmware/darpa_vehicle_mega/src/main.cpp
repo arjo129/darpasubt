@@ -21,8 +21,8 @@
  * In ServoTimers.h (Servo library), timers 1 and 3 are disabled to prevent conflicts.
  * 
  * TODO:
- * - Explore solvInArcTurn and solvOutArcTurn functions, combining them into one.
  * - Fix PID integral value contributing to speed accumulation.
+ * - Modify solvTwist such that one call of this function will solve all 4 wheels, reducing computation.
  */
 
 #include <main.h>

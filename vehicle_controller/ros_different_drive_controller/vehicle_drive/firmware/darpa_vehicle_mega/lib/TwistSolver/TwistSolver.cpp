@@ -90,9 +90,9 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
   drive->steerAngle = steerAngle;
 
   // Convert drive speed to degrees/second for the encoder
-  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+  drive->speed = drive->speed * CONV_TO_ENC_SPD;
 
-  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->steerAngle = drive->speed * RADS_TO_DEGS; // Convert to degrees.
   drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
 
   return TWIST_OK;
@@ -164,7 +164,7 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
     // In third quadrant, we want the complement angle in negative sign.
     steerAngle = -steerAngle - M_PI;
   }
-  drive->steerAngle = (steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->steerAngle = steerAngle * RADS_TO_DEGS; // Convert to degrees.
   drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
   ////////// End
 
@@ -172,7 +172,7 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
   drive->speed = arcRadius * angular.z / wheel.radius; // V = R x W
   if (linear.x < 0) drive->speed *= -1;
   // Convert drive speed to degrees/second for the encoder
-  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+  drive->speed = drive->speed * CONV_TO_ENC_SPD;
   ////////// End
   
   return TWIST_OK;
@@ -201,7 +201,7 @@ static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platfor
   {
     steerAngle = dirAngle + M_PI_2;
   }
-  drive->steerAngle = (steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->steerAngle = steerAngle * RADS_TO_DEGS; // Convert to degrees.
   drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
 
   // Get the drive speed.
@@ -209,7 +209,7 @@ static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platfor
   drive->speed = speedMs / wheel.radius;
   if (dirAngle < 0) drive->speed *= -1;
   // Convert drive speed to degrees/second for the encoder
-  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+  drive->speed = drive->speed * CONV_TO_ENC_SPD;
 
   return TWIST_OK;
 }
