@@ -42,7 +42,7 @@ Encoder::Encoder(
 #ifdef ENCODER_MEGA_ATMEGA2560
 
   // Initialise the port register bit position for both pins.
-  // This is later used to read the pin HIGH/LOW value during updateCount().
+  // This is used later to read the pin HIGH/LOW value during updateCount().
   pinAReg = 1 << checkRegShift(pinA, pinAAddrType);
   pinBReg = 1 << checkRegShift(pinB, pinBAddrType);
 

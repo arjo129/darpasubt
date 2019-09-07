@@ -60,7 +60,5 @@ typedef struct
 TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
 static double solvBodyRadius(LinearVels_t linear, AngularVels_t angular);
 static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
-static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
-static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
 static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
 static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);

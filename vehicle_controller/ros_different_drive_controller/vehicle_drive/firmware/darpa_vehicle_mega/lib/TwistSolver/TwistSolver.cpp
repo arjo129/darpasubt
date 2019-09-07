@@ -48,10 +48,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
  */
  static double solvBodyRadius(LinearVels_t linear, AngularVels_t angular)
 {
-  double turnRadius = linear.x / angular.z;
-  turnRadius = fabs(turnRadius);
-
-  return turnRadius;
+  return linear.x / angular.z;
 }
 
 /**
@@ -102,134 +99,6 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
 }
 
 /**
- * @brief Computes the steering angle and drive speed of wheels from inner arc, given the body's
- * linear and angular velocities.
- * 
- * @param linear LinearVels_t type representing the body's linear velocity.
- * @param angular AngularVels_t type representing the body's angular velocity.
- * @param platform PlatformDimensions_t type representing the body's dimension parameters.
- * @param wheel WheelParams_t type representing the wheel's paramters.
- * @param drive DriveParams_t type representing the computed drive parameters. 
- * @return TwistError_t Error enumeration indicating calculation results.
- */
-static TwistError_t solvInArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
-{
-  if (angular.z == 0)
-  {
-    drive->steerAngle = 0;
-    drive->speed = 0;
-    return TWIST_ZERO;
-  }
-
-  // Compute the steering angle required.
-  double bodyRadius = solvBodyRadius(linear, angular);
-  if (bodyRadius < PLATFORM_RADIUS_LIM)
-  {
-    // Body radius is too low, there is no valid steer angle.
-    drive->steerAngle = 0;
-    drive->speed = 0;
-    return TWIST_EX_LIM;
-  }
-  double arcRadius = sqrt(pow(bodyRadius - platform.lengthHalf, 2) + (platform.breadthHalf * platform.breadthHalf));
-
-  double steerAngle = asin(platform.breadthHalf / arcRadius);
-  // Arc turn counter clockwise.
-  if (angular.z > 0)
-  {
-    if (wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT && linear.x > 0) steerAngle *= -1;
-    if (wheel.wheelPos == WHEEL_POS_TOP_RIGHT && linear.x < 0) steerAngle *= -1;
-  }
-  // Arc turn clockwise.
-  else if (angular.z < 0)
-  {
-    if (wheel.wheelPos == WHEEL_POS_TOP_RIGHT && linear.x > 0) steerAngle *= -1;
-    if (wheel.wheelPos == WHEEL_POS_BOTTOM_LEFT && linear.x < 0) steerAngle *= -1;
-  }
-  drive->steerAngle = steerAngle;
-
-  // Compute the rotation speed required.
-  // Keep all values positive for easier sign manupulation.
-  angular.z = fabs(angular.z);
-  steerAngle = fabs(steerAngle);
-
-  double driveSpeed = arcRadius * angular.z / wheel.radius;
-  if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
-  drive->speed = driveSpeed;
-
-  // Convert drive speed to degrees/second for the encoder
-  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
-
-  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
-  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
-
-  return TWIST_OK;
-}
-
-/**
- * @brief Computes the steering angle and drive speed of wheels from outer arc, given the body's
- * linear and angular velocities.
- * 
- * @param linear LinearVels_t type representing the body's linear velocity.
- * @param angular AngularVels_t type representing the body's angular velocity.
- * @param platform PlatformDimensions_t type representing the body's dimension parameters.
- * @param wheel WheelParams_t type representing the wheel's paramters.
- * @param drive DriveParams_t type representing the computed drive parameters. 
- * @return TwistError_t Error enumeration indicating calculation results.
- */
-static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
-{
-  if (angular.z == 0)
-  {
-    drive->steerAngle = 0;
-    drive->speed = 0;
-    return TWIST_ZERO;
-  }
-
-  // Compute the steer angle.
-  double bodyRadius = solvBodyRadius(linear, angular);
-  if (bodyRadius < PLATFORM_RADIUS_LIM)
-  {
-    // Body radius is too low, there is no valid steer angle.
-    drive->steerAngle = 0;
-    drive->speed = 0;
-    return TWIST_EX_LIM;
-  }
-  double arcRadius = sqrt((platform.breadthHalf * platform.breadthHalf) + pow(platform.lengthHalf + bodyRadius, 2));
-  
-  double steerAngle = asin(platform.breadthHalf / arcRadius);
-  // Arc turn counter clockwise.
-  if (angular.z > 0)
-  {
-    if (wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT && linear.x > 0) steerAngle *= -1;
-    if (wheel.wheelPos == WHEEL_POS_TOP_LEFT && linear.x < 0) steerAngle *= -1;
-  }
-  // Arc turn clockwise.
-  else
-  {
-    if (wheel.wheelPos == WHEEL_POS_TOP_LEFT && linear.x > 0) steerAngle *= -1;
-    if (wheel.wheelPos == WHEEL_POS_BOTTOM_RIGHT && linear.x < 0) steerAngle *= -1;
-  }
-  drive->steerAngle = steerAngle;
-
-  // Compute the rotation speed required.
-  // Keep all values positive for easier sign manupulation.
-  angular.z = fabs(angular.z);
-  steerAngle = fabs(steerAngle);
-
-  double driveSpeed = arcRadius * angular.z / wheel.radius;
-  if (linear.x < 0) driveSpeed *= -1; // Movement is backwards.
-  drive->speed = driveSpeed;
-
-  // Convert drive speed to degrees/second for the encoder
-  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
-
-  drive->steerAngle = (drive->steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
-  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
-
-  return TWIST_OK;
-}
-
-/**
  * @brief Determines how to compute the steering angle and drive speed of a single wheel during arc
  * turning, given the body's linear and angular velocities.
  * 
@@ -242,53 +111,71 @@ static TwistError_t solvOutArcTurn(LinearVels_t linear, AngularVels_t angular, P
  */
 static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive)
 {
-  WheelPosition_t wheelPos = wheel.wheelPos;
-  if (angular.z > 0 && (wheelPos == WHEEL_POS_TOP_LEFT || wheelPos == WHEEL_POS_BOTTOM_LEFT))
+  WheelPosition_t pos = wheel.wheelPos;
+  
+  if (angular.z == 0)
   {
-    if (linear.x > 0)
-    {
-      return solvInArcTurn(linear, angular, platform, wheel, drive);
-    }
-    else
-    {
-      return solvOutArcTurn(linear, angular, platform, wheel, drive);
-    }
+    drive->steerAngle = 0;
+    drive->speed = 0;
+    return TWIST_ZERO;
   }
-  else if (angular.z > 0 && (wheelPos == WHEEL_POS_TOP_RIGHT || wheelPos == WHEEL_POS_BOTTOM_RIGHT))
+  
+  double bodyRadius = solvBodyRadius(linear, angular);
+  if (fabs(bodyRadius) < PLATFORM_RADIUS_LIM)
   {
-    if (linear.x > 0)
-    {
-      return solvOutArcTurn(linear, angular, platform, wheel, drive);
-    }
-    else
-    {
-      return solvInArcTurn(linear, angular, platform, wheel, drive);
-    }
-    
+    // Body radius is too low, there is no valid steer angle.
+    drive->steerAngle = 0;
+    drive->speed = 0;
+    return TWIST_EX_LIM;
   }
-  else if (angular.z < 0 && (wheelPos == WHEEL_POS_TOP_RIGHT || wheelPos == WHEEL_POS_BOTTOM_RIGHT))
+
+  ////////// Compute steering angle
+  double steerAngle = 0;
+  double arcRadius = 0;
+  double vertical = 0;
+  switch (pos)
   {
-    if (linear.x > 0)
-    {
-      return solvInArcTurn(linear, angular, platform, wheel, drive);
-    }
-    else
-    {
-      return solvOutArcTurn(linear, angular, platform, wheel, drive);
-    }
-    
+    case WHEEL_POS_TOP_RIGHT:
+      arcRadius = bodyRadius + platform.lengthHalf;
+      vertical = platform.breadthHalf;
+      break;
+    case WHEEL_POS_TOP_LEFT:
+      arcRadius = bodyRadius - platform.lengthHalf;
+      vertical = platform.breadthHalf;
+      break;
+    case WHEEL_POS_BOTTOM_LEFT:
+      arcRadius = bodyRadius - platform.lengthHalf;
+      vertical = -platform.breadthHalf;
+      break;
+    default:
+      arcRadius = bodyRadius + platform.lengthHalf;
+      vertical = -platform.breadthHalf;
   }
-  else
+  steerAngle = atan2(vertical, arcRadius);
+
+  // Correct the calculated angle to the directional angle.
+  if (steerAngle >= M_PI_2 && steerAngle <= M_PI)
   {
-    if (linear.x > 0)
-    {
-      return solvOutArcTurn(linear, angular, platform, wheel, drive);
-    }
-    else
-    {
-      return solvInArcTurn(linear, angular, platform, wheel, drive);
-    }
+    // In second quadrant, we want the complement angle.
+    steerAngle = M_PI - steerAngle;
   }
+  else if (steerAngle <= -M_PI_2 && steerAngle >= -M_PI)
+  {
+    // In third quadrant, we want the complement angle in negative sign.
+    steerAngle = -steerAngle - M_PI;
+  }
+  drive->steerAngle = (steerAngle / (2.0 * M_PI)) * 360.0; // Convert to degrees.
+  drive->posAngle = 90 - drive->steerAngle + wheel.servCalib;
+  ////////// End
+
+  ////////// Compute drive speed
+  drive->speed = arcRadius * angular.z / wheel.radius; // V = R x W
+  if (linear.x < 0) drive->speed *= -1;
+  // Convert drive speed to degrees/second for the encoder
+  drive->speed = ((drive->speed / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
+  ////////// End
+  
+  return TWIST_OK;
 }
 
 /**

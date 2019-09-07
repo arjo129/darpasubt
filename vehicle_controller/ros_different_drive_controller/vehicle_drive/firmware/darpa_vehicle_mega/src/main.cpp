@@ -143,7 +143,7 @@ void setup() {
   nh.advertise(wheelBPub);
   nh.advertise(wheelCPub);
   nh.advertise(wheelDPub);
-  // nh.advertise(debugPub);
+  nh.advertise(debugPub);
   nh.subscribe(twistSub);
 
   initMotors();
@@ -522,9 +522,41 @@ void handleTwist(void)
   errB = solveTwist(linear, angular, platform, wheelB, &driveB);
   errC = solveTwist(linear, angular, platform, wheelC, &driveC);
   errD = solveTwist(linear, angular, platform, wheelD, &driveD);
-  res = checkParams();
+  // res = checkParams();
   if (res != PARAM_OK || errA != TWIST_OK || errB != TWIST_OK || errC != TWIST_OK || errD != TWIST_OK)
   {
+    debugMsg.data = "params error";
+    debugPub.publish(&debugMsg);
+    if (errA != TWIST_OK)
+    {
+      debugMsg.data = "A error";
+      debugPub.publish(&debugMsg);
+    }
+    if (errA == TWIST_ZERO)
+    {
+      debugMsg.data = "A zero";
+      debugPub.publish(&debugMsg);
+    }
+    if (errB != TWIST_OK)
+    {
+      debugMsg.data = "B error";
+      debugPub.publish(&debugMsg);
+    }
+    if (errB == TWIST_EX_LIM)
+    {
+      debugMsg.data = "B exceed";
+      debugPub.publish(&debugMsg);
+    }
+    if (errC != TWIST_OK)
+    {
+      debugMsg.data = "C error";
+      debugPub.publish(&debugMsg);
+    }
+    if (errD != TWIST_OK)
+    {
+      debugMsg.data = "D error";
+      debugPub.publish(&debugMsg);
+    }
     handleParamErr(res);
   }
   else
