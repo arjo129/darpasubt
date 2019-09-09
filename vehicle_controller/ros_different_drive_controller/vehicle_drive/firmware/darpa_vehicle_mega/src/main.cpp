@@ -22,7 +22,7 @@
  * 
  * TODO:
  * - Fix PID integral value contributing to speed accumulation.
- * - Modify solvTwist such that one call of this function will solve all 4 wheels, reducing computation.
+ * - Modify solvTwist such that one call of this function will solve all 4 wheels at once, reducing computation.
  */
 
 #include <main.h>
@@ -38,7 +38,6 @@ void updateC(void);
 void updateD(void);
 void adjust(void);
 void pubData(void);
-void setAllMotorsSpeed(long speed);
 void turnServos(void);
 void turnWheels(void);
 uint16_t checkParams(void);
@@ -271,48 +270,22 @@ void adjust(void)
  */
 void pubData(void)
 {
-    encoderAMsg.data = encoderASpd;
-    encoderBMsg.data = encoderBSpd;
-    encoderCMsg.data = encoderCSpd;
-    encoderDMsg.data = encoderDSpd;
-    wheelAMsg.data = driveA.steerAngle;
-    wheelBMsg.data = driveB.steerAngle;
-    wheelCMsg.data = driveC.steerAngle;
-    wheelDMsg.data = driveD.steerAngle;
-    encoderAPub.publish(&encoderAMsg);
-    encoderBPub.publish(&encoderBMsg);
-    encoderCPub.publish(&encoderCMsg);
-    encoderDPub.publish(&encoderDMsg);
-    wheelAPub.publish(&wheelAMsg);
-    wheelBPub.publish(&wheelBMsg);
-    wheelCPub.publish(&wheelCMsg);
-    wheelDPub.publish(&wheelDMsg);
-}
-
-/**
- * @brief Sets the speed of all motors.
- * 
- * @param speed The speed in deg/sec.
- */
-void setAllMotorsSpeed(long speed)
-{
-  scA.setSpeed(speed);
-  scB.setSpeed(speed);
-  scC.setSpeed(speed);
-  scD.setSpeed(speed);
-}
-
-/**
- * @brief Sets direction of all motors.
- * 
- * @param dir The direction of MOTOR_DIR_t enum.
- */
-void setAllMotorsDir(MOTOR_DIR_t dir)
-{
-  motorA.setDir(dir);
-  motorB.setDir(dir);
-  motorC.setDir(dir);
-  motorD.setDir(dir);
+  encoderAMsg.data = encoderASpd;
+  encoderBMsg.data = encoderBSpd;
+  encoderCMsg.data = encoderCSpd;
+  encoderDMsg.data = encoderDSpd;
+  wheelAMsg.data = driveA.steerAngle;
+  wheelBMsg.data = driveB.steerAngle;
+  wheelCMsg.data = driveC.steerAngle;
+  wheelDMsg.data = driveD.steerAngle;
+  encoderAPub.publish(&encoderAMsg);
+  encoderBPub.publish(&encoderBMsg);
+  encoderCPub.publish(&encoderCMsg);
+  encoderDPub.publish(&encoderDMsg);
+  wheelAPub.publish(&wheelAMsg);
+  wheelBPub.publish(&wheelBMsg);
+  wheelCPub.publish(&wheelCMsg);
+  wheelDPub.publish(&wheelDMsg);
 }
 
 /**
@@ -525,38 +498,6 @@ void handleTwist(void)
   // res = checkParams();
   if (res != PARAM_OK || errA != TWIST_OK || errB != TWIST_OK || errC != TWIST_OK || errD != TWIST_OK)
   {
-    debugMsg.data = "params error";
-    debugPub.publish(&debugMsg);
-    if (errA != TWIST_OK)
-    {
-      debugMsg.data = "A error";
-      debugPub.publish(&debugMsg);
-    }
-    if (errA == TWIST_ZERO)
-    {
-      debugMsg.data = "A zero";
-      debugPub.publish(&debugMsg);
-    }
-    if (errB != TWIST_OK)
-    {
-      debugMsg.data = "B error";
-      debugPub.publish(&debugMsg);
-    }
-    if (errB == TWIST_EX_LIM)
-    {
-      debugMsg.data = "B exceed";
-      debugPub.publish(&debugMsg);
-    }
-    if (errC != TWIST_OK)
-    {
-      debugMsg.data = "C error";
-      debugPub.publish(&debugMsg);
-    }
-    if (errD != TWIST_OK)
-    {
-      debugMsg.data = "D error";
-      debugPub.publish(&debugMsg);
-    }
     handleParamErr(res);
   }
   else
