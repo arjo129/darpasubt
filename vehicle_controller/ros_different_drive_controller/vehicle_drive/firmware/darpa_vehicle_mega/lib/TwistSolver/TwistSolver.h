@@ -59,8 +59,23 @@ typedef struct
   double servCalib;
 } WheelParams_t;
 
-TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
+typedef struct
+{
+  WheelParams_t wheelParams;
+  DriveParams_t driveParams;
+} DriveUnit_t;
+
+typedef struct
+{
+  DriveUnit_t driveUnitA;
+  DriveUnit_t driveUnitB;
+  DriveUnit_t driveUnitC;
+  DriveUnit_t driveUnitD;
+} DriveSet_t;
+
+
+TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, DriveSet_t* driveSet);
 static double solvBodyRadius(LinearVels_t linear, AngularVels_t angular);
-static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
-static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
-static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, WheelParams_t wheel, DriveParams_t* drive);
+static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, DriveSet_t* driveSet);
+static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, DriveSet_t* driveSet);
+static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, DriveSet_t* driveSet);

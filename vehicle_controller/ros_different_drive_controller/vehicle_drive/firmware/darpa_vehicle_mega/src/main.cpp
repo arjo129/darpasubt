@@ -22,7 +22,6 @@
  * 
  * TODO:
  * - Fix PID integral value contributing to speed accumulation.
- * - Modify solvTwist such that one call of this function will solve all 4 wheels at once, reducing computation.
  */
 
 #include <main.h>
@@ -94,14 +93,7 @@ Servo servoD;
 LinearVels_t linear;
 AngularVels_t angular;
 PlatformDimensions_t platform;
-DriveParams_t driveA;
-WheelParams_t wheelA;
-DriveParams_t driveB;
-WheelParams_t wheelB;
-DriveParams_t driveC;
-WheelParams_t wheelC;
-DriveParams_t driveD;
-WheelParams_t wheelD;
+DriveSet_t driveSet;
 
 ros::NodeHandle nh;
 std_msgs::Int32 encoderAMsg;
@@ -274,10 +266,10 @@ void pubData(void)
   encoderBMsg.data = encoderBSpd;
   encoderCMsg.data = encoderCSpd;
   encoderDMsg.data = encoderDSpd;
-  wheelAMsg.data = driveA.steerAngle;
-  wheelBMsg.data = driveB.steerAngle;
-  wheelCMsg.data = driveC.steerAngle;
-  wheelDMsg.data = driveD.steerAngle;
+  wheelAMsg.data = driveSet.driveUnitA.driveParams.steerAngle;
+  wheelBMsg.data = driveSet.driveUnitB.driveParams.steerAngle;
+  wheelCMsg.data = driveSet.driveUnitC.driveParams.steerAngle;
+  wheelDMsg.data = driveSet.driveUnitD.driveParams.steerAngle;
   encoderAPub.publish(&encoderAMsg);
   encoderBPub.publish(&encoderBMsg);
   encoderCPub.publish(&encoderCMsg);
@@ -323,10 +315,10 @@ ISR(TIMER3_COMPA_vect)
  */
 void turnServos(void)
 {
-  servoA.write(driveA.posAngle);
-  servoB.write(driveB.posAngle);
-  servoC.write(driveC.posAngle);
-  servoD.write(driveD.posAngle);
+  servoA.write(driveSet.driveUnitA.driveParams.posAngle);
+  servoB.write(driveSet.driveUnitB.driveParams.posAngle);
+  servoC.write(driveSet.driveUnitC.driveParams.posAngle);
+  servoD.write(driveSet.driveUnitD.driveParams.posAngle);
 }
 
 /**
@@ -349,33 +341,33 @@ void initControlParams(void)
   angular.y = 0;
   angular.z = 0;
 
-  wheelA.wheelPos = WHEEL_POS_TOP_LEFT;
-  wheelA.radius = WHEEL_RADIUS;
-  wheelA.servCalib = SERVO_A_CALIB_VAL;
-  driveA.speed = 0;
-  driveA.steerAngle = 0;
-  driveA.posAngle = 90 + SERVO_A_CALIB_VAL;
+  driveSet.driveUnitA.wheelParams.wheelPos = WHEEL_POS_TOP_LEFT;
+  driveSet.driveUnitA.wheelParams.radius = WHEEL_RADIUS;
+  driveSet.driveUnitA.wheelParams.servCalib = SERVO_A_CALIB_VAL;
+  driveSet.driveUnitA.driveParams.speed = 0;
+  driveSet.driveUnitA.driveParams.steerAngle = 0;
+  driveSet.driveUnitA.driveParams.posAngle = 90 + SERVO_A_CALIB_VAL;
   
-  wheelB.wheelPos = WHEEL_POS_TOP_RIGHT;
-  wheelB.radius = WHEEL_RADIUS;
-  wheelB.servCalib = SERVO_B_CALIB_VAL;
-  driveB.speed = 0;
-  driveB.steerAngle = 0;
-  driveB.posAngle = 90 + SERVO_B_CALIB_VAL;
+  driveSet.driveUnitB.wheelParams.wheelPos = WHEEL_POS_TOP_RIGHT;
+  driveSet.driveUnitB.wheelParams.radius = WHEEL_RADIUS;
+  driveSet.driveUnitB.wheelParams.servCalib = SERVO_B_CALIB_VAL;
+  driveSet.driveUnitB.driveParams.speed = 0;
+  driveSet.driveUnitB.driveParams.steerAngle = 0;
+  driveSet.driveUnitB.driveParams.posAngle = 90 + SERVO_B_CALIB_VAL;
   
-  wheelC.wheelPos = WHEEL_POS_BOTTOM_LEFT;
-  wheelC.radius = WHEEL_RADIUS;
-  wheelC.servCalib = SERVO_C_CALIB_VAL;
-  driveC.speed = 0;
-  driveC.steerAngle = 0;
-  driveC.posAngle = 90 + SERVO_C_CALIB_VAL;
+  driveSet.driveUnitC.wheelParams.wheelPos = WHEEL_POS_BOTTOM_LEFT;
+  driveSet.driveUnitC.wheelParams.radius = WHEEL_RADIUS;
+  driveSet.driveUnitC.wheelParams.servCalib = SERVO_C_CALIB_VAL;
+  driveSet.driveUnitC.driveParams.speed = 0;
+  driveSet.driveUnitC.driveParams.steerAngle = 0;
+  driveSet.driveUnitC.driveParams.posAngle = 90 + SERVO_C_CALIB_VAL;
   
-  wheelD.wheelPos = WHEEL_POS_BOTTOM_RIGHT;
-  wheelD.radius = WHEEL_RADIUS;
-  wheelD.servCalib = SERVO_D_CALIB_VAL;
-  driveD.speed = 0;
-  driveD.steerAngle = 0;
-  driveD.posAngle = 90 + SERVO_D_CALIB_VAL;
+  driveSet.driveUnitD.wheelParams.wheelPos = WHEEL_POS_BOTTOM_RIGHT;
+  driveSet.driveUnitD.wheelParams.radius = WHEEL_RADIUS;
+  driveSet.driveUnitD.wheelParams.servCalib = SERVO_D_CALIB_VAL;
+  driveSet.driveUnitD.driveParams.speed = 0;
+  driveSet.driveUnitD.driveParams.steerAngle = 0;
+  driveSet.driveUnitD.driveParams.posAngle = 90 + SERVO_D_CALIB_VAL;
 
   turnServos();
 }
@@ -386,10 +378,10 @@ void initControlParams(void)
  */
 void turnWheels(void)
 {
-  scA.setSpeed(driveA.speed);
-  scB.setSpeed(driveB.speed);
-  scC.setSpeed(driveC.speed);
-  scD.setSpeed(driveD.speed);
+  scA.setSpeed(driveSet.driveUnitA.driveParams.speed);
+  scB.setSpeed(driveSet.driveUnitB.driveParams.speed);
+  scC.setSpeed(driveSet.driveUnitC.driveParams.speed);
+  scD.setSpeed(driveSet.driveUnitD.driveParams.speed);
 }
 
 /**
@@ -402,23 +394,23 @@ uint16_t checkParams(void)
   uint16_t result = PARAM_OK;
 
   // Check for motors limit.
-  if (fabs(driveA.speed) > MOTOR_SPEED_LIMIT ||
-    fabs(driveB.speed) > MOTOR_SPEED_LIMIT ||
-    fabs(driveC.speed) > MOTOR_SPEED_LIMIT ||
-    fabs(driveD.speed) > MOTOR_SPEED_LIMIT)
+  if (fabs(driveSet.driveUnitA.driveParams.speed) > MOTOR_SPEED_LIMIT ||
+    fabs(driveSet.driveUnitB.driveParams.speed) > MOTOR_SPEED_LIMIT ||
+    fabs(driveSet.driveUnitC.driveParams.speed) > MOTOR_SPEED_LIMIT ||
+    fabs(driveSet.driveUnitD.driveParams.speed) > MOTOR_SPEED_LIMIT)
   {
     result |= PARAM_MOTOR_EXCEED;
   }
   
   // Check for servos limit.
-  if ((driveB.posAngle - wheelB.servCalib) < SERVO_B_LOWER_LIMIT ||
-    (driveB.posAngle - wheelB.servCalib) > SERVO_B_UPPER_LIMIT ||
-    (driveD.posAngle - wheelD.servCalib) < SERVO_D_LOWER_LIMIT ||
-    (driveD.posAngle - wheelD.servCalib) > SERVO_D_UPPER_LIMIT ||
-    (driveA.posAngle - wheelA.servCalib) < SERVO_A_LOWER_LIMIT ||
-    (driveA.posAngle - wheelA.servCalib) > SERVO_A_UPPER_LIMIT ||
-    (driveC.posAngle - wheelC.servCalib) < SERVO_C_LOWER_LIMIT ||
-    (driveC.posAngle - wheelC.servCalib) > SERVO_C_UPPER_LIMIT)
+  if ((driveSet.driveUnitB.driveParams.posAngle - driveSet.driveUnitB.wheelParams.servCalib) < SERVO_B_LOWER_LIMIT ||
+    (driveSet.driveUnitB.driveParams.posAngle - driveSet.driveUnitB.wheelParams.servCalib) > SERVO_B_UPPER_LIMIT ||
+    (driveSet.driveUnitD.driveParams.posAngle - driveSet.driveUnitD.wheelParams.servCalib) < SERVO_D_LOWER_LIMIT ||
+    (driveSet.driveUnitD.driveParams.posAngle - driveSet.driveUnitD.wheelParams.servCalib) > SERVO_D_UPPER_LIMIT ||
+    (driveSet.driveUnitA.driveParams.posAngle - driveSet.driveUnitA.wheelParams.servCalib) < SERVO_A_LOWER_LIMIT ||
+    (driveSet.driveUnitA.driveParams.posAngle - driveSet.driveUnitA.wheelParams.servCalib) > SERVO_A_UPPER_LIMIT ||
+    (driveSet.driveUnitC.driveParams.posAngle - driveSet.driveUnitC.wheelParams.servCalib) < SERVO_C_LOWER_LIMIT ||
+    (driveSet.driveUnitC.driveParams.posAngle - driveSet.driveUnitC.wheelParams.servCalib) > SERVO_C_UPPER_LIMIT)
   {
     result |= PARAM_SERVO_EXCEED;
   }
@@ -433,10 +425,10 @@ uint16_t checkParams(void)
  */
 void handleParamErr(uint16_t err)
 {
-  driveA.speed = 0;
-  driveB.speed = 0;
-  driveC.speed = 0;
-  driveD.speed = 0;
+  driveSet.driveUnitA.driveParams.speed = 0;
+  driveSet.driveUnitB.driveParams.speed = 0;
+  driveSet.driveUnitC.driveParams.speed = 0;
+  driveSet.driveUnitD.driveParams.speed = 0;
   turnWheels();
   delay(1500);
 }
@@ -454,21 +446,21 @@ void resetDriveParams(void)
   angular.y = 0;
   angular.z = 0;
 
-  driveA.speed = 0;
-  driveA.steerAngle = 0;
-  driveA.posAngle = 90 + wheelA.servCalib;
+  driveSet.driveUnitA.driveParams.speed = 0;
+  driveSet.driveUnitA.driveParams.steerAngle = 0;
+  driveSet.driveUnitA.driveParams.posAngle = 90 + driveSet.driveUnitA.wheelParams.servCalib;
   
-  driveB.speed = 0;
-  driveB.steerAngle = 0;
-  driveB.posAngle = 90 + wheelB.servCalib;
+  driveSet.driveUnitB.driveParams.speed = 0;
+  driveSet.driveUnitB.driveParams.steerAngle = 0;
+  driveSet.driveUnitB.driveParams.posAngle = 90 + driveSet.driveUnitB.wheelParams.servCalib;
   
-  driveC.speed = 0;
-  driveC.steerAngle = 0;
-  driveC.posAngle = 90 + wheelC.servCalib;
+  driveSet.driveUnitC.driveParams.speed = 0;
+  driveSet.driveUnitC.driveParams.steerAngle = 0;
+  driveSet.driveUnitC.driveParams.posAngle = 90 + driveSet.driveUnitC.wheelParams.servCalib;
   
-  driveD.speed = 0;
-  driveD.steerAngle = 0;
-  driveD.posAngle = 90 + wheelD.servCalib;
+  driveSet.driveUnitD.driveParams.speed = 0;
+  driveSet.driveUnitD.driveParams.steerAngle = 0;
+  driveSet.driveUnitD.driveParams.posAngle = 90 + driveSet.driveUnitD.wheelParams.servCalib;
 }
 
 /**
@@ -490,13 +482,10 @@ void twistCb(const geometry_msgs::Twist& twistMsg)
  */
 void handleTwist(void)
 {
-  TwistError_t errA, errB, errC, errD;
-  errA = solveTwist(linear, angular, platform, wheelA, &driveA);
-  errB = solveTwist(linear, angular, platform, wheelB, &driveB);
-  errC = solveTwist(linear, angular, platform, wheelC, &driveC);
-  errD = solveTwist(linear, angular, platform, wheelD, &driveD);
+  TwistError_t err;
+  err = solveTwist(linear, angular, platform, &driveSet);
   // res = checkParams();
-  if (res != PARAM_OK || errA != TWIST_OK || errB != TWIST_OK || errC != TWIST_OK || errD != TWIST_OK)
+  if (res != PARAM_OK || err != TWIST_OK)
   {
     handleParamErr(res);
   }
