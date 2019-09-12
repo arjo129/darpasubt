@@ -165,11 +165,7 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
   // Since all the wheels have the same radius, we can use one value for every wheels.
   double nearDriveSpeed = nearArcRadius * angular.z / driveSet->driveUnitA.wheelParams.radius;
   double farDriveSpeed = farArcRadius * angular.z / driveSet->driveUnitA.wheelParams.radius;
-  if (linear.x < 0)
-  {
-    nearDriveSpeed = -nearDriveSpeed;
-    farDriveSpeed = -farDriveSpeed;
-  }
+
   // Convert drive speed to degrees/second for the encoder
   nearDriveSpeed = nearDriveSpeed * CONV_TO_ENC_SPD;
   farDriveSpeed = farDriveSpeed * CONV_TO_ENC_SPD;
