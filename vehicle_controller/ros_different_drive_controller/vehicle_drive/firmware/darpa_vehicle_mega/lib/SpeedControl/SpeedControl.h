@@ -27,5 +27,4 @@ class SpeedControl
     double iGain;
     double dGain;
     double iTerm; // Keep track of integral term.
-    double iLimit; // Integral term limit to prevent hunting.
 };

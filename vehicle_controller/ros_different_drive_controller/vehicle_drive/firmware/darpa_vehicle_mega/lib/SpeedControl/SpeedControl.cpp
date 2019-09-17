@@ -34,7 +34,6 @@ SpeedControl::SpeedControl(Motor *motor, Encoder *encoder) : motor(motor), encod
   iGain = DEF_GAIN;
   dGain = DEF_GAIN;
   iTerm = 0;
-  iLimit = iGain * 25000;
 };
 
 /**
@@ -46,6 +45,7 @@ long SpeedControl::correctPwm(void)
 {
   // Get the scalar speed.
   long speed = encoder->getSpeed();
+  long retSpeed = speed;
   if (speed < 0)
   {
     speed *= -1;
@@ -56,11 +56,7 @@ long SpeedControl::correctPwm(void)
 
   // Calculate P, I, D values.
   double pTerm = pGain * (double)error;
-  iTerm += iGain * (double)error;
-  if (iTerm > iLimit)
-  {
-    iTerm = iLimit;
-  }
+  setPoint == 0 ? iTerm = 0 : iTerm += iGain * (double)error;
   double dTerm = dGain * (speed - prevSpeed); // Uses derivative on measurement. See: http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-derivative-kick/
 
   // Calculate the pwm value to set.
@@ -74,12 +70,13 @@ long SpeedControl::correctPwm(void)
   {
     pwm = 0;
   }
+  if (setPoint == 0 && speed == 0) pwm = 0;
    
   // Set pwm.
   motor->setPwm(pwm);
   prevSpeed = speed;
 
-  return speed;
+  return retSpeed;
 }
 
 /**
