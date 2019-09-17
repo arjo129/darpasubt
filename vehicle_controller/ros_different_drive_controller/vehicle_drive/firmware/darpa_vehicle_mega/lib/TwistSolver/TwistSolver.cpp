@@ -10,7 +10,7 @@
  * @param driveSet A set of DriveUnit_t representing every wheels' and motors' parameters.
  * return TwistError_t Error enumeration indicating calculation results.
  */
-TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, DriveSet_t* driveSet)
+TwistError_t solveTwist(const LinearVels_t& linear, const AngularVels_t& angular, const PlatformDimensions_t& platform, DriveSet_t* driveSet)
 {
   if (linear.x == 0 && linear.y == 0 && angular.z == 0)
   {
@@ -57,7 +57,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
  * @param angular AngularVels_t type representing the body's angular velocity.
  * @return double The corresponding turn radius of the body.
  */
- static double solvBodyRadius(LinearVels_t linear, AngularVels_t angular)
+ static double solvBodyRadius(const LinearVels_t& linear, const AngularVels_t& angular)
 {
   return linear.x / angular.z;
 }
@@ -71,7 +71,7 @@ TwistError_t solveTwist(LinearVels_t linear, AngularVels_t angular, PlatformDime
  * @param driveSet A set of DriveUnit_t representing every wheels' and motors' parameters.
  * @return TwistError_t Error enumeration indicating calculation results.
  */
-static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t platform, DriveSet_t* driveSet)
+static TwistError_t solvSpotTurn(const AngularVels_t& angular, const PlatformDimensions_t& platform, DriveSet_t* driveSet)
 {
   if (angular.z == 0)
   {
@@ -122,7 +122,7 @@ static TwistError_t solvSpotTurn(AngularVels_t angular, PlatformDimensions_t pla
  * @param driveSet A set of DriveUnit_t representing every wheels' and motors' parameters. 
  * @return TwistError_t Error enumeration indicating calculation results.
  */
-static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, PlatformDimensions_t platform, DriveSet_t *driveSet)
+static TwistError_t solvArcTurn(const LinearVels_t& linear, const AngularVels_t& angular, const PlatformDimensions_t& platform, DriveSet_t *driveSet)
 {
   if (angular.z == 0)
   {
@@ -219,7 +219,7 @@ static TwistError_t solvArcTurn(LinearVels_t linear, AngularVels_t angular, Plat
  * @param driveSet A set of DriveUnit_t representing every wheels' and motors' parameters.
  * @return TwistError_t Error enumeration indicating calculation results. 
  */
-static TwistError_t solvStrafe(LinearVels_t linear, PlatformDimensions_t platform, DriveSet_t* driveSet)
+static TwistError_t solvStrafe(const LinearVels_t& linear, const PlatformDimensions_t& platform, DriveSet_t* driveSet)
 {
   // Get the steer angle first.
   // We use a negative linear.y to follow mathematical convention where positive horizontal axis denotes right.
