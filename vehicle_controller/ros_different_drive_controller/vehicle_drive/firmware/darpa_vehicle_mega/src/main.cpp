@@ -105,7 +105,7 @@ std_msgs::Int32 wheelBMsg;
 std_msgs::Int32 wheelCMsg;
 std_msgs::Int32 wheelDMsg;
 std_msgs::String debugMsg;
-ros::Subscriber<geometry_msgs::Twist> twistSub("twist_cmd", &twistCb);
+ros::Subscriber<geometry_msgs::Twist> twistSub("cmd_vel", &twistCb);
 ros::Publisher encoderAPub("encoder_A_speed", &encoderAMsg);
 ros::Publisher encoderBPub("encoder_B_speed", &encoderBMsg);
 ros::Publisher encoderCPub("encoder_C_speed", &encoderCMsg);
@@ -157,8 +157,9 @@ void loop() {
     needAdjust = false;
     adjust();
     pubData();
-    nh.spinOnce();
   }
+
+  nh.spinOnce();
 }
 
 /**
@@ -484,7 +485,7 @@ void handleTwist(void)
 {
   TwistError_t err;
   err = solveTwist(linear, angular, platform, &driveSet);
-  // res = checkParams();
+  res = checkParams();
   if (res != PARAM_OK || err != TWIST_OK)
   {
     handleParamErr(res);
