@@ -43,6 +43,7 @@ uint16_t checkParams(void);
 void handleParamErr(uint16_t err);
 void twistCb(const geometry_msgs::Twist& twistMsg);
 void handleTwist(void);
+void pidCb(const geometry_msgs::Point& pidMsg);
 
 // All global variables.
 Motor motorA(MOTOR_A_DIR_PIN, MOTOR_A_PWM_PIN);
@@ -106,6 +107,7 @@ std_msgs::Int32 wheelCMsg;
 std_msgs::Int32 wheelDMsg;
 std_msgs::String debugMsg;
 ros::Subscriber<geometry_msgs::Twist> twistSub("cmd_vel", &twistCb);
+ros::Subscriber<geometry_msgs::Point> pidSub("pid_set", &pidCb);
 ros::Publisher encoderAPub("encoder_A_speed", &encoderAMsg);
 ros::Publisher encoderBPub("encoder_B_speed", &encoderBMsg);
 ros::Publisher encoderCPub("encoder_C_speed", &encoderCMsg);
@@ -136,6 +138,7 @@ void setup() {
   nh.advertise(wheelDPub);
   nh.advertise(debugPub);
   nh.subscribe(twistSub);
+  // nh.subscribe(pidSub); // Comment out if we do not want to set PID.
 
   initMotors();
   delay(3000); // Delay 3 seconds to allow servos to move to 0 degree position.
@@ -475,6 +478,18 @@ void twistCb(const geometry_msgs::Twist& twistMsg)
   linear.x = twistMsg.linear.x;
   linear.y = twistMsg.linear.y;
   angular.z = twistMsg.angular.z;
+}
+
+void pidCb(const geometry_msgs::Point& pidMsg)
+{
+  P_GAIN = pidMsg.x;
+  I_GAIN = pidMsg.y;
+  D_GAIN = pidMsg.z;
+
+  scA.setGains(P_GAIN, I_GAIN, D_GAIN);
+  scB.setGains(P_GAIN, I_GAIN, D_GAIN);
+  scC.setGains(P_GAIN, I_GAIN, D_GAIN);
+  scD.setGains(P_GAIN, I_GAIN, D_GAIN);
 }
 
 /**

@@ -3,6 +3,7 @@
 #include <std_msgs/String.h>
 #include <std_msgs/Int32.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Point.h>
 #include <SpeedControl.h>
 #include <Servo.h>
 #include <TwistSolver.h>
@@ -37,30 +38,18 @@
 #define ENCODER_COMM_DELTA_T 50000
 #define ENCODER_COMM_TICKS_PER_REV 24
 
-// #define SC_A_P_GAIN 0.00423
-#define SC_A_P_GAIN 0.0029
-// #define SC_A_I_GAIN 0.0008
-#define SC_A_I_GAIN 0.0001
-// #define SC_A_D_GAIN 0.0005
-#define SC_A_D_GAIN 0.00025
-// #define SC_B_P_GAIN 0.00423
-#define SC_B_P_GAIN 0.0029
-// #define SC_B_I_GAIN 0.0008
-#define SC_B_I_GAIN 0.0001
-// #define SC_B_D_GAIN 0.0005
-#define SC_B_D_GAIN 0.00025
-// #define SC_C_P_GAIN 0.00423
-#define SC_C_P_GAIN 0.0029
-// #define SC_C_I_GAIN 0.0008
-#define SC_C_I_GAIN 0.0001
-// #define SC_C_D_GAIN 0.0005
-#define SC_C_D_GAIN 0.00025
-// #define SC_D_P_GAIN 0.00423
-#define SC_D_P_GAIN 0.0029
-// #define SC_D_I_GAIN 0.0008
-#define SC_D_I_GAIN 0.0001
-// #define SC_D_D_GAIN 0.0005
-#define SC_D_D_GAIN 0.00025
+#define SC_A_P_GAIN 0.000635
+#define SC_A_I_GAIN 0.000015
+#define SC_A_D_GAIN 0.000004
+#define SC_B_P_GAIN 0.000635
+#define SC_B_I_GAIN 0.000015
+#define SC_B_D_GAIN 0.000004
+#define SC_C_P_GAIN 0.000635
+#define SC_C_I_GAIN 0.000015
+#define SC_C_D_GAIN 0.000004
+#define SC_D_P_GAIN 0.000635
+#define SC_D_I_GAIN 0.000015
+#define SC_D_D_GAIN 0.000004
 #define SC_MIN_SPEED 0
 #define SC_MAX_SPEED 60000
 
@@ -80,3 +69,7 @@ typedef enum
   PARAM_SERVO_EXCEED = 0b1,
   PARAM_MOTOR_EXCEED = 0b10
 } CHK_PARAM_RES_t;
+
+double P_GAIN = 0.000635;
+double I_GAIN = 0.000015;
+double D_GAIN = 0.000004;
