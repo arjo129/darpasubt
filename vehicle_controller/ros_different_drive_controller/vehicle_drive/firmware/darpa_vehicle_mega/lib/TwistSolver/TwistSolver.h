@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <params.h>
 
-static const double SHAFT_TO_ENCODER_FACTOR = 20.4; // Shaft to encoder revolution factor.
+static const double SHAFT_TO_ENCODER_FACTOR = 98.78; // Shaft to encoder revolution factor.
 static const double CONV_TO_ENC_SPD = ((1.0 / (2.0 * M_PI)) * 360.0) * SHAFT_TO_ENCODER_FACTOR;
 static const double RADS_TO_DEGS = (1.0 / (2.0 * M_PI)) * 360.0;
 
