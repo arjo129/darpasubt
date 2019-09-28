@@ -97,26 +97,11 @@ PlatformDimensions_t platform;
 DriveSet_t driveSet;
 
 ros::NodeHandle nh;
-std_msgs::Int32 encoderAMsg;
-std_msgs::Int32 encoderBMsg;
-std_msgs::Int32 encoderCMsg;
-std_msgs::Int32 encoderDMsg;
-std_msgs::Int32 wheelAMsg;
-std_msgs::Int32 wheelBMsg;
-std_msgs::Int32 wheelCMsg;
-std_msgs::Int32 wheelDMsg;
+vehicle_drive::UGV_Odom odomMsg;
 std_msgs::String debugMsg;
 ros::Subscriber<geometry_msgs::Twist> twistSub("cmd_vel", &twistCb);
 ros::Subscriber<geometry_msgs::Point> pidSub("pid_set", &pidCb);
-ros::Publisher encoderAPub("encoder_A_speed", &encoderAMsg);
-ros::Publisher encoderBPub("encoder_B_speed", &encoderBMsg);
-ros::Publisher encoderCPub("encoder_C_speed", &encoderCMsg);
-ros::Publisher encoderDPub("encoder_D_speed", &encoderDMsg);
-ros::Publisher wheelAPub("wheel_A_angle", &wheelAMsg);
-ros::Publisher wheelBPub("wheel_B_angle", &wheelBMsg);
-ros::Publisher wheelCPub("wheel_C_angle", &wheelCMsg);
-ros::Publisher wheelDPub("wheel_D_angle", &wheelDMsg);
-ros::Publisher debugPub("platform_debug", &debugMsg);
+ros::Publisher odomPub("ugv_odometry", &odomMsg);
 
 uint16_t res;
 bool haveTwist = false;
@@ -128,15 +113,7 @@ long encoderDSpd = 0;
 
 void setup() {
   nh.initNode();
-  nh.advertise(encoderAPub);
-  nh.advertise(encoderBPub);
-  nh.advertise(encoderCPub);
-  nh.advertise(encoderDPub);
-  nh.advertise(wheelAPub);
-  nh.advertise(wheelBPub);
-  nh.advertise(wheelCPub);
-  nh.advertise(wheelDPub);
-  nh.advertise(debugPub);
+  nh.advertise(odomPub);
   nh.subscribe(twistSub);
   // nh.subscribe(pidSub); // Comment out if we do not want to set PID.
 
@@ -266,22 +243,15 @@ void adjust(void)
  */
 void pubData(void)
 {
-  encoderAMsg.data = encoderASpd;
-  encoderBMsg.data = encoderBSpd;
-  encoderCMsg.data = encoderCSpd;
-  encoderDMsg.data = encoderDSpd;
-  wheelAMsg.data = driveSet.driveUnitA.driveParams.steerAngle;
-  wheelBMsg.data = driveSet.driveUnitB.driveParams.steerAngle;
-  wheelCMsg.data = driveSet.driveUnitC.driveParams.steerAngle;
-  wheelDMsg.data = driveSet.driveUnitD.driveParams.steerAngle;
-  encoderAPub.publish(&encoderAMsg);
-  encoderBPub.publish(&encoderBMsg);
-  encoderCPub.publish(&encoderCMsg);
-  encoderDPub.publish(&encoderDMsg);
-  wheelAPub.publish(&wheelAMsg);
-  wheelBPub.publish(&wheelBMsg);
-  wheelCPub.publish(&wheelCMsg);
-  wheelDPub.publish(&wheelDMsg);
+  odomMsg.encoderA = encoderASpd;
+  odomMsg.encoderB = encoderBSpd;
+  odomMsg.encoderC = encoderCSpd;
+  odomMsg.encoderD = encoderDSpd;
+  odomMsg.wheelA = driveSet.driveUnitA.driveParams.steerAngle;
+  odomMsg.wheelB = driveSet.driveUnitB.driveParams.steerAngle;
+  odomMsg.wheelC = driveSet.driveUnitC.driveParams.steerAngle;
+  odomMsg.wheelD = driveSet.driveUnitD.driveParams.steerAngle;
+  odomPub.publish(&odomMsg);
 }
 
 /**

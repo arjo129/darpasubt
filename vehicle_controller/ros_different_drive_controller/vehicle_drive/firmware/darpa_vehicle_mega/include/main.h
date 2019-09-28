@@ -8,6 +8,7 @@
 #include <Servo.h>
 #include <TwistSolver.h>
 #include <params.h>
+#include <UGV_Odom.h>
 
 // All Motors related
 #define MOTOR_A_DIR_PIN 26
