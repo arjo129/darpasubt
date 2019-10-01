@@ -1,5 +1,4 @@
 <launch>
   <include file="$(find vehicle_drive)/launch/serial.launch" />
-  <include file="$(find vehicle_drive)/launch/teleop.launch" />
 
 </launch>
