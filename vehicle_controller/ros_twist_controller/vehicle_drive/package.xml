@@ -49,13 +49,10 @@
   <!-- Use doc_depend for packages you need only for building documentation: -->
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>differential_drive</build_depend>
   <build_depend>rosserial_arduino</build_depend>
   <build_depend>teleop_twist_keyboard</build_depend>
-  <build_export_depend>differential_drive</build_export_depend>
   <build_export_depend>rosserial_arduino</build_export_depend>
   <build_export_depend>teleop_twist_keyboard</build_export_depend>
-  <exec_depend>differential_drive</exec_depend>
   <exec_depend>rosserial_arduino</exec_depend>
   <exec_depend>teleop_twist_keyboard</exec_depend>
 

@@ -1,0 +1,6 @@
+{
+  "terminal.integrated.env.linux": {
+    "PATH": "/home/lekok/.platformio/penv/bin:/home/lekok/.platformio/penv:/home/lekok/.local/bin:/opt/ros/melodic/bin:/home/lekok/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/data/tools/gcc-arm-none-eabi/bin:/home/lekok/go/bin:/snap/bin:/usr/lib/jvm/java-10-oracle/bin:/usr/lib/jvm/java-10-oracle/db/bin:/usr/lib/jvm/java-10-oracle/bin:/usr/lib/jvm/java-10-oracle/db/bin:/opt/fff/",
+    "PLATFORMIO_CALLER": "vscode"
+  }
+}
