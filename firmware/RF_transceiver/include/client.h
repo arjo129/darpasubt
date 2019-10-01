@@ -1,8 +1,5 @@
 #include <RH_RF95.h>
 
-void clientSetup(RH_RF95 *client);
-void clientLoop(RH_RF95 *client);
-
 /**
  * @brief Client class that allows requests to be made a server.
  * 
@@ -10,8 +7,8 @@ void clientLoop(RH_RF95 *client);
 class Client
 {
   private:
-    SoftwareSerial *softSerial;
-    RH_RF95 *client; // Instance of the radio driver in operation.
+    SoftwareSerial softSerial;
+    RH_RF95 client; // Instance of the radio driver in operation.
     uint8_t address; // Unique identifier for this server.
     float frequency; // Operation frequency.
 

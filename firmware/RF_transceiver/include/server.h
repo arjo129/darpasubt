@@ -9,8 +9,8 @@
 class Server
 {
   private:
-    SoftwareSerial *softSerial;
-    RH_RF95 *server; // Instance of the radio driver in operation.
+    SoftwareSerial softSerial;
+    RH_RF95 server; // Instance of the radio driver in operation.
     uint8_t address; // Unique identifier for this server.
     float frequency; // Operation frequency.
 

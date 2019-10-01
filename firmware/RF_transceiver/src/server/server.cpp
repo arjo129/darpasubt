@@ -13,14 +13,12 @@
  * @param frequency operation frequency of the module.
  */
 Server::Server(uint8_t address, uint8_t receivePin, uint8_t transmitPin, float frequency)
+    :
+    softSerial(receivePin, transmitPin),
+    server(softSerial),
+    address(address),
+    frequency(frequency)
 {
-  this->address = address;
-  this->frequency = frequency;
-
-  // Initialise the instance of the radio driver.
-  softSerial = new SoftwareSerial(receivePin, transmitPin);
-  server = new RH_RF95(*softSerial);
-
   pinMode(LED_PIN, OUTPUT);
 }
 
@@ -33,15 +31,15 @@ Server::Server(uint8_t address, uint8_t receivePin, uint8_t transmitPin, float f
 bool Server::init(void)
 {
   Serial.println("Initialising RF98 SERVER");
-  if (!server->init())
+  if (!server.init())
   {
     return false;
   }
 
   Serial.print("Setting Frequency: ");
   Serial.println(frequency);
-  server->setFrequency(frequency);
-  server->setThisAddress(address);
+  server.setFrequency(frequency);
+  server.setThisAddress(address);
   Serial.println("Initialisation success.");
 
   return true;
@@ -69,12 +67,12 @@ void Server::receive(void)
   bool recv;
   
   // Check if there are data in the reception buffer.
-  if (!server->available())
+  if (!server.available())
   {
     return;
   }
 
-  recv = waitData(server, buf, MAX_DATA_LEN, 0, &origin); // set timeout to continuously find messages
+  recv = waitData(&server, buf, MAX_DATA_LEN, 0, &origin); // set timeout to continuously find messages
   if (recv)
   {
     digitalWrite(LED_PIN, HIGH);
@@ -86,8 +84,8 @@ void Server::receive(void)
     
     // Send acknowledgement
     uint8_t toSend[MAX_DATA_LEN];
-    writeMsg(server, toSend, MAX_DATA_LEN, ADDRESS, 1, "Message acknowledged"); // Send to node with address '1'.
-    sendData(server, toSend, MAX_DATA_LEN);
+    writeMsg(&server, toSend, MAX_DATA_LEN, ADDRESS, 1, "Message acknowledged"); // Send to node with address '1'.
+    sendData(&server, toSend, MAX_DATA_LEN);
     
     digitalWrite(LED_PIN, LOW);
   }

@@ -13,13 +13,12 @@
  * @param frequency operation frequency of the module.
  */
 Client::Client (uint8_t address, uint8_t receivePin, uint8_t transmitPin, float frequency)
+    :
+    softSerial(receivePin, transmitPin),
+    client(softSerial),
+    address(address),
+    frequency(frequency)
 {
-  this->address = address;
-  this->frequency = frequency;
-
-  // Initialise the instance of the radio driver.
-  softSerial = new SoftwareSerial(receivePin, transmitPin);
-  client = new RH_RF95(*softSerial);
 }
 
 /**
@@ -31,15 +30,15 @@ Client::Client (uint8_t address, uint8_t receivePin, uint8_t transmitPin, float 
 bool Client::init(void)
 {
   Serial.println("Initialising RF98 CLIENT");
-  if (!client->init())
+  if (!client.init())
   {
     return false;
   }
 
   Serial.print("Setting Frequency: ");
   Serial.println(frequency);
-  client->setFrequency(frequency);
-  client->setThisAddress(address);
+  client.setFrequency(frequency);
+  client.setThisAddress(address);
   Serial.println("Initialisation success.");
 
   return true;
@@ -64,14 +63,14 @@ void Client::loop(void)
   uint8_t toSend[MAX_DATA_LEN];
   uint8_t origin;
 
-  writeMsg(client, toSend, MAX_DATA_LEN, ADDRESS, 0, "Requesting coordinates"); // Send to node with address '0'.
-  sendData(client, toSend, MAX_DATA_LEN);
+  writeMsg(&client, toSend, MAX_DATA_LEN, ADDRESS, 0, "Requesting coordinates"); // Send to node with address '0'.
+  sendData(&client, toSend, MAX_DATA_LEN);
   
   // Wait for acknowledgement from server
   uint8_t buf[MAX_DATA_LEN];
   bool ack;
 
-  ack = waitData(client, buf, MAX_DATA_LEN, CL_WAIT_TIME, &origin);
+  ack = waitData(&client, buf, MAX_DATA_LEN, CL_WAIT_TIME, &origin);
   if (ack)
   {
     Serial.print("Acknowledge from ");
