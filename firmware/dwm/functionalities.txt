@@ -1,0 +1,136 @@
+Exchange functionalities:
+  1. TX general message
+  2. RX general messages
+  3. TX Acknowledge command message
+  4. TX range initiation message
+  5. TX range response message
+  6. TX range confirm message
+  7. TX range distance message
+  8. RX initiation message
+  9. RX response message
+  10.RX confirm message
+  11.RX distance message
+  12.RX command message
+
+
+
+
+Command functionalities:
+  1. Start network ranging
+  2. Stop network ranging
+  3. Start device ranging
+  4. Stop device ranging
+  5. Set device as Tag
+  6. Set device as Anchor
+  7. Set role ID
+  8. Execute switching of roles
+
+  
+
+Classes:
+  1. message_transceiver (done)
+      - Transmits and receives frames
+  2. message_processor (done)
+      - Encode and decode messages(array) for tx/rx
+      - Timestamps, ID, exchange sequence number
+  3. timestamper (done)
+      - Reads TX/RX timestamps from device
+  4. command (done)
+      - Struct for commands
+      - Serialising/Deserialising command structs
+  5. UART 
+      - Handles serial comms
+      - Handles serial interrupts
+  6. ranging_manager
+      - Manages all ranging functions
+      - Manages the roles of all nodes in the network
+      - Manages the ID of all nodes
+  7. node_status
+      - describes the node parameters
+      - node ID
+      - tag/anchor ID
+      - state of node
+      - operation mode
+      - gateway status
+      - 
+
+
+message_transceiver:
+Global:
+  1. TX frame
+  2. RX frame
+
+Static:
+  1. check message type
+
+
+
+message_processor:
+Global:
+  1. Read timestamps from messages
+  2. Write timestamps to messages
+  3. Write range initiation message
+  4. Read rang initiation message
+  5. Write range response message
+  6. Read range response message
+  7. Write range confirm message
+  8. Read range confirm message
+  9. Write range distance message
+  10.Read range distance message
+
+Static:
+  1. Write 4 bytes timestamp
+  2. Read 4 bytes timestamp
+
+
+
+
+timestamper:
+Global:
+  1. Read TX/RX timestamp from device
+
+
+
+command:
+Global:
+  1. Deserialize Command
+  2. Serialize Command
+
+Static:
+  1. Serialize Switches
+  2. Deserialize Switches
+
+
+
+UART:
+Global:
+  1. Initialize UART
+
+Static:
+  1. Get char from UART
+  2. UART error handler callback function
+  3. Handle UART internal errors
+
+
+
+ranging_manager:
+Global:
+  1. Start network ranging
+  2. Stop network ranging
+  3. Start device ranging
+  4. Stop device ranging
+  5. Set device as Tag
+  6. Set device as Anchor
+  7. Set role ID
+  8. Execute switching of roles
+
+Static:
+  1. Distribute command to network
+  2. Execute command on device
+  3. 
+
+
+
+node_status:
+Global:
+  1.
