@@ -177,10 +177,10 @@ void initMotors(void)
   scD.setMinSpeed(0);
 
   // Initialise steering servos.
-  servoA.attach(SERVO_A_PWM_PIN);
-  servoB.attach(SERVO_B_PWM_PIN);
-  servoC.attach(SERVO_C_PWM_PIN);
-  servoD.attach(SERVO_D_PWM_PIN);
+  servoA.attach(SERVO_A_PWM_PIN, SERVO_MIN_PULSE_WIDTH, SERVO_MAX_PULSE_WIDTH);
+  servoB.attach(SERVO_B_PWM_PIN, SERVO_MIN_PULSE_WIDTH, SERVO_MAX_PULSE_WIDTH);
+  servoC.attach(SERVO_C_PWM_PIN, SERVO_MIN_PULSE_WIDTH, SERVO_MAX_PULSE_WIDTH);
+  servoD.attach(SERVO_D_PWM_PIN, SERVO_MIN_PULSE_WIDTH, SERVO_MAX_PULSE_WIDTH);
   servoA.write(90 + SERVO_A_CALIB_VAL);
   servoB.write(90 + SERVO_B_CALIB_VAL);
   servoC.write(90 + SERVO_C_CALIB_VAL);

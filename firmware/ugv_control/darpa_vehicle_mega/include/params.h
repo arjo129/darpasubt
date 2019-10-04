@@ -22,4 +22,6 @@
 #define SERVO_C_LOWER_LIMIT SERVO_OUTER_LIMIT // Maximum degree position for inner rotation. 
 #define SERVO_D_UPPER_LIMIT 180.0 - SERVO_OUTER_LIMIT // Maximum degree position for inner rotation. 
 #define SERVO_D_LOWER_LIMIT SERVO_INNER_LIMIT // Maximum degree position for inner rotation. 
+#define SERVO_MIN_PULSE_WIDTH 500
+#define SERVO_MAX_PULSE_WIDTH 2500
 #define MOTOR_SPEED_LIMIT 100000 // In degress per second of the encoder.
