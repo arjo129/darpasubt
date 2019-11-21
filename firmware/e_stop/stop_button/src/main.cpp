@@ -26,7 +26,7 @@ void setup() {
 }
 
 void loop() {
-  if (OP_MODE == 0)
+  if (MODE == TX_MODE)
   {
     if (isLock && toSend)
     {
@@ -46,7 +46,7 @@ void loop() {
       toSend = false;
     }
   }
-  else
+  else if (MODE == RX_MODE)
   {
     uint8_t len = MAX_SIZE;
     if (node.recv(buf, &len))
