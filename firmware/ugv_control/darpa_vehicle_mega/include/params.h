@@ -10,10 +10,10 @@
 // Servos and motor limits.
 #define SERVO_OUTER_LIMIT 0.0
 #define SERVO_INNER_LIMIT 0.0
-#define SERVO_A_CALIB_VAL -2 // Calibration values are the positive/negative offset from 90 degrees position.
-#define SERVO_B_CALIB_VAL 1
-#define SERVO_C_CALIB_VAL 8
-#define SERVO_D_CALIB_VAL 5
+#define SERVO_A_CALIB_VAL -7 // Calibration values are the positive/negative offset from 90 degrees position.
+#define SERVO_B_CALIB_VAL -3
+#define SERVO_C_CALIB_VAL 1
+#define SERVO_D_CALIB_VAL 3
 #define SERVO_A_UPPER_LIMIT 180.0 - SERVO_OUTER_LIMIT // Minimum degree position for outer rotation.
 #define SERVO_A_LOWER_LIMIT SERVO_INNER_LIMIT // Maximum degree position for inner rotation. 
 #define SERVO_B_UPPER_LIMIT 180.0 - SERVO_INNER_LIMIT // Minimum degree position for outer rotation.
@@ -24,4 +24,4 @@
 #define SERVO_D_LOWER_LIMIT SERVO_INNER_LIMIT // Maximum degree position for inner rotation. 
 #define SERVO_MIN_PULSE_WIDTH 500
 #define SERVO_MAX_PULSE_WIDTH 2500
-#define MOTOR_SPEED_LIMIT 100000 // In degress per second of the encoder.
+#define MOTOR_SPEED_LIMIT 200000 // In degress per second of the encoder.
