@@ -55,6 +55,7 @@ long SpeedControl::correctPwm(void)
   long error = setPoint - speed;
 
   // Calculate P, I, D values.
+  // TODO: Explore better Integral term computation (See: sliding window values)
   double pTerm = pGain * (double)error;
   setPoint == 0 ? iTerm = 0 : iTerm += iGain * (double)error;
   double dTerm = dGain * (speed - prevSpeed); // Uses derivative on measurement. See: http://brettbeauregard.com/blog/2011/04/improving-the-beginner%E2%80%99s-pid-derivative-kick/
