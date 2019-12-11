@@ -6,7 +6,7 @@ namespace Chunk
      * @brief Construct a new Segment:: Segment struct.
      * 
      */
-    Segment::Segment(void) : seq(0), checksum(0)
+    Segment::Segment(void) : chunk_id(0), flags_offset(0)
     {
         for (int i = 0; i < PAYLOAD_SIZE; i++)
         {
@@ -34,7 +34,18 @@ namespace Chunk
         this->id = CRC::CRC::calc_crc16(data, len);
     }
 
-    Chunk::Chunk(void) {}
+    /**
+     * @brief Construct a new Chunk:: Chunk object.
+     * 
+     */
+    Chunk::Chunk(void)
+    {
+        this->id = 0;
+        this->segments_count = 0;
+        memset(this->data, 0, MAX_DATA_SIZE);
+        memset(this->segments, 0, sizeof(Segment) * MAX_SEG_CNT);
+    }
+
     Chunk::~Chunk(void) {}
 
     /**
@@ -55,21 +66,30 @@ namespace Chunk
      */
     void Chunk::segment_data(uint8_t& src_addr, uint8_t& dest_addr)
     {
-        this->source = src_addr;
-        this->dest = dest_addr;
-
-        this->ack = 0;
-        this->flags = 0;
-        
         this->segments_count = (len + PAYLOAD_SIZE - 1) / PAYLOAD_SIZE;
         
         for (uint8_t i = 0; i < this->segments_count; i++)
         {
             Segment seg;
-            seg.seq = i;
+
+            seg.chunk_id = this->id;
+            // First Segment
+            if (i == 0)
+            {
+                seg.flags_offset |= SYN_BIT;
+            }
+
+            // Last Segment
+            if (i != this->segments_count - 1)
+            {
+                seg.flags_offset |= MF_BIT;
+            }
 
             uint16_t pl_len = PAYLOAD_SIZE;
             uint16_t byte_idx = i * PAYLOAD_SIZE;
+
+            seg.flags_offset |= (OFFSET_SET_MASK & byte_idx); // Segment offset
+            
             if (len - byte_idx < PAYLOAD_SIZE) pl_len = len - byte_idx;
             memcpy(&(seg.payload), &data[i * PAYLOAD_SIZE], pl_len);
 
@@ -85,14 +105,10 @@ namespace Chunk
      */
     void Chunk::flatten_seg(uint8_t index, uint8_t buf[SEGMENT_SIZE])
     {
-        buf[SRC_IDX] = this->source;
-        buf[DEST_IDX] = this->dest;
-        buf[FLAGS_IDX] = this->flags;
-        memcpy(&buf[SEQ_IDX], &(this->segments[index].seq), sizeof(uint32_t));
-        memcpy(&buf[ACK_IDX], &(this->ack), sizeof(uint32_t));
+        buf[CHUNK_IDX] = this->id;
+        buf[F_OFFSET_IDX] = this->segments[index].flags_offset;
         memcpy(&buf[PAYL_IDX], &(this->segments[index].payload), PAYLOAD_SIZE);
 
-        uint16_t crc = CRC::CRC::append_crc16(buf, SEGMENT_SIZE, CRC_IDX);
-        this->segments[index].checksum = crc;
+        CRC::CRC::append_crc16(buf, SEGMENT_SIZE, CRC_IDX);
     }
 }
