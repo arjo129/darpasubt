@@ -52,14 +52,16 @@ void setup()
 
 void loop()
 {
+    transporter.process_queue();
+
     if (MESH_ADDRESS == 1)
     {
-        Chunk::Chunk chunk(data, sizeof(data)-1);
-        transporter.send(2, &chunk);
+        Chunk::Chunk chunk(data, sizeof(data)-1, dest);
+        transporter.queue_chunk(chunk);
     }
     else if (MESH_ADDRESS == 2)
     {
-        transporter.receive(buf);
-        memset(buf, 0, sizeof(buf));
+        Chunk::Chunk recv = transporter.receive();
+        Serial.println(recv.get_id(), HEX);
     }
 }

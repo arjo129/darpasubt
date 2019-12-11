@@ -1,20 +1,25 @@
 #include <Arduino.h>
 #include <RHMesh.h>
-#include <Chunk.h>
+#include <circular_buffer.h>
 
 namespace Transport
 {
+    const size_t MAX_BUFFER_SIZE = 1;
+    
     class Transport
     {
         private:
-            uint8_t source_addr;
-            Chunk::Chunk* chunk;
+            uint8_t src_addr;
             RHMesh* net_manager;
+            circular_buffer queue;
+            
+            void send(Chunk::Chunk chunk);
             
         public:
             Transport(uint8_t src_addr, RHMesh* net_manager);
             ~Transport(void);
-            void send(uint8_t dest_addr, Chunk::Chunk* chunk);
-            void receive(uint8_t* data);
+            void queue_chunk(Chunk::Chunk& chunk);
+            void process_queue(void);
+            Chunk::Chunk receive(void);
     };
 }
