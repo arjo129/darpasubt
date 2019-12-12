@@ -1,3 +1,6 @@
+#ifndef Chunk_h
+#define Chunk_h
+
 #include <Arduino.h>
 #include <crc.h>
 
@@ -87,3 +90,5 @@ namespace Chunk
         void get_flat_segment(uint16_t index, uint8_t flat[SEGMENT_SIZE]);
     };
 }
+
+#endif

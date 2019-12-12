@@ -1,3 +1,6 @@
+#ifndef common_h
+#define common_h
+
 /* Configure address of node. Uncomment to set. */
 // #define MESH_ADDRESS 1
 #define MESH_ADDRESS 2
@@ -34,3 +37,5 @@ WARNING: Clashes with USE_HARDWARE_SERIAL*/
 #define MSG_INIT_SUCCESS "Initialisation succeed"
 #define MSG_INIT_FAILED "Initialisation failed"
 #define MSG_WHOAMI "I am address " STR(MESH_ADDRESS)
+
+#endif

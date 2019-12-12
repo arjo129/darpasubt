@@ -1,3 +1,6 @@
+#ifndef Transport_h
+#define Transport_h
+
 #include <Arduino.h>
 #include <RHMesh.h>
 #include <Array.h>
@@ -28,3 +31,5 @@ namespace Transport
             Chunk::Chunk receive(bool& complete);
     };
 }
+
+#endif

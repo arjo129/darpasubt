@@ -1,5 +1,5 @@
-#ifndef _CIRCULAR_BUFFER_H
-#define _CIRCULAR_BUFFER_H
+#ifndef circular_buffer_h
+#define circular_buffer_h
 
 #include <stdlib.h>
 #include <Chunk.h>

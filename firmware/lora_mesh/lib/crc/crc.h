@@ -1,3 +1,6 @@
+#ifndef circular_buffer_h
+#define circular_buffer_h
+
 #include <Arduino.h>
 #include <util/crc16.h>
 
@@ -11,3 +14,5 @@ namespace CRC
             static bool check_crc16(uint8_t* data, uint16_t len, uint16_t index);
     };
 }
+
+#endif
