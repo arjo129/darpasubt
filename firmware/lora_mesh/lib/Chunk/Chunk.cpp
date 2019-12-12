@@ -6,7 +6,7 @@ namespace Chunk
      * @brief Construct a new Segment:: Segment struct.
      * 
      */
-    Segment::Segment(void) : chunk_id(0), flags_offset(0)
+    Segment::Segment(void) : chunk_id(0), chunk_len(0), flags_offset(0)
     {
         for (int i = 0; i < PAYLOAD_SIZE; i++)
         {
@@ -15,6 +15,91 @@ namespace Chunk
     }
 
     Segment::~Segment(void) {}
+
+    /**
+     * @brief Flattens a Segment into a bytes array.
+     * 
+     * @param buf array to hold flattened Segment.
+     */
+    void Segment::flatten_seg(uint8_t buf[SEGMENT_SIZE])
+    {
+        buf[CHUNK_IDX] = (this->chunk_id & HIGH_16_BITS_MASK) >> 8;
+        buf[CHUNK_IDX+1]  = this->chunk_id & LOW_16_BITS_MASK;
+        buf[CHUNK_LEN_IDX] = (this->chunk_len & HIGH_16_BITS_MASK) >> 8;
+        buf[CHUNK_LEN_IDX+1]  = this->chunk_len & LOW_16_BITS_MASK;
+        buf[F_OFFSET_IDX] = (this->flags_offset & HIGH_16_BITS_MASK) >> 8;
+        buf[F_OFFSET_IDX+1] = this->flags_offset;
+        memcpy(&buf[PAYL_IDX], &(this->payload), PAYLOAD_SIZE);
+
+        CRC::CRC::append_crc16(buf, SEGMENT_SIZE, CRC_IDX);
+    }
+
+    /**
+     * @brief Expands a bytes array into a Segment.
+     * 
+     * @param buf buffer array containing the bytes.
+     */
+    void Segment::expand_seg(uint8_t buf[SEGMENT_SIZE])
+    {
+        this->chunk_id |= (uint16_t)buf[CHUNK_IDX] << 8;
+        this->chunk_id |= (uint16_t)buf[CHUNK_IDX+1];
+        this->chunk_len |= (uint16_t)buf[CHUNK_LEN_IDX] << 8;
+        this->chunk_len |= (uint16_t)buf[CHUNK_LEN_IDX+1];
+        this->flags_offset |= (uint16_t)buf[F_OFFSET_IDX] << 8;
+        this->flags_offset |= (uint16_t)buf[F_OFFSET_IDX+1];
+        memcpy(&(this->payload), &buf[PAYL_IDX], PAYLOAD_SIZE);
+    }
+
+    /**
+     * @brief Operator == overload to check if two Segments are equal in attribute values.
+     * 
+     * @param seg Segment to compare with.
+     * @return true if every attributes have the same value.
+     * @return false if at least one attribute has different values.
+     */
+    bool Segment::operator==(const Segment& seg)
+    {
+        if (this->chunk_id == seg.chunk_id && 
+            this->chunk_len == seg.chunk_len &&
+            this->flags_offset == seg.flags_offset &&
+            !memcmp(this->payload, seg.payload, PAYLOAD_SIZE))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @brief Checks if the SYN bit is set.
+     * 
+     * @return true if SYN is set to '1'.
+     * @return false if SYN is not set to '0'.
+     */
+    bool Segment::check_syn(void)
+    {
+        return (this->flags_offset & SYN_BIT) > 0;
+    }
+
+    /**
+     * @brief Checks if the MF bit is set.
+     * 
+     * @return true if MF is set to '1'.
+     * @return false if MF is not set '0'.
+     */
+    bool Segment::check_mf(void)
+    {
+        return (this->flags_offset & MF_BIT) > 0;
+    }
+
+    /**
+     * @brief Retrieves the Segment offset.
+     * 
+     * @return uint16_t offset value.
+     */
+    uint16_t Segment::get_offset(void)
+    {
+        return (this->flags_offset & OFFSET_SET_MASK);
+    }
 
     /**
      * @brief Construct a new Chunk:: Chunk object.
@@ -53,6 +138,15 @@ namespace Chunk
     Chunk::~Chunk(void) {}
 
     /**
+     * @brief Sets the id of the Chunk.
+     * 
+     */
+    void Chunk::set_id(uint16_t id)
+    {
+        this->id = id;
+    }
+
+    /**
      * @brief Returns the number of Segments in this Chunk.
      * 
      * @return uint16_t number of Segments.
@@ -83,6 +177,26 @@ namespace Chunk
     }
 
     /**
+     * @brief Returns a pointer to the data field of the Chunk.
+     * 
+     * @return uint8_t* pointer to the first byte of data.
+     */
+    uint8_t* Chunk::get_data(void)
+    {
+        return this->data;
+    }
+
+    /**
+     * @brief Returns the length of data in the Chunk.
+     * 
+     * @return uint16_t length in bytes.
+     */
+    uint16_t Chunk::get_len(void)
+    {
+        return this->len;
+    }
+
+    /**
      * @brief Breaks a Chunk into Segments.
      * 
      * @param src_addr address of source node.
@@ -96,6 +210,8 @@ namespace Chunk
             Segment seg;
 
             seg.chunk_id = this->id;
+            seg.chunk_len = this->len;
+            
             // First Segment
             if (i == 0)
             {
@@ -112,7 +228,6 @@ namespace Chunk
             uint16_t byte_idx = i * PAYLOAD_SIZE;
 
             seg.flags_offset |= (OFFSET_SET_MASK & (byte_idx / 8)); // Segment offset
-            Serial.println(seg.flags_offset, HEX);
             
             if (len - byte_idx < PAYLOAD_SIZE) pl_len = len - byte_idx;
             memcpy(&(seg.payload), &data[i * PAYLOAD_SIZE], pl_len);
@@ -122,50 +237,54 @@ namespace Chunk
     }
 
     /**
-     * @brief Flattens a Segment into a bytes array.
-     * 
-     * @param index index position of the segment to flatten.
-     * @param buf array to hold flattened Segment.
-     */
-    void Chunk::flatten_seg(uint8_t index, uint8_t buf[SEGMENT_SIZE])
-    {
-        buf[CHUNK_IDX] = (this->id & HIGH_16_BITS_MASK) >> 8;
-        buf[CHUNK_IDX+1]  = this->id & LOW_16_BITS_MASK;
-        buf[F_OFFSET_IDX] = (this->segments[index].flags_offset & HIGH_16_BITS_MASK) >> 8;
-        buf[F_OFFSET_IDX+1] = this->segments[index].flags_offset;
-        memcpy(&buf[PAYL_IDX], &(this->segments[index].payload), PAYLOAD_SIZE);
-
-        CRC::CRC::append_crc16(buf, SEGMENT_SIZE, CRC_IDX);
-    }
-
-    /**
      * @brief Assemble a Segment back into the Chunk.
      * 
      * @param segment Segment to assemble back.
-     * @return true if Segment is first Segment or belongs to the Chunk.
-     * @return false if Segment does not belong to the Chunk and is not assembled.
      */
-    bool Chunk::assemble_seg(Segment segment)
+    void Chunk::assemble_seg(Segment segment)
     {
-        if (check_syn(segment.flags_offset))
+        uint16_t pos = (segment.get_offset() * 8) / PAYLOAD_SIZE;
+        if (this->segments[pos] == segment) return;
+
+        this->segments[pos] = segment;
+        segments_count++;
+    }
+
+    /**
+     * @brief Check if Chunk is complete and has all original Segments.
+     * 
+     * @return true if Chunk has all Segments.
+     * @return false if Chunk has at least one missing Segment.
+     */
+    bool Chunk::check_complete(void)
+    {
+        if (segments_count == 0)
+            return false; // Early return.
+
+        // Look for the last Segment from the back.
+        uint8_t i;
+        for (i = MAX_SEG_CNT-1; i >= 0; i--)
         {
-            this->id = segment.chunk_id;
-            this->segments[0] = segment;
-            segments_count++;
-        }
-        else
-        {
-            if (segment.chunk_id != this->id)
+            Segment seg = segments[i];
+            if (!seg.check_mf() && seg.get_offset() == 0 && this->segments_count == 1)
             {
-                return false;
+                // This is the first and only Segment in this Chunk.
+                return true;
             }
 
-            uint16_t pos = (get_offset(segment.flags_offset) * 8) / PAYLOAD_SIZE;
-            this->segments[pos] = segment;
-            segments_count++;
+            if (!seg.check_mf() && seg.get_offset() > 0)
+            {
+                // Found the last Segment.
+                uint16_t supposed_count = ((seg.get_offset() * 8) / PAYLOAD_SIZE) + 1;
+                if (this->segments_count == supposed_count) 
+                    return true;
+                else 
+                    return false;
+            }
         }
 
-        return true;
+        // If reach here, it means no last or any Segments are found at all.
+        return false;
     }
 
     /**
@@ -176,63 +295,21 @@ namespace Chunk
     {
         for (int i = 0; i < this->segments_count; i++)
         {
-            memcpy(&(this->data[i * PAYLOAD_SIZE]), segments[i].payload, PAYLOAD_SIZE);
+            memcpy(&(this->data[i * PAYLOAD_SIZE]), this->segments[i].payload, PAYLOAD_SIZE);
         }
 
         this->id = CRC::CRC::calc_crc16(this->data, MAX_DATA_SIZE);
+        this->len = this->segments[0].chunk_len;
     }
 
     /**
-     * @brief Expands a bytes array into a Segment.
+     * @brief Retrieve a flattened Segment in the given index position.
      * 
-     * @param buf buffer array containing the bytes.
-     * @return Segment expanded Segment.
+     * @param index index position of Segment stored.
+     * @param flat pointer to buffer to store flattened Segment.
      */
-    Segment Chunk::expand_seg(uint8_t buf[SEGMENT_SIZE])
+    void Chunk::get_flat_segment(uint16_t index, uint8_t flat[SEGMENT_SIZE])
     {
-        Segment ret;
-
-        ret.chunk_id |= (uint16_t)buf[CHUNK_IDX] << 8;
-        ret.chunk_id |= (uint16_t)buf[CHUNK_IDX+1];
-        ret.flags_offset |= (uint16_t)buf[F_OFFSET_IDX] << 8;
-        ret.flags_offset |= (uint16_t)buf[F_OFFSET_IDX+1];
-        memcpy(&ret.payload, &buf[PAYL_IDX], PAYLOAD_SIZE);
-
-        return ret;
-    }
-
-    /**
-     * @brief Checks if the SYN bit is set.
-     * 
-     * @param flags_offset the bit field containing the SYN bit.
-     * @return true if SYN is set.
-     * @return false if SYN is not set.
-     */
-    bool Chunk::check_syn(uint16_t flags_offset)
-    {
-        return (flags_offset & SYN_BIT) > 0;
-    }
-
-    /**
-     * @brief Checks if the MF bit is set.
-     * 
-     * @param flags_offset the bit field containing the MF bit.
-     * @return true if MF is set.
-     * @return false if MF is not set.
-     */
-    bool Chunk::check_mf(uint16_t flags_offset)
-    {
-        return (flags_offset & MF_BIT) > 0;
-    }
-
-    /**
-     * @brief Retrieves the Segment offset.
-     * 
-     * @param flags_offset the bit field containing the offset bits.
-     * @return uint16_t 
-     */
-    uint16_t Chunk::get_offset(uint16_t flags_offset)
-    {
-        return (flags_offset & OFFSET_SET_MASK);
+        this->segments[index].flatten_seg(flat);
     }
 }

@@ -10,7 +10,8 @@ namespace Transport
     Transport::Transport(uint8_t src_addr, RHMesh* net_manager) :
         src_addr(src_addr),
         net_manager(net_manager),
-        queue(MAX_BUFFER_SIZE)
+        send_queue(MAX_BUFFER_SIZE)
+        // recv_queue(MAX_BUFFER_SIZE)
     {
     }
 
@@ -26,20 +27,21 @@ namespace Transport
      * 
      * @param chunk 
      */
-    void Transport::queue_chunk(Chunk::Chunk& chunk)
+    void Transport::queue_chunk(Chunk::Chunk chunk)
     {
-        queue.put(chunk);
+        send_queue.put(chunk);
     }
 
     /**
      * @brief Sends out one Chunk if there is any in the sending queue.
      * 
+     * TODO: Re-queue a chunk if any of its segments fail to send.
      */
-    void Transport::process_queue(void)
+    void Transport::process_send_queue(void)
     {
-        if (!queue.empty())
+        if (!send_queue.empty())
         {
-            Chunk::Chunk chunk = queue.get();
+            Chunk::Chunk chunk = send_queue.get();
             send(chunk);
         }
     }
@@ -49,7 +51,7 @@ namespace Transport
      * 
      * @param chunk Chunk containing the data to be sent.
      */
-    void Transport::send(Chunk::Chunk chunk)
+    void Transport::send(Chunk::Chunk& chunk)
     {
         // Break data chunk into segments.
         chunk.segment_data(this->src_addr);
@@ -57,7 +59,7 @@ namespace Transport
         for (uint8_t i = 0; i < chunk.get_seg_count(); i++)
         {
             uint8_t buf[SEGMENT_SIZE] = {0};
-            chunk.flatten_seg(i, buf);
+            chunk.get_flat_segment(i, buf);
             net_manager->sendtoWait(buf, sizeof(buf), chunk.get_dest());
             Serial.print(F("sent : 0x"));
             for (int j = 0; j < SEGMENT_SIZE; j++)
@@ -71,66 +73,99 @@ namespace Transport
     }
 
     /**
+     * @brief Process and take actions according to the context of the Segment.
+     *          A Segment can be one of the following three cases:
+     *          (1):
+     *          The Segment is the first and only Segment of a Chunk.
+     *          In this case, the Segment's offset == zero and MF bit is set to '0'.
+     *          The action to take is to create a new Chunk consisting of the payload.
+     * 
+     *          (2):
+     *          The Segment belongs to a Chunk consisting of more than one Segments but it is not
+     *          the last Segment.
+     *          In this case, the Segments's MF bit will be set to '1' and offset >= 0.
+     *          The action to take is to first check if a Chunk for this Segment exists in the
+     *          recv_queue. If it does not exist, create new Chunk and insert this Segment.
+     *          Otherwise, insert this Segment.
+     * 
+     *          (3):
+     *          The Segment is the last Segment of a Chunk.
+     *          In this case, the Segment's offset > 0 and MF bit is set to '0'.
+     *          The action to take is to first check if a Chunk for this Segment exists in the
+     *          recv_queue. If it does not exist, create new Chunk and insert this Segment.
+     *          Otherwise, insert this Segment.
+     *          Determine the expected segments count for the chunk using the offset and payload
+     *          size.
+     * 
+     * @param segment 
+     */
+    Chunk::Chunk Transport::process_segment(Chunk::Segment& segment, bool& complete)
+    {
+        uint8_t pos = insert_segment(segment);
+        if (trackings[pos].check_complete())
+        {
+            complete = true;
+            Chunk::Chunk ret = trackings[pos];
+            ret.reassemble(); //
+            trackings.remove(pos);
+            return ret;
+        }
+
+        complete = false;
+        Chunk::Chunk ret;
+        return ret;
+    }
+    
+    /**
+     * @brief Inserts a Segment into a corresponding exisiting or new Chunk.
+     * 
+     * @param segment Segment to insert.
+     * @return uint8_t index of inserted position in the Chunk trackings.
+     */
+    uint8_t Transport::insert_segment(Chunk::Segment& segment)
+    {
+        size_t count = trackings.size();
+        for (uint8_t i = 0; i < count; i++)
+        {
+            if (trackings[i].get_id() == segment.chunk_id)
+            {
+                trackings[i].assemble_seg(segment);
+                return i;
+            }
+        }
+
+        // If reach here, the Chunk does not currently exist. Create a new Chunk.
+        Chunk::Chunk new_chunk;
+        new_chunk.set_id(segment.chunk_id);
+        new_chunk.assemble_seg(segment);
+        trackings.push_back(new_chunk);
+
+        return trackings.size()-1;
+    }
+
+    /**
      * @brief Receives a data Chunk from a source address.
      * 
      * @return Chunk::Chunk received data Chunk.
      */
-    Chunk::Chunk Transport::receive(void)
+    Chunk::Chunk Transport::receive(bool& complete)
     {
         uint8_t source = 0;
         uint8_t buf[SEGMENT_SIZE] = {0};
         uint8_t len = sizeof(buf);
         if (net_manager->recvfromAck(buf, &len, &source))
         {
-            Chunk::Segment segment = Chunk::Chunk::expand_seg(buf);
-
-            if (Chunk::Chunk::check_syn(segment.flags_offset))
+            if (CRC::CRC::check_crc16(buf, SEGMENT_SIZE, CRC_IDX))
             {
-                bool wrong_chunk = false;
-                Chunk::Chunk recv_chunk;
-                recv_chunk.assemble_seg(segment);
-                memset(buf, 0, len);
-
-                while (net_manager->recvfromAck(buf, &len, &source))
-                {
-                    segment = Chunk::Chunk::expand_seg(buf);
-                    bool res = recv_chunk.assemble_seg(segment);
-                    if (!res)
-                    {
-                        wrong_chunk = true;
-                        break;
-                    }
-                    if (!Chunk::Chunk::check_mf(segment.flags_offset))
-                    {
-                        break;
-                    }
-                }
-
-                if (wrong_chunk)
-                {
-                    Chunk::Chunk empty;
-                    return empty;
-                }
-                else
-                {
-                    recv_chunk.reassemble();
-                    return recv_chunk;
-                }
+                Chunk::Segment new_segment;
+                new_segment.expand_seg(buf);
+                return process_segment(new_segment, complete);
             }
-            
-            // Serial.print(F("from "));
-            // Serial.print(source);
-            // Serial.print(F(" : "));
-            // for (int j = 0; j < SEGMENT_SIZE; j++)
-            // {
-            //     Serial.print(data[j], HEX);
-            // }
-            // Serial.println(F(""));
-            // if (CRC::CRC::check_crc16(data, SEGMENT_SIZE, CRC_IDX))
-            //     Serial.println(F("crc correct"));
-            // else
-            //     Serial.println(F("crc wrong"));
         }
+
+        complete = false;
+        Chunk::Chunk ret;
+        return ret;
     }
 }
 

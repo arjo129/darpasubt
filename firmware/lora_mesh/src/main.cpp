@@ -14,6 +14,7 @@
 #include <SoftwareSerial.h>
 #include <common.h>
 #include <Transport.h>
+#include <main.h>
 
 #ifdef USE_SOFTWARE_SERIAL
 SoftwareSerial soft_serial (RX_SOFTSERIAL_PIN, TX_SOFTSERIAL_PIN);
@@ -27,10 +28,9 @@ RH_RF95<HardwareSerial> driver(HARD_SERIAL);
 // Class to manage message delivery and receipt, using the driver declared above
 RHMesh mesh_manager(driver, MESH_ADDRESS);
 // Messages data
-// uint8_t data[] = "AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDDDDDDDDDDEEEEEEEEEEFFFFFFFFFFGGGGGGGGGGHHHHHHHHHHIIIIIIIIIIJJJJJJJJJJAAAAAAAAAABBBBBBBBBBCCCCCCCCCCDDDDDDDDDDEEEEEEEEEEFFFFFFFFFFGGGGGGGGGGHHHHHHHHHHIIIIIIIIIIJJJJJJJJJJAAAAAAAAAABBBBBBBBBBCCCCCCCCCCDDDDDDDDDDEEEEEEEEEEFFFFFFFFFFGGGGGGGGGGHHHHHHHHHHIIIIIIIIIIJJJJJJJJJJ";
 uint8_t data[] = "AAAAAAAAAB";
 // Dont put this on the stack:
-uint8_t buf[RH_MESH_MAX_MESSAGE_LEN];
+uint8_t buf[MAX_DATA_SIZE];
 uint8_t buf_len = sizeof(buf);
 uint8_t dest = 2;
 
@@ -41,7 +41,7 @@ void setup()
     Serial.begin(115200);
 
     while (!mesh_manager.init()) {}
-    driver.setFrequency(434.0);
+    config_network(&driver, &mesh_manager);
 
     #ifdef DEBUG_PRINT
     Serial.println(F(MSG_INIT_SUCCESS));
@@ -52,7 +52,7 @@ void setup()
 
 void loop()
 {
-    transporter.process_queue();
+    transporter.process_send_queue();
 
     if (MESH_ADDRESS == 1)
     {
@@ -61,7 +61,26 @@ void loop()
     }
     else if (MESH_ADDRESS == 2)
     {
-        Chunk::Chunk recv = transporter.receive();
-        Serial.println(recv.get_id(), HEX);
+        bool complete = false;
+        Chunk::Chunk recv = transporter.receive(complete);
+        if (complete)
+        {
+            Serial.println((char*)recv.get_data());
+        }
     }
+}
+
+/**
+ * @brief Configures network with defined values.
+ * 
+ * @param driver radio driver used.
+ * @param mesh_manager mesh network manager used.
+ */
+void config_network(RH_RF95<SoftwareSerial>* driver, RHMesh* mesh_manager)
+{
+    driver->setFrequency(434.0);
+    driver->setTxPower(TX_POWER);
+    mesh_manager->setRetries(RE_TX_RETRIES);
+    mesh_manager->setTimeout(RE_TX_TIMEOUT);
+    mesh_manager->setArpTimeout(MESH_ARP_TIMEOUT);
 }
