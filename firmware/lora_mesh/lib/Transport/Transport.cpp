@@ -56,6 +56,7 @@ namespace Transport
         // Break data chunk into segments.
         chunk.segment_data(this->src_addr);
         // Send each segment one by one.
+        Serial.println(chunk.get_seg_count());
         for (uint8_t i = 0; i < chunk.get_seg_count(); i++)
         {
             uint8_t buf[SEGMENT_SIZE] = {0};
