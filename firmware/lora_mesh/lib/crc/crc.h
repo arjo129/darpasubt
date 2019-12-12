@@ -1,5 +1,5 @@
-#ifndef circular_buffer_h
-#define circular_buffer_h
+#ifndef crc_h
+#define crc_h
 
 #include <Arduino.h>
 #include <util/crc16.h>
