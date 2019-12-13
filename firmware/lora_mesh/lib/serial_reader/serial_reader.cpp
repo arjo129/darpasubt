@@ -11,6 +11,8 @@ namespace serial_reader
      *        Chunk is reached. In those cases, the terminate flag is set and no more bytes will
      *        be further read.
      * 
+     * TODO: Read incoming data into Chunks and store them in a read circular buffer queue, so that more data can be read at once.
+     *       Use some bytes to indicate start and end of chunks. Otherwise, its easy to mix up the data between chunks.
      */
     void read(void)
     {

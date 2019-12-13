@@ -8,7 +8,7 @@
 
 namespace Transport
 {
-    const size_t MAX_BUFFER_SIZE = 10;
+    const size_t MAX_BUFFER_SIZE = 2;
     const uint8_t MAX_ATTEMPTS = 3;
     
     class Transport

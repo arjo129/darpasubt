@@ -25,7 +25,7 @@ namespace Transport
     /**
      * @brief Push a chunk into the processing queue.
      * 
-     * @param chunk 
+     * @param chunk Chunk to be queued.
      */
     void Transport::queue_chunk(Chunk::Chunk chunk)
     {
@@ -67,7 +67,7 @@ namespace Transport
         {
             uint8_t buf[SEGMENT_SIZE] = {0};
             chunk.get_flat_segment(i, buf);
-            
+
             if (net_manager->sendtoWait(buf, sizeof(buf), chunk.get_dest()) != RH_ROUTER_ERROR_NONE)
                 return false;
             
@@ -109,8 +109,12 @@ namespace Transport
      *          Determine the expected segments count for the chunk using the offset and payload
      *          size.
      * 
-     * @param segment 
+     * @param segment Segment to be processed.
+     * @param complete reference to boolean flag to indicate if the Chunk belonging to the Segment 
+     *                  has all the Segments after processing.
+     * @return Chunk::Chunk the complete Chunk if it is complete, otherwise a new empty Chunk.
      */
+
     Chunk::Chunk Transport::process_segment(Chunk::Segment& segment, bool& complete)
     {
         uint8_t pos = insert_segment(segment);
@@ -158,6 +162,8 @@ namespace Transport
     /**
      * @brief Receives a data Chunk from a source address.
      * 
+     * @param complete reference to boolean flag to indicate if the Chunk belonging to the Segment 
+     *                  has all the Segments after processing.
      * @return Chunk::Chunk received data Chunk.
      */
     Chunk::Chunk Transport::receive(bool& complete)
