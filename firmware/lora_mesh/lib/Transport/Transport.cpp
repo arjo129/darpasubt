@@ -35,14 +35,18 @@ namespace Transport
     /**
      * @brief Sends out one Chunk if there is any in the sending queue.
      * 
-     * TODO: Re-queue a chunk if any of its segments fail to send.
      */
     void Transport::process_send_queue(void)
     {
         if (!send_queue.empty())
         {
             Chunk::Chunk chunk = send_queue.get();
-            send(chunk);
+            if (!send(chunk))
+            {
+                chunk.increment_attempts();
+                if (chunk.get_attempts() < MAX_ATTEMPTS)
+                    send_queue.put(chunk);
+            }
         }
     }
 
@@ -50,18 +54,23 @@ namespace Transport
      * @brief Sends a data Chunk to a given destination address.
      * 
      * @param chunk Chunk containing the data to be sent.
+     * @return true if every Segment was transmitted successfully.
+     * @return false if at least one Segment failed to transmit.
      */
-    void Transport::send(Chunk::Chunk& chunk)
+    bool Transport::send(Chunk::Chunk& chunk)
     {
         // Break data chunk into segments.
-        chunk.segment_data(this->src_addr);
+        if (chunk.get_attempts() == 0)
+            chunk.segment_data(this->src_addr);
         // Send each segment one by one.
-        Serial.println(chunk.get_seg_count());
         for (uint8_t i = 0; i < chunk.get_seg_count(); i++)
         {
             uint8_t buf[SEGMENT_SIZE] = {0};
             chunk.get_flat_segment(i, buf);
-            net_manager->sendtoWait(buf, sizeof(buf), chunk.get_dest());
+            
+            if (net_manager->sendtoWait(buf, sizeof(buf), chunk.get_dest()) != RH_ROUTER_ERROR_NONE)
+                return false;
+            
             Serial.print(F("sent : 0x"));
             for (int j = 0; j < SEGMENT_SIZE; j++)
             {
@@ -71,6 +80,8 @@ namespace Transport
             Serial.println(F(""));
         }
         Serial.println(F(""));
+
+        return true;
     }
 
     /**

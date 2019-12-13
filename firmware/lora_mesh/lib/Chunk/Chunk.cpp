@@ -110,7 +110,8 @@ namespace Chunk
     Chunk::Chunk(uint8_t* data, uint16_t len, uint16_t dest) : 
         len(len), 
         segments_count(0), 
-        dest(dest)
+        dest(dest),
+        attempts(0)
     {
         memset(this->data, 0, MAX_DATA_SIZE);
         memset(this->segments, 0, sizeof(Segment) * MAX_SEG_CNT);
@@ -129,7 +130,8 @@ namespace Chunk
     id(0),
     len(0),
     segments_count(0),
-    dest(0)
+    dest(0),
+    attempts(0)
     {
         memset(this->data, 0, MAX_DATA_SIZE);
         memset(this->segments, 0, sizeof(Segment) * MAX_SEG_CNT);
@@ -144,6 +146,15 @@ namespace Chunk
     void Chunk::set_id(uint16_t id)
     {
         this->id = id;
+    }
+
+    /**
+     * @brief Increment the attempts counter by one.
+     * 
+     */
+    void Chunk::increment_attempts(void)
+    {
+        this->attempts++;
     }
 
     /**
@@ -197,12 +208,22 @@ namespace Chunk
     }
 
     /**
+     * @brief Returns the number of attempts.
+     * 
+     * @return uint8_t number of attempts.
+     */
+    uint8_t Chunk::get_attempts(void)
+    {
+        return this->attempts;
+    }
+
+    /**
      * @brief Breaks a Chunk into Segments.
      * 
      * @param src_addr address of source node.
      */
     void Chunk::segment_data(uint8_t& src_addr)
-    {
+    {   
         this->segments_count = (len + PAYLOAD_SIZE - 1) / PAYLOAD_SIZE;
         
         for (uint8_t i = 0; i < this->segments_count; i++)

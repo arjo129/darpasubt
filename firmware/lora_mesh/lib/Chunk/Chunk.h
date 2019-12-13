@@ -70,6 +70,7 @@ namespace Chunk
         Segment segments[MAX_SEG_CNT];
         uint8_t segments_count;
         uint16_t dest;
+        uint8_t attempts;
 
         public:
         Chunk(void);
@@ -77,11 +78,13 @@ namespace Chunk
         ~Chunk(void);
         
         void set_id(uint16_t id);
+        void increment_attempts(void);
         uint16_t get_seg_count(void);
         uint16_t get_dest(void);
         uint16_t get_id(void);
         uint8_t* get_data(void);
         uint16_t get_len(void);
+        uint8_t get_attempts(void);
 
         void segment_data(uint8_t& src_addr);
         void assemble_seg(Segment segment);

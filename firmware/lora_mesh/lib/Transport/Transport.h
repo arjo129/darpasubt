@@ -8,7 +8,8 @@
 
 namespace Transport
 {
-    const size_t MAX_BUFFER_SIZE = 1;
+    const size_t MAX_BUFFER_SIZE = 10;
+    const uint8_t MAX_ATTEMPTS = 3;
     
     class Transport
     {
@@ -19,7 +20,7 @@ namespace Transport
             // circular_buffer recv_queue;
             Array<Chunk::Chunk, MAX_BUFFER_SIZE> trackings;
             
-            void send(Chunk::Chunk& chunk);
+            bool send(Chunk::Chunk& chunk);
             Chunk::Chunk process_segment(Chunk::Segment& segment, bool& complete);
             uint8_t insert_segment(Chunk::Segment& segment);
             
