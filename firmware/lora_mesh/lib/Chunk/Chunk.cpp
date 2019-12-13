@@ -319,7 +319,7 @@ namespace Chunk
             memcpy(&(this->data[i * PAYLOAD_SIZE]), this->segments[i].payload, PAYLOAD_SIZE);
         }
 
-        this->id = CRC::CRC::calc_crc16(this->data, MAX_DATA_SIZE);
+        this->id = this->segments[0].chunk_id;
         this->len = this->segments[0].chunk_len;
     }
 
