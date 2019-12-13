@@ -20,9 +20,9 @@
 #endif
 
 #ifdef USE_HARDWARE_SERIAL
-#define RX_HARDSERIAL_PIN 0
-#define TX_HARDSERIAL_PIN 1
-#define HARD_SERIAL Serial
+#define RX_HARDSERIAL_PIN 19
+#define TX_HARDSERIAL_PIN 18
+#define HARD_SERIAL Serial1 // Change the Serial port if need to.
 #endif
 
 /* Network configuration values. */
@@ -31,8 +31,7 @@
 #define RE_TX_TIMEOUT 100 // Time in milliseconds to timeout retransmission.
 #define MESH_ARP_TIMEOUT 100 // Time in milliseconds to timeout route resolving.
 
-/* Define to print debugging prints. 
-WARNING: Clashes with USE_HARDWARE_SERIAL*/
+/* Define to print debugging prints. */
 #define DEBUG_PRINT
 
 /* Helper Macros for debugging prints. */

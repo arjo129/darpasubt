@@ -1,12 +1,4 @@
-// rf95_client.pde
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple messageing client
-// with the RH_RF95 class. RH_RF95 class does not provide for addressing or
-// reliability, so you should only use RH_RF95 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example rf95_server
-// Tested with Anarduino MiniWirelessLoRa, Rocket Scream Mini Ultra Pro with
-// the RFM95W, Adafruit Feather M0 with RFM95
+// Mesh network implementation using the Grove LoRa RFM95 module.
 
 #include <RH_RF95.h>
 #include <RHMesh.h>
@@ -16,14 +8,66 @@
 #include <Transport.h>
 #include <main.h>
 
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+
+
+
 #ifdef USE_SOFTWARE_SERIAL
+/**
+ * @brief Configures network with defined values. For Software Serial.
+ * 
+ * @param driver radio driver used.
+ * @param mesh_manager mesh network manager used.
+ */
+void config_network(RH_RF95<SoftwareSerial>* driver, RHMesh* mesh_manager)
+{
+    driver->setFrequency(434.0);
+    driver->setTxPower(TX_POWER);
+    mesh_manager->setRetries(RE_TX_RETRIES);
+    mesh_manager->setTimeout(RE_TX_TIMEOUT);
+    mesh_manager->setArpTimeout(MESH_ARP_TIMEOUT);
+}
+
 SoftwareSerial soft_serial (RX_SOFTSERIAL_PIN, TX_SOFTSERIAL_PIN);
 RH_RF95<SoftwareSerial> driver(soft_serial);
 #endif
 
+
+
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+
+
+
 #ifdef USE_HARDWARE_SERIAL
+/**
+ * @brief Configures network with defined values. For Hardware Serial.
+ * 
+ * @param driver radio driver used.
+ * @param mesh_manager mesh network manager used.
+ */
+void config_network(RH_RF95<HardwareSerial>* driver, RHMesh* mesh_manager)
+{
+    driver->setFrequency(434.0);
+    driver->setTxPower(TX_POWER);
+    mesh_manager->setRetries(RE_TX_RETRIES);
+    mesh_manager->setTimeout(RE_TX_TIMEOUT);
+    mesh_manager->setArpTimeout(MESH_ARP_TIMEOUT);
+}
+
 RH_RF95<HardwareSerial> driver(HARD_SERIAL);
 #endif
+
+
+
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////
+
+
 
 // Class to manage message delivery and receipt, using the driver declared above
 RHMesh mesh_manager(driver, MESH_ADDRESS);
@@ -74,19 +118,4 @@ void loop()
     //         Serial.println((char*)recv.get_data());
     //     }
     // }
-}
-
-/**
- * @brief Configures network with defined values.
- * 
- * @param driver radio driver used.
- * @param mesh_manager mesh network manager used.
- */
-void config_network(RH_RF95<SoftwareSerial>* driver, RHMesh* mesh_manager)
-{
-    driver->setFrequency(434.0);
-    driver->setTxPower(TX_POWER);
-    mesh_manager->setRetries(RE_TX_RETRIES);
-    mesh_manager->setTimeout(RE_TX_TIMEOUT);
-    mesh_manager->setArpTimeout(MESH_ARP_TIMEOUT);
 }
