@@ -71,6 +71,8 @@ namespace Chunk
         uint8_t segments_count;
         uint16_t dest;
         uint8_t attempts;
+        
+        uint16_t gen_id(uint32_t seed);
 
         public:
         Chunk(void);
@@ -85,7 +87,6 @@ namespace Chunk
         uint8_t* get_data(void);
         uint16_t get_len(void);
         uint8_t get_attempts(void);
-
         void segment_data(uint8_t& src_addr);
         void assemble_seg(Segment segment);
         bool check_complete(void);

@@ -119,7 +119,7 @@ namespace Chunk
         {
             this->data[i] = data[i];
         }
-        this->id = CRC::CRC::calc_crc16(this->data, MAX_DATA_SIZE);
+        this->id = gen_id(micros());
     }
 
     /**
@@ -332,5 +332,17 @@ namespace Chunk
     void Chunk::get_flat_segment(uint16_t index, uint8_t flat[SEGMENT_SIZE])
     {
         this->segments[index].flatten_seg(flat);
+    }
+
+    /**
+     * @brief Generates a random using a seed.
+     * 
+     * @param seed seed to use.
+     * @return uint16_t generated random number.
+     */
+    uint16_t Chunk::gen_id(uint32_t seed)
+    {
+        randomSeed(seed);
+        return rand();
     }
 }
