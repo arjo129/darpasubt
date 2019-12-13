@@ -73,7 +73,7 @@ namespace Chunk
      * @brief Checks if the SYN bit is set.
      * 
      * @return true if SYN is set to '1'.
-     * @return false if SYN is not set to '0'.
+     * @return false if SYN is set to '0'.
      */
     bool Segment::check_syn(void)
     {
@@ -84,7 +84,7 @@ namespace Chunk
      * @brief Checks if the MF bit is set.
      * 
      * @return true if MF is set to '1'.
-     * @return false if MF is not set '0'.
+     * @return false if MF is set '0'.
      */
     bool Segment::check_mf(void)
     {
