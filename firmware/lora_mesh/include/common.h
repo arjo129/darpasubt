@@ -1,8 +1,6 @@
 #ifndef common_h
 #define common_h
 
-#include <Chunk.h>
-
 /* Configure address of node. Uncomment to set. */
 #define MESH_ADDRESS 1
 // #define MESH_ADDRESS 2
@@ -11,9 +9,8 @@
 
 /* Configure Serial for radio comms. Uncomment to use. */
 #define SERIAL_BAUD_RATE 115200
-#define SERIAL_READ_SIZE MAX_DATA_SIZE
-#define USE_SOFTWARE_SERIAL
-// #define USE_HARDWARE_SERIAL
+// #define USE_SOFTWARE_SERIAL
+#define USE_HARDWARE_SERIAL
 #ifdef USE_SOFTWARE_SERIAL
 #define RX_SOFTSERIAL_PIN 10
 #define TX_SOFTSERIAL_PIN 11

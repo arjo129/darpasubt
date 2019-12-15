@@ -71,11 +71,6 @@ RH_RF95<HardwareSerial> driver(HARD_SERIAL);
 
 // Class to manage message delivery and receipt, using the driver declared above
 RHMesh mesh_manager(driver, MESH_ADDRESS);
-// Messages data
-uint8_t data[] = "AAAAAAAAAB";
-// Dont put this on the stack:
-uint8_t dest = 2;
-
 Transport::Transport transporter(MESH_ADDRESS, &mesh_manager);
 
 void setup() 
@@ -95,27 +90,21 @@ void setup()
 void loop()
 {
     serial_reader::read();
-    if (serial_reader::terminate)
+    while (serial_reader::read_queue.size() > 0)
     {
-        Chunk::Chunk chunk(serial_reader::buffer, serial_reader::current_len, dest);
-        transporter.queue_chunk(chunk);
-        serial_reader::clear();
+        transporter.queue_chunk(serial_reader::read_queue.get());
     }
     
     transporter.process_send_queue();
 
-    // if (MESH_ADDRESS == 1)
-    // {
-    //     Chunk::Chunk chunk(data, sizeof(data)-1, dest);
-    //     transporter.queue_chunk(chunk);
-    // }
-    // else if (MESH_ADDRESS == 2)
-    // {
-    //     bool complete = false;
-    //     Chunk::Chunk recv = transporter.receive(complete);
-    //     if (complete)
-    //     {
-    //         Serial.println((char*)recv.get_data());
-    //     }
-    // }
+    bool complete = false;
+    Chunk::Chunk new_chunk = transporter.receive(complete);
+    if (complete)
+    {
+        for (int i = 0; i < new_chunk.get_len(); i++)
+        {
+            Serial.print(*(new_chunk.get_data()+i));
+        }
+        Serial.println(F(""));
+    }
 }
