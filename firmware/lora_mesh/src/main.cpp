@@ -72,6 +72,7 @@ RH_RF95<HardwareSerial> driver(HARD_SERIAL);
 // Class to manage message delivery and receipt, using the driver declared above
 RHMesh mesh_manager(driver, MESH_ADDRESS);
 Transport::Transport transporter(MESH_ADDRESS, &mesh_manager);
+Chunk::Chunk recv_chunk;
 
 void setup() 
 {
@@ -97,13 +98,11 @@ void loop()
     
     transporter.process_send_queue();
 
-    bool complete = false;
-    Chunk::Chunk new_chunk = transporter.receive(complete);
-    if (complete)
+    if (transporter.receive(recv_chunk))
     {
-        for (int i = 0; i < new_chunk.get_len(); i++)
+        for (int i = 0; i < recv_chunk.get_len(); i++)
         {
-            Serial.print(*(new_chunk.get_data()+i));
+            Serial.print(*(recv_chunk.get_data()+i));
         }
         Serial.println(F(""));
     }

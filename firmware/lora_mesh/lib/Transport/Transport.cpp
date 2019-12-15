@@ -86,50 +86,46 @@ namespace Transport
 
     /**
      * @brief Process and take actions according to the context of the Segment.
-     *          A Segment can be one of the following three cases:
-     *          (1):
-     *          The Segment is the first and only Segment of a Chunk.
-     *          In this case, the Segment's offset == zero and MF bit is set to '0'.
-     *          The action to take is to create a new Chunk consisting of the payload.
-     * 
-     *          (2):
-     *          The Segment belongs to a Chunk consisting of more than one Segments but it is not
-     *          the last Segment.
-     *          In this case, the Segments's MF bit will be set to '1' and offset >= 0.
-     *          The action to take is to first check if a Chunk for this Segment exists in the
-     *          recv_queue. If it does not exist, create new Chunk and insert this Segment.
-     *          Otherwise, insert this Segment.
-     * 
-     *          (3):
-     *          The Segment is the last Segment of a Chunk.
-     *          In this case, the Segment's offset > 0 and MF bit is set to '0'.
-     *          The action to take is to first check if a Chunk for this Segment exists in the
-     *          recv_queue. If it does not exist, create new Chunk and insert this Segment.
-     *          Otherwise, insert this Segment.
-     *          Determine the expected segments count for the chunk using the offset and payload
-     *          size.
+     *        A Segment can be one of the following three cases:
+     *        (1):
+     *        The Segment is the first and only Segment of a Chunk.
+     *        In this case, the Segment's offset == zero and MF bit is set to '0'.
+     *        The action to take is to create a new Chunk consisting of the payload.
+     *
+     *        (2):
+     *        The Segment belongs to a Chunk consisting of more than one Segments but it is not
+     *        the last Segment.
+     *        In this case, the Segments's MF bit will be set to '1' and offset >= 0.
+     *        The action to take is to first check if a Chunk for this Segment exists in the
+     *        recv_queue. If it does not exist, create new Chunk and insert this Segment.
+     *        Otherwise, insert this Segment.
+     *
+     *        (3):
+     *        The Segment is the last Segment of a Chunk.
+     *        In this case, the Segment's offset > 0 and MF bit is set to '0'.
+     *        The action to take is to first check if a Chunk for this Segment exists in the
+     *        recv_queue. If it does not exist, create new Chunk and insert this Segment.
+     *        Otherwise, insert this Segment.
+     *        Determine the expected segments count for the chunk using the offset and payload
+     *        size.
      * 
      * @param segment Segment to be processed.
-     * @param complete reference to boolean flag to indicate if the Chunk belonging to the Segment 
-     *                  has all the Segments after processing.
-     * @return Chunk::Chunk the complete Chunk if it is complete, otherwise a new empty Chunk.
+     * @param chunk reference to the Chunk to be assigned to.
+     * @return true if a Chunk is complete as a result of processing the Segment.
+     * @return false false otherwise.
      */
-
-    Chunk::Chunk Transport::process_segment(Chunk::Segment& segment, bool& complete)
+    bool Transport::process_segment(Chunk::Segment& segment, Chunk::Chunk& chunk)
     {
         uint8_t pos = insert_segment(segment);
         if (trackings[pos].check_complete())
         {
-            complete = true;
-            Chunk::Chunk ret = trackings[pos];
-            ret.reassemble(); //
+            chunk = trackings[pos];
+            chunk.reassemble();
             trackings.remove(pos);
-            return ret;
+            return true;
         }
 
-        complete = false;
-        Chunk::Chunk ret;
-        return ret;
+        return false; // Leave the reference Chunk untouch.
     }
     
     /**
@@ -162,11 +158,11 @@ namespace Transport
     /**
      * @brief Receives a data Chunk from a source address.
      * 
-     * @param complete reference to boolean flag to indicate if the Chunk belonging to the Segment 
-     *                  has all the Segments after processing.
-     * @return Chunk::Chunk received data Chunk.
+     * @param recv reference to a Chunk object to be assigned with received Chunk.
+     * @return true if a Chunk is completed and that is assigned to the reference parameter.
+     * @return false if no Chunks are completed and thus not assigned to reference parameter.
      */
-    Chunk::Chunk Transport::receive(bool& complete)
+    bool Transport::receive(Chunk::Chunk& recv)
     {
         uint8_t source = 0;
         uint8_t buf[SEGMENT_SIZE] = {0};
@@ -177,13 +173,11 @@ namespace Transport
             {
                 Chunk::Segment new_segment;
                 new_segment.expand_seg(buf);
-                return process_segment(new_segment, complete);
+                return process_segment(new_segment, recv);
             }
         }
 
-        complete = false;
-        Chunk::Chunk ret;
-        return ret;
+        return false; // Leave the reference Chunk untouch.
     }
 }
 

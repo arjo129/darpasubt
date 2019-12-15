@@ -21,7 +21,7 @@ namespace Transport
             Array<Chunk::Chunk, MAX_BUFFER_SIZE> trackings;
             
             bool send(Chunk::Chunk& chunk);
-            Chunk::Chunk process_segment(Chunk::Segment& segment, bool& complete);
+            bool process_segment(Chunk::Segment& segment, Chunk::Chunk& chunk);
             uint8_t insert_segment(Chunk::Segment& segment);
             
         public:
@@ -29,7 +29,7 @@ namespace Transport
             ~Transport(void);
             void queue_chunk(Chunk::Chunk chunk);
             void process_send_queue(void);
-            Chunk::Chunk receive(bool& complete);
+            bool receive(Chunk::Chunk& recv);
     };
 }
 
