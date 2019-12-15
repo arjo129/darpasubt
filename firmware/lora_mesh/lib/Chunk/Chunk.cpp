@@ -343,6 +343,6 @@ namespace Chunk
     uint16_t Chunk::gen_id(uint32_t seed)
     {
         randomSeed(seed);
-        return random(sizeof(this->id));
+        return random(USHRT_MAX);
     }
 }

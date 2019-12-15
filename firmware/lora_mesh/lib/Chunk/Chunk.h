@@ -1,6 +1,7 @@
 #ifndef Chunk_h
 #define Chunk_h
 
+#include <limits.h>
 #include <Arduino.h>
 #include <crc.h>
 
