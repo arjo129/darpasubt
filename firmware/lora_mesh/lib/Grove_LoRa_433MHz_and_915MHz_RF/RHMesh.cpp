@@ -14,6 +14,7 @@
 #include <RHMesh.h>
 
 uint8_t RHMesh::_tmpMessage[RH_ROUTER_MAX_MESSAGE_LEN];
+uint16_t RHMesh::_arpTimeout;
 
 ////////////////////////////////////////////////////////////////////
 // Constructors
@@ -66,7 +67,7 @@ bool RHMesh::doArp(uint8_t address)
     // FIXME: timeout should be configurable
     unsigned long starttime = millis();
     int32_t timeLeft;
-    while ((timeLeft = RH_MESH_ARP_TIMEOUT - (millis() - starttime)) > 0)
+    while ((timeLeft = _arpTimeout - (millis() - starttime)) > 0)
     {
 	if (waitAvailableTimeout(timeLeft))
 	{
@@ -240,5 +241,8 @@ bool RHMesh::recvfromAckTimeout(uint8_t* buf, uint8_t* len, uint16_t timeout, ui
     return false;
 }
 
-
+void RHMesh::setArpTimeout(uint16_t timeout)
+{
+	_arpTimeout = timeout;
+}
 

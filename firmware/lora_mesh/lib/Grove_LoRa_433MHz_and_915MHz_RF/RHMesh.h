@@ -213,6 +213,8 @@ public:
     /// \return true if a valid message was copied to buf
     bool recvfromAckTimeout(uint8_t* buf, uint8_t* len,  uint16_t timeout, uint8_t* source = NULL, uint8_t* dest = NULL, uint8_t* id = NULL, uint8_t* flags = NULL);
 
+    void setArpTimeout(uint16_t timeout);
+
 protected:
 
     /// Internal function that inspects messages being received and adjusts the routing table if necessary.
@@ -250,7 +252,8 @@ protected:
 private:
     /// Temporary message buffer
     static uint8_t _tmpMessage[RH_ROUTER_MAX_MESSAGE_LEN];
-
+    static uint16_t _arpTimeout;
+    
 };
 
 /// @example rf22_mesh_client.pde
