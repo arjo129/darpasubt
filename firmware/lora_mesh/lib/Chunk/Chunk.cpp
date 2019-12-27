@@ -114,7 +114,7 @@ namespace Chunk
         attempts(0)
     {
         memset(this->data, 0, MAX_DATA_SIZE);
-        memset(this->segments, 0, sizeof(Segment) * MAX_SEG_CNT);
+        memset(this->segments, 0, SEGMENT_SIZE * MAX_SEG_CNT);
         for (uint16_t i = 0; i < len; i++)
         {
             this->data[i] = data[i];
@@ -134,7 +134,7 @@ namespace Chunk
     attempts(0)
     {
         memset(this->data, 0, MAX_DATA_SIZE);
-        memset(this->segments, 0, sizeof(Segment) * MAX_SEG_CNT);
+        memset(this->segments, 0, SEGMENT_SIZE * MAX_SEG_CNT);
     }
 
     Chunk::~Chunk(void) {}
@@ -283,8 +283,7 @@ namespace Chunk
             return false; // Early return.
 
         // Look for the last Segment from the back.
-        uint8_t i;
-        for (i = MAX_SEG_CNT-1; i >= 0; i--)
+        for (int i = this->segments_count-1; i >= 0; i--)
         {
             Segment seg = segments[i];
             if (!seg.check_mf() && seg.get_offset() == 0 && this->segments_count == 1)
@@ -314,13 +313,21 @@ namespace Chunk
      */
     void Chunk::reassemble(void)
     {
-        for (int i = 0; i < this->segments_count; i++)
-        {
-            memcpy(&(this->data[i * PAYLOAD_SIZE]), this->segments[i].payload, PAYLOAD_SIZE);
-        }
+        if (segments_count <= 0) return; // Sanity check.
 
         this->id = this->segments[0].chunk_id;
         this->len = this->segments[0].chunk_len;
+
+        uint16_t rem_len = this->len;
+        for (int i = 0; i < this->segments_count; i++)
+        {
+            if (rem_len >= PAYLOAD_SIZE)
+                memcpy(&(this->data[i * PAYLOAD_SIZE]), this->segments[i].payload, PAYLOAD_SIZE);
+            else
+                memcpy(&(this->data[i * PAYLOAD_SIZE]), this->segments[i].payload, rem_len);
+            
+            rem_len -= PAYLOAD_SIZE;
+        }
     }
 
     /**

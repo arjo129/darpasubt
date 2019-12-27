@@ -6,8 +6,8 @@
 #include <crc.h>
 
 #define HEADER_SIZE 8
-#define PAYLOAD_SIZE 32
-#define SEGMENT_SIZE (HEADER_SIZE) + (PAYLOAD_SIZE)
+#define PAYLOAD_SIZE 232 // MUST BE in multiples of 8 due to segmentisation rules.
+#define SEGMENT_SIZE (HEADER_SIZE) + (PAYLOAD_SIZE) // CANNOT exceen 240, the maximum size allowable for RHMesh.
 #define CHUNK_IDX 0
 #define CHUNK_LEN_IDX 2
 #define F_OFFSET_IDX 4
@@ -15,7 +15,7 @@
 #define PAYL_IDX 8
 
 // NOTE: Tested 150, its stretching SRAM limit.
-#define MAX_DATA_SIZE 50
+#define MAX_DATA_SIZE 5000
 #define MAX_SEG_CNT (((MAX_DATA_SIZE) / (PAYLOAD_SIZE)) + 1)
 
 #define MF_BIT 0x2000
