@@ -2,7 +2,7 @@
 #define crc_h
 
 #include <Arduino.h>
-#include <util/crc16.h>
+#include <FastCRC.h>
 
 namespace CRC
 {

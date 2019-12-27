@@ -11,12 +11,8 @@ namespace CRC
      */
     uint16_t CRC::calc_crc16(uint8_t* data, uint16_t len)
     {
-        uint16_t crc = 0;
-        for (int i = 0; i < len; i++)
-        {
-            crc = _crc_xmodem_update(crc, data[i]);
-        }
-        return crc;
+        FastCRC16 crc16;
+        return crc16.ccitt(data, len);
     }
 
     /**
