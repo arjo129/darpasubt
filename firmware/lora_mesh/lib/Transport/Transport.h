@@ -18,7 +18,7 @@ namespace Transport
             uint8_t src_addr;
             RHMesh* net_manager;
             circular_buffer send_queue;
-            // circular_buffer recv_queue;
+            circular_buffer recv_queue;
             Array<Chunk::Chunk, MAX_BUFFER_SIZE> trackings;
             
             bool send(Chunk::Chunk& chunk);
@@ -30,7 +30,8 @@ namespace Transport
             ~Transport(void);
             void queue_chunk(Chunk::Chunk chunk);
             void process_send_queue(void);
-            bool receive(Chunk::Chunk& recv);
+            bool receive(void);
+            bool get_one_chunk(Chunk::Chunk& recv_chunk);
     };
 }
 

@@ -10,8 +10,8 @@ namespace Transport
     Transport::Transport(uint8_t src_addr, RHMesh* net_manager) :
         src_addr(src_addr),
         net_manager(net_manager),
-        send_queue(MAX_BUFFER_SIZE)
-        // recv_queue(MAX_BUFFER_SIZE)
+        send_queue(MAX_BUFFER_SIZE),
+        recv_queue(MAX_BUFFER_SIZE)
     {
     }
 
@@ -158,11 +158,10 @@ namespace Transport
     /**
      * @brief Receives a data Chunk from a source address.
      * 
-     * @param recv reference to a Chunk object to be assigned with received Chunk.
-     * @return true if a Chunk is completed and that is assigned to the reference parameter.
-     * @return false if no Chunks are completed and thus not assigned to reference parameter.
+     * @return true if a Chunk is completed pushed into the receive queue.
+     * @return false if no Chunks are completed, nothing is pushed to received queue.
      */
-    bool Transport::receive(Chunk::Chunk& recv)
+    bool Transport::receive(void)
     {
         uint8_t source = 0;
         uint8_t buf[SEGMENT_SIZE] = {0};
@@ -171,14 +170,32 @@ namespace Transport
         {
             if (CRC::CRC::check_crc16(buf, SEGMENT_SIZE, CRC_IDX))
             {
+                Chunk::Chunk new_chunk;
                 Chunk::Segment new_segment;
                 new_segment.expand_seg(buf);
-                return process_segment(new_segment, recv);
+                if (process_segment(new_segment, new_chunk))
+                {
+                    recv_queue.put(new_chunk);
+                    return true;
+                }
             }
         }
+        return false;
+    }
 
-        return false; // Leave the reference Chunk untouch.
+    /**
+     * @brief Returns the oldest Chunk available in the received queue. 
+     * 
+     * @param recv_chunk Reference to a Chunk to be assigned with the oldest received Chunk, if available.
+     * @return true if the received queue was not empty to begin with.
+     * @return false otherwise.
+     */
+    bool Transport::get_one_chunk(Chunk::Chunk& recv_chunk)
+    {
+        bool flag = true;
+        if (this->recv_queue.empty())
+            flag = false;
+        recv_chunk = this->recv_queue.get();
+        return flag;
     }
 }
-
-

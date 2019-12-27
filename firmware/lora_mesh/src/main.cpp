@@ -98,12 +98,11 @@ void loop()
     
     transporter.process_send_queue();
 
-    if (transporter.receive(recv_chunk))
+    if (transporter.receive())
     {
-        for (int i = 0; i < recv_chunk.get_len(); i++)
+        if (transporter.get_one_chunk(recv_chunk))
         {
-            Serial.print(*(recv_chunk.get_data()+i));
+            // Do something with the Chunk.
         }
-        Serial.println(F(""));
     }
 }
