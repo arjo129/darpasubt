@@ -27,6 +27,8 @@
 #define RE_TX_RETRIES 3 // Number of retransmissions. 0 to transmit only once.
 #define RE_TX_TIMEOUT 100 // Time in milliseconds to timeout retransmission.
 #define MESH_ARP_TIMEOUT 100 // Time in milliseconds to timeout route resolving.
+#define MAX_CHUNK_QUEUE_SIZE 20 // The size of the queue store Chunks to be sent.
+#define MAX_CHUNK_ATTEMPTS 3 // Maximum number of attempts to resend a failed Chunk.
 
 /* Define to print debugging prints. */
 #define DEBUG_PRINT

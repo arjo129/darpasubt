@@ -5,11 +5,12 @@
 #include <RHMesh.h>
 #include <Array.h>
 #include <circular_buffer.h>
+#include <common.h>
 
 namespace Transport
 {
-    const size_t MAX_BUFFER_SIZE = 2;
-    const uint8_t MAX_ATTEMPTS = 3;
+    const size_t MAX_BUFFER_SIZE = MAX_CHUNK_QUEUE_SIZE;
+    const uint8_t MAX_ATTEMPTS = MAX_CHUNK_ATTEMPTS;
     
     class Transport
     {

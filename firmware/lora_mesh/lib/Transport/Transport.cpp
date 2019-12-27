@@ -44,7 +44,7 @@ namespace Transport
             if (!send(chunk))
             {
                 chunk.increment_attempts();
-                if (chunk.get_attempts() < MAX_ATTEMPTS)
+                if (chunk.get_attempts() <= MAX_ATTEMPTS)
                     send_queue.put(chunk);
             }
         }
